@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import '../../../../app/models/media_item.dart';
-import '../controller/video_player_controller.dart';
+import 'package:flutter_listenfy/Modules/player/Video/Controller/video_player_controller.dart';
 
 class VideoPlayerBinding extends Bindings {
   @override

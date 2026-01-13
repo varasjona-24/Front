@@ -3,17 +3,17 @@ import 'package:get/get.dart';
 import 'app_routes.dart';
 
 // Entry / Home
-import '../../modules/home/binding/home_binding.dart';
-import '../../modules/home/view/home_entry_page.dart';
-import '../../modules/home/view/home_page.dart';
+import 'package:flutter_listenfy/Modules/home/binding/home_binding.dart';
+import 'package:flutter_listenfy/Modules/home/view/home_entry_page.dart';
+import 'package:flutter_listenfy/Modules/home/view/home_page.dart';
 
 // Player
-import '../../modules/player/audio/binding/audio_player_binding.dart';
-import '../../modules/player/audio/view/audio_player_page.dart';
+import 'package:flutter_listenfy/Modules/player/audio/binding/audio_player_binding.dart';
+import 'package:flutter_listenfy/Modules/player/audio/view/audio_player_page.dart';
 
 // Video
-import '../../modules/player/video/binding/video_player_binding.dart';
-import '../../modules/player/video/view/video_player_page.dart';
+import 'package:flutter_listenfy/Modules/player/Video/binding/video_player_binding.dart';
+import 'package:flutter_listenfy/Modules/player/Video/view/video_player_page.dart';
 
 abstract class AppPages {
   static final routes = <GetPage>[
