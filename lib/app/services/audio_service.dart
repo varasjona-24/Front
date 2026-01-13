@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
@@ -111,6 +112,59 @@ class AudioService extends GetxService {
     final sameTrack = isSameTrack(item, variant);
     if (sameTrack && hasSourceLoaded) {
       if (!_player.playing) await _player.play();
+      return;
+    }
+
+    // Si es un archivo local, usa Uri.file
+    if (item.source == MediaSource.local) {
+      final path = variant.fileName;
+      final f = File(path);
+      if (!f.existsSync()) {
+        throw Exception('Archivo local no encontrado: $path');
+      }
+
+      await _player.stop();
+
+      isLoading.value = true;
+      isPlaying.value = false;
+      state.value = PlaybackState.loading;
+
+      try {
+        await _player.setAudioSource(
+          AudioSource.uri(Uri.file(path), tag: item.title),
+          initialPosition: Duration.zero,
+        );
+
+        _currentItem = item;
+        _currentVariant = variant;
+
+        await _player.play();
+      } on PlayerException catch (pe) {
+        await _player.stop();
+        _currentItem = null;
+        _currentVariant = null;
+
+        isLoading.value = false;
+        isPlaying.value = false;
+        state.value = PlaybackState.stopped;
+
+        throw Exception(
+          'Error al reproducir: ${pe.message} (code: ${pe.code})',
+        );
+      } catch (e) {
+        await _player.stop();
+        _currentItem = null;
+        _currentVariant = null;
+
+        isLoading.value = false;
+        isPlaying.value = false;
+        state.value = PlaybackState.stopped;
+
+        rethrow;
+      } finally {
+        isLoading.value = false;
+      }
+
       return;
     }
 

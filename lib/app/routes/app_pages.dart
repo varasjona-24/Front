@@ -15,6 +15,10 @@ import 'package:flutter_listenfy/Modules/player/audio/view/audio_player_page.dar
 import 'package:flutter_listenfy/Modules/player/Video/binding/video_player_binding.dart';
 import 'package:flutter_listenfy/Modules/player/Video/view/video_player_page.dart';
 
+// Sources
+import 'package:flutter_listenfy/Modules/sources/binding/sources_binding.dart';
+import 'package:flutter_listenfy/Modules/sources/view/sources_page.dart';
+
 abstract class AppPages {
   static final routes = <GetPage>[
     // Entry
@@ -43,6 +47,13 @@ abstract class AppPages {
       name: AppRoutes.videoPlayer,
       page: () => const VideoPlayerPage(),
       binding: VideoPlayerBinding(),
+    ),
+
+    // Sources
+    GetPage(
+      name: AppRoutes.sources,
+      page: () => const SourcesPage(),
+      binding: SourcesBinding(),
     ),
 
     // Video Player
