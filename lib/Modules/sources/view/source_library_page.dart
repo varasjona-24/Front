@@ -6,6 +6,11 @@ import '../../../app/models/media_item.dart';
 import '../../player/audio/view/audio_player_page.dart';
 import '../domain/source_origin.dart';
 
+// UI
+import '../../../app/ui/widgets/navigation/app_top_bar.dart';
+import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
+import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
+
 class SourceLibraryPage extends StatefulWidget {
   const SourceLibraryPage({
     super.key,
@@ -25,15 +30,7 @@ class SourceLibraryPage extends StatefulWidget {
 class _SourceLibraryPageState extends State<SourceLibraryPage> {
   final MediaRepository _repo = Get.find<MediaRepository>();
 
-  late Future<List<MediaItem>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _load();
-  }
-
-  Future<List<MediaItem>> _load() async {
+  Future<List<MediaItem>> _load([HomeMode? mode]) async {
     final all = await _repo.getLibrary();
     Iterable<MediaItem> items = all;
 
@@ -43,6 +40,12 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
 
     if (widget.origin != null) {
       items = items.where((e) => e.origin == widget.origin);
+    }
+
+    // Filtrado por modo (audio/video) si se provee
+    if (mode != null) {
+      final isAudio = mode == HomeMode.audio;
+      items = items.where((e) => isAudio ? e.hasAudio : e.hasVideo);
     }
 
     // opcional: ordenar por createdAt del primer variant (nuevo primero)
@@ -57,65 +60,195 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
-      body: FutureBuilder<List<MediaItem>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final list = snap.data ?? const <MediaItem>[];
-          if (list.isEmpty) {
-            return Center(
-              child: Text(
-                'No hay contenido aquí todavía.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+    final HomeController home = Get.find<HomeController>();
+
+    final bg = Color.alphaBlend(
+      scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
+      scheme.surface,
+    );
+
+    final barBg = Color.alphaBlend(
+      scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
+      scheme.surface,
+    );
+
+    return Obx(() {
+      final mode = home.mode.value;
+
+      return Scaffold(
+        backgroundColor: bg,
+        extendBody: true,
+        appBar: AppTopBar(
+          title: Text(widget.title),
+          onSearch: home.onSearch,
+          onToggleMode: home.toggleMode,
+          mode: mode == HomeMode.audio
+              ? AppMediaMode.audio
+              : AppMediaMode.video,
+        ),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: FutureBuilder<List<MediaItem>>(
+                future: _load(mode),
+                builder: (context, snap) {
+                  if (snap.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final list = snap.data ?? const <MediaItem>[];
+
+                  // separar audio / video
+                  final audio = list.where((e) => e.hasAudio).toList();
+                  final video = list.where((e) => e.hasVideo).toList();
+
+                  if (audio.isEmpty && video.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No hay contenido aquí todavía.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ScrollConfiguration(
+                    behavior: const _NoGlowScrollBehavior(),
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.only(
+                        top: 12,
+                        bottom: kBottomNavigationBarHeight + 18,
+                        left: 12,
+                        right: 12,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (audio.isNotEmpty) ...[
+                            Text(
+                              'Audio',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...audio.map((item) => _itemTile(item, list)),
+                            const SizedBox(height: 18),
+                          ],
+
+                          if (video.isNotEmpty) ...[
+                            Text(
+                              'Videos',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            ...video.map((item) => _itemTile(item, list)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // NAV
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: barBg,
+                  border: Border(
+                    top: BorderSide(
+                      color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
+                      width: 56,
+                    ),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: AppBottomNav(
+                    currentIndex: 4,
+                    onTap: (index) {
+                      final HomeController home = Get.find<HomeController>();
+                      switch (index) {
+                        case 1:
+                          home.goToPlaylists();
+                          break;
+                        case 2:
+                          home.goToArtists();
+                          break;
+                        case 3:
+                          home.goToDownloads();
+                          break;
+                        case 4:
+                          home.goToSources();
+                          break;
+                        case 5:
+                          home.goToSettings();
+                          break;
+                      }
+                    },
+                  ),
                 ),
               ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _itemTile(MediaItem item, List<MediaItem> queue) {
+    final v = item.audioVariant ?? item.variants.first;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        contentPadding: EdgeInsets.zero,
+        leading: Icon(
+          v.kind == MediaVariantKind.video
+              ? Icons.videocam_rounded
+              : Icons.music_note_rounded,
+        ),
+        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          item.subtitle.isNotEmpty ? item.subtitle : item.origin.key,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.play_arrow_rounded),
+          onPressed: () {
+            final idx = queue.indexWhere((e) => e.id == item.id);
+            Get.to(
+              () => const AudioPlayerPage(),
+              arguments: {'queue': queue, 'index': idx == -1 ? 0 : idx},
             );
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, i) {
-              final item = list[i];
-              final v = item.audioVariant ?? item.variants.first;
-
-              return ListTile(
-                leading: Icon(
-                  v.kind == MediaVariantKind.video
-                      ? Icons.videocam_rounded
-                      : Icons.music_note_rounded,
-                ),
-                title: Text(
-                  item.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Text(
-                  item.subtitle.isNotEmpty ? item.subtitle : item.origin.key,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                trailing: IconButton(
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  onPressed: () {
-                    Get.to(
-                      () => const AudioPlayerPage(),
-                      arguments: {'queue': list, 'index': i},
-                    );
-                  },
-                ),
-              );
-            },
-          );
-        },
+          },
+        ),
       ),
     );
+  }
+}
+
+class _NoGlowScrollBehavior extends ScrollBehavior {
+  const _NoGlowScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }

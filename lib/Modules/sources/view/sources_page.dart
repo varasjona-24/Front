@@ -10,164 +10,254 @@ import '../domain/source_pill_data.dart';
 import '../ui/source_pill_tile.dart';
 import 'source_library_page.dart';
 
+// UI widgets
+import '../../../app/ui/widgets/navigation/app_top_bar.dart';
+import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
+import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
+
 class SourcesPage extends GetView<SourcesController> {
   const SourcesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     final pills = _buildPills(controller);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sources'),
-        centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Limpiar selección local',
-            onPressed: controller.clearLocal,
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+    final bg = Color.alphaBlend(
+      scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
+      scheme.surface,
+    );
+
+    final barBg = Color.alphaBlend(
+      scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
+      scheme.surface,
+    );
+
+    final HomeController home = Get.find<HomeController>();
+
+    return Obx(() {
+      final mode = home.mode.value;
+
+      return Scaffold(
+        backgroundColor: bg,
+        extendBody: true,
+        appBar: AppTopBar(
+          title: const Text('Sources'),
+          onSearch: home.onSearch,
+          onToggleMode: home.toggleMode,
+          mode: mode == HomeMode.audio
+              ? AppMediaMode.audio
+              : AppMediaMode.video,
+        ),
+        body: Stack(
           children: [
-            Text(
-              'Fuentes',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Explora tu contenido por origen o por lo que está guardado offline.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            ...pills.map(
-              (p) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: SourcePillTile(data: p),
-              ),
-            ),
-
-            const SizedBox(height: 18),
-            Text(
-              'Seleccionados (Dispositivo)',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            Obx(() {
-              final list = controller.localFiles;
-
-              if (list.isEmpty) {
-                return Text(
-                  'No hay archivos seleccionados.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+            Positioned.fill(
+              child: ScrollConfiguration(
+                behavior: const _NoGlowScrollBehavior(),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.only(
+                    top: 12,
+                    bottom: kBottomNavigationBarHeight + 18,
+                    left: 16,
+                    right: 16,
                   ),
-                );
-              }
-
-              return Column(
-                children: List.generate(list.length, (i) {
-                  final item = list[i];
-                  final variant = item.variants.first;
-                  final isVideo = variant.kind == MediaVariantKind.video;
-
-                  final displayPath = variant.localPath ?? variant.fileName;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Card(
-                      elevation: 0,
-                      color: theme.colorScheme.surfaceContainer,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: ListTile(
-                        leading: Icon(
-                          isVideo
-                              ? Icons.videocam_rounded
-                              : Icons.music_note_rounded,
-                        ),
-                        title: Text(
-                          item.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        subtitle: Text(
-                          displayPath,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: Wrap(
-                          spacing: 6,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.save_alt_rounded),
-                              tooltip: 'Importar a la app (offline)',
-                              onPressed: () async {
-                                final imported = await controller
-                                    .importToAppStorage(item);
-
-                                if (imported == null) {
-                                  Get.snackbar(
-                                    'Import',
-                                    'Falló la importación',
-                                    snackPosition: SnackPosition.BOTTOM,
-                                    margin: const EdgeInsets.all(12),
-                                  );
-                                  return;
-                                }
-
-                                final idx = controller.localFiles.indexWhere(
-                                  (e) => e.id == item.id,
-                                );
-                                if (idx != -1)
-                                  controller.localFiles[idx] = imported;
-
-                                Get.snackbar(
-                                  'Import',
-                                  'Guardado en Biblioteca offline ✅',
-                                  snackPosition: SnackPosition.BOTTOM,
-                                  margin: const EdgeInsets.all(12),
-                                );
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.play_arrow_rounded),
-                              tooltip: 'Reproducir',
-                              onPressed: () {
-                                final queue = List.of(list);
-                                Get.to(
-                                  () => const AudioPlayerPage(),
-                                  arguments: {'queue': queue, 'index': i},
-                                );
-                              },
-                            ),
-                          ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Fuentes',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Explora tu contenido por origen o por lo que está guardado offline.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      ...pills.map(
+                        (p) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: SourcePillTile(data: p),
+                        ),
+                      ),
+
+                      const SizedBox(height: 18),
+                      Text(
+                        'Seleccionados (Dispositivo)',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      Obx(() {
+                        final list = controller.localFiles;
+
+                        if (list.isEmpty) {
+                          return Text(
+                            'No hay archivos seleccionados.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: List.generate(list.length, (i) {
+                            final item = list[i];
+                            final variant = item.variants.first;
+                            final isVideo =
+                                variant.kind == MediaVariantKind.video;
+
+                            final displayPath =
+                                variant.localPath ?? variant.fileName;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Card(
+                                elevation: 0,
+                                color: theme.colorScheme.surfaceContainer,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: ListTile(
+                                  leading: Icon(
+                                    isVideo
+                                        ? Icons.videocam_rounded
+                                        : Icons.music_note_rounded,
+                                  ),
+                                  title: Text(
+                                    item.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    displayPath,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  trailing: Wrap(
+                                    spacing: 6,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.save_alt_rounded,
+                                        ),
+                                        tooltip: 'Importar a la app (offline)',
+                                        onPressed: () async {
+                                          final imported = await controller
+                                              .importToAppStorage(item);
+
+                                          if (imported == null) {
+                                            Get.snackbar(
+                                              'Import',
+                                              'Falló la importación',
+                                              snackPosition:
+                                                  SnackPosition.BOTTOM,
+                                              margin: const EdgeInsets.all(12),
+                                            );
+                                            return;
+                                          }
+
+                                          final idx = controller.localFiles
+                                              .indexWhere(
+                                                (e) => e.id == item.id,
+                                              );
+                                          if (idx != -1)
+                                            controller.localFiles[idx] =
+                                                imported;
+
+                                          Get.snackbar(
+                                            'Import',
+                                            'Guardado en Biblioteca offline ✅',
+                                            snackPosition: SnackPosition.BOTTOM,
+                                            margin: const EdgeInsets.all(12),
+                                          );
+                                        },
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.play_arrow_rounded,
+                                        ),
+                                        tooltip: 'Reproducir',
+                                        onPressed: () {
+                                          final queue = List.of(list);
+                                          Get.to(
+                                            () => const AudioPlayerPage(),
+                                            arguments: {
+                                              'queue': queue,
+                                              'index': i,
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: barBg,
+                  border: Border(
+                    top: BorderSide(
+                      color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
+                      width: 56,
                     ),
-                  );
-                }),
-              );
-            }),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: AppBottomNav(
+                    currentIndex: 4,
+                    onTap: (index) {
+                      switch (index) {
+                        case 1:
+                          home.goToPlaylists();
+                          break;
+                        case 2:
+                          home.goToArtists();
+                          break;
+                        case 3:
+                          home.goToDownloads();
+                          break;
+                        case 4:
+                          home.goToSources();
+                          break;
+                        case 5:
+                          home.goToSettings();
+                          break;
+                      }
+                    },
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 
   List<SourcePillData> _buildPills(SourcesController controller) {
@@ -375,5 +465,18 @@ class SourcesPage extends GetView<SourcesController> {
         onTap: openOrigin(SourceOrigin.generic, 'Genérico'),
       ),
     ];
+  }
+}
+
+class _NoGlowScrollBehavior extends ScrollBehavior {
+  const _NoGlowScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }
