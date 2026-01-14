@@ -27,4 +27,10 @@ class LocalLibraryStore {
 
     await _box.write(_key, list.map((e) => e.toJson()).toList());
   }
+
+  Future<void> remove(String id) async {
+    final list = await readAll();
+    list.removeWhere((e) => e.id == id);
+    await _box.write(_key, list.map((e) => e.toJson()).toList());
+  }
 }

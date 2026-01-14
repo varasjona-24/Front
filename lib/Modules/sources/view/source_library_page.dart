@@ -225,15 +225,107 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        trailing: IconButton(
-          icon: const Icon(Icons.play_arrow_rounded),
-          onPressed: () {
-            final idx = queue.indexWhere((e) => e.id == item.id);
-            Get.to(
-              () => const AudioPlayerPage(),
-              arguments: {'queue': queue, 'index': idx == -1 ? 0 : idx},
-            );
-          },
+        trailing: Wrap(
+          spacing: 6,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.play_arrow_rounded),
+              onPressed: () {
+                final idx = queue.indexWhere((e) => e.id == item.id);
+                Get.to(
+                  () => const AudioPlayerPage(),
+                  arguments: {'queue': queue, 'index': idx == -1 ? 0 : idx},
+                );
+              },
+            ),
+
+            IconButton(
+              icon: const Icon(Icons.cloud_download_rounded),
+              tooltip: 'Descargar',
+              onPressed: () async {
+                final hasAudio = item.hasAudio;
+                final hasVideo = item.hasVideo;
+
+                final options = <String>[];
+                if (hasAudio) options.addAll(['mp3', 'm4a']);
+                if (hasVideo) options.addAll(['mp4']);
+
+                if (options.isEmpty) {
+                  Get.snackbar(
+                    'Download',
+                    'No hay formatos disponibles para descargar',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                  return;
+                }
+
+                final choice = await showModalBottomSheet<String>(
+                  context: Get.context!,
+                  builder: (ctx) {
+                    return SafeArea(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final fmt in options)
+                            ListTile(
+                              leading: const Icon(Icons.file_download_outlined),
+                              title: Text(fmt.toUpperCase()),
+                              onTap: () => Navigator.of(ctx).pop(fmt),
+                            ),
+                          ListTile(
+                            leading: const Icon(Icons.close),
+                            title: const Text('Cancelar'),
+                            onTap: () => Navigator.of(ctx).pop(),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                );
+
+                if (choice == null) return;
+
+                final kind = hasAudio && ['mp3', 'm4a'].contains(choice)
+                    ? 'audio'
+                    : 'video';
+                final mediaId = item.publicId.isNotEmpty
+                    ? item.publicId
+                    : item.id;
+
+                // feedback: muestra diálogo de progreso
+                showDialog(
+                  context: Get.context!,
+                  barrierDismissible: false,
+                  builder: (_) =>
+                      const Center(child: CircularProgressIndicator()),
+                );
+
+                final ok = await _repo.requestAndFetchMedia(
+                  mediaId: mediaId,
+                  url: null,
+                  kind: kind,
+                  format: choice,
+                );
+
+                // dismiss progress dialog
+                if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
+
+                if (ok) {
+                  Get.snackbar(
+                    'Download',
+                    'Descarga guardada en downloads ✅',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                } else {
+                  Get.snackbar(
+                    'Download',
+                    'Falló la descarga',
+                    snackPosition: SnackPosition.BOTTOM,
+                  );
+                }
+              },
+            ),
+          ],
         ),
       ),
     );

@@ -19,6 +19,10 @@ import 'package:flutter_listenfy/Modules/player/Video/view/video_player_page.dar
 import 'package:flutter_listenfy/Modules/sources/binding/sources_binding.dart';
 import 'package:flutter_listenfy/Modules/sources/view/sources_page.dart';
 
+// Downloads
+import 'package:flutter_listenfy/Modules/downloads/binding/downloads_binding.dart';
+import 'package:flutter_listenfy/Modules/downloads/view/downloads_page.dart';
+
 abstract class AppPages {
   static final routes = <GetPage>[
     // Entry
@@ -54,6 +58,13 @@ abstract class AppPages {
       name: AppRoutes.sources,
       page: () => const SourcesPage(),
       binding: SourcesBinding(),
+    ),
+
+    // Downloads
+    GetPage(
+      name: AppRoutes.downloads,
+      page: () => const DownloadsPage(),
+      binding: DownloadsBinding(),
     ),
 
     // Video Player
