@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:flutter_listenfy/Modules/sources/domain/source_origin.dart';
 
 enum MediaSource { local, youtube }
 
@@ -12,6 +13,7 @@ class MediaItem {
   final MediaSource source;
   final String? thumbnail;
   final List<MediaVariant> variants;
+  final SourceOrigin origin;
 
   /// Duración base del media
   final int? durationSeconds;
@@ -25,6 +27,7 @@ class MediaItem {
     required this.variants,
     this.thumbnail,
     this.durationSeconds,
+    required this.origin,
   });
 
   /// ID preferido para endpoints / archivos
@@ -42,6 +45,10 @@ class MediaItem {
   /// Duración preferida
   int? get effectiveDurationSeconds =>
       audioVariant?.durationSeconds ?? durationSeconds;
+
+  /// Indica si alguna variante tiene un path local (almacenado offline)
+  bool get isOfflineStored =>
+      variants.any((v) => v.localPath != null && v.localPath!.isNotEmpty);
 
   // ---------------------------------------------------------------------------
   // JSON
@@ -89,6 +96,7 @@ class MediaItem {
       thumbnail: (json['thumbnail'] as String?)?.trim(),
       variants: variants,
       durationSeconds: durationSeconds,
+      origin: SourceOriginX.fromKey(json['origin'] as String?),
     );
   }
 
@@ -98,6 +106,7 @@ class MediaItem {
     'title': title,
     'artist': subtitle,
     'source': source == MediaSource.local ? 'local' : 'youtube',
+    'origin': origin.key,
     'thumbnail': thumbnail,
     'duration': durationSeconds,
     'variants': variants.map((v) => v.toJson()).toList(),
