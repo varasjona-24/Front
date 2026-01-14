@@ -1,8 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+
+import 'package:audio_session/audio_session.dart';
 import 'package:get/get.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:audio_session/audio_session.dart';
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
@@ -64,10 +65,7 @@ class AudioService extends GetxService {
   Stream<ProcessingState> get processingStateStream =>
       _player.processingStateStream;
 
-  // Loop mode observable (UI puede leerlo)
   final Rx<LoopMode> loopMode = LoopMode.off.obs;
-
-  // Playback speed
   final RxDouble speed = 1.0.obs;
 
   Future<void> setLoopOff() async {
@@ -80,7 +78,6 @@ class AudioService extends GetxService {
     await _player.setLoopMode(LoopMode.one);
   }
 
-  /// Ajusta la velocidad de reproducción
   Future<void> setSpeed(double s) async {
     speed.value = s;
     await _player.setSpeed(s);
@@ -103,31 +100,43 @@ class AudioService extends GetxService {
   }
 
   Future<void> play(MediaItem item, MediaVariant variant) async {
-    // ✅ si no hay variant válido, no hay archivo
     if (!variant.isValid) {
       throw Exception('No existe archivo para reproducir (variant inválido).');
     }
 
-    // ✅ mismo track: solo resume
     final sameTrack = isSameTrack(item, variant);
     if (sameTrack && hasSourceLoaded) {
       if (!_player.playing) await _player.play();
       return;
     }
 
-    // Si es un archivo local, usa Uri.file
+    // ✅ corta audio anterior
+    await _player.stop();
+
+    // UI inmediato
+    isLoading.value = true;
+    isPlaying.value = false;
+    state.value = PlaybackState.loading;
+
+    // -----------------------------------------------------------------------
+    // ✅ LOCAL
+    // -----------------------------------------------------------------------
     if (item.source == MediaSource.local) {
-      final path = variant.fileName;
+      // ✅ CLAVE: usar localPath (si no existe, fallback a fileName)
+      final path =
+          (variant.localPath != null && variant.localPath!.trim().isNotEmpty)
+          ? variant.localPath!.trim()
+          : variant.fileName.trim();
+
       final f = File(path);
       if (!f.existsSync()) {
+        // debug útil
+        print('❌ Local file not found');
+        print('fileName = ${variant.fileName}');
+        print('localPath = ${variant.localPath}');
+        print('using path = $path');
         throw Exception('Archivo local no encontrado: $path');
       }
-
-      await _player.stop();
-
-      isLoading.value = true;
-      isPlaying.value = false;
-      state.value = PlaybackState.loading;
 
       try {
         await _player.setAudioSource(
@@ -139,6 +148,7 @@ class AudioService extends GetxService {
         _currentVariant = variant;
 
         await _player.play();
+        return;
       } on PlayerException catch (pe) {
         await _player.stop();
         _currentItem = null;
@@ -164,25 +174,16 @@ class AudioService extends GetxService {
       } finally {
         isLoading.value = false;
       }
-
-      return;
     }
 
-    // ✅ ESTE ES EL CAMBIO IMPORTANTE:
-    // usa item.id como antes (porque ese endpoint lo soporta)
+    // -----------------------------------------------------------------------
+    // 🌐 REMOTO (backend)
+    // -----------------------------------------------------------------------
     final url =
         '${ApiConfig.baseUrl}/api/v1/media/file/${item.id}/audio/${variant.format}';
 
     print('🎵 AudioService.play');
     print('🌐 Audio URL: $url');
-
-    // ✅ corta audio anterior para que NO quede "playing" fantasma
-    await _player.stop();
-
-    // UI inmediato
-    isLoading.value = true;
-    isPlaying.value = false;
-    state.value = PlaybackState.loading;
 
     try {
       await _player.setAudioSource(
@@ -190,7 +191,6 @@ class AudioService extends GetxService {
         initialPosition: Duration.zero,
       );
 
-      // ✅ recién aquí confirmas track actual
       _currentItem = item;
       _currentVariant = variant;
 

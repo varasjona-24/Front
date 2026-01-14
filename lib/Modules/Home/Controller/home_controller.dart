@@ -100,7 +100,11 @@ class HomeController extends GetxController {
   void goToPlaylists() => Get.toNamed(AppRoutes.playlists);
   void goToArtists() => Get.toNamed(AppRoutes.artists);
   void goToDownloads() => Get.toNamed(AppRoutes.downloads);
-  void goToSources() => Get.toNamed(AppRoutes.sources);
+  void goToSources() async {
+    await Get.toNamed(AppRoutes.sources);
+    loadHome();
+  }
+
   void goToSettings() => Get.toNamed(AppRoutes.settings);
 
   void enterHome() {
