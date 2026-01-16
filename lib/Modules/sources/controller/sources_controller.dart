@@ -165,3 +165,22 @@ class SourcesController extends GetxController {
     return sha1.convert(bytes).toString();
   }
 }
+
+extension SourcesControllerPlayable on SourcesController {
+  /// Devuelve un URL reproducible.
+  /// - Local: file:///...
+  /// - Remoto: si fileName ya es URL, lo devuelve tal cual (fallback)
+  String resolvePlayableUrl(MediaItem item) {
+    if (item.variants.isEmpty) return '';
+
+    final v = item.variants.first;
+
+    final lp = (v.localPath ?? '').trim();
+    if (lp.isNotEmpty) {
+      return Uri.file(lp).toString(); // ✅ LINK CORRECTO
+    }
+
+    // Fallback: si en otros casos fileName trae un URL remoto completo.
+    return (v.fileName).trim();
+  }
+}

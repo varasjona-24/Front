@@ -42,13 +42,16 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
       items = items.where((e) => e.origin == widget.origin);
     }
 
-    // Filtrado por modo (audio/video) si se provee
+    // ✅ FIX: Filtrado por modo (audio/video) por KIND, no por "local"
     if (mode != null) {
       final isAudio = mode == HomeMode.audio;
-      items = items.where((e) => isAudio ? e.hasAudio : e.hasVideo);
+      items = items.where(
+        (e) => isAudio
+            ? e.variants.any((v) => v.kind == MediaVariantKind.audio)
+            : e.variants.any((v) => v.kind == MediaVariantKind.video),
+      );
     }
 
-    // opcional: ordenar por createdAt del primer variant (nuevo primero)
     final list = items.toList();
     list.sort(
       (a, b) =>
@@ -102,8 +105,20 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   final list = snap.data ?? const <MediaItem>[];
 
                   // separar audio / video
-                  final audio = list.where((e) => e.hasAudio).toList();
-                  final video = list.where((e) => e.hasVideo).toList();
+                  final audio = list
+                      .where(
+                        (e) => e.variants.any(
+                          (v) => v.kind == MediaVariantKind.audio,
+                        ),
+                      )
+                      .toList();
+                  final video = list
+                      .where(
+                        (e) => e.variants.any(
+                          (v) => v.kind == MediaVariantKind.video,
+                        ),
+                      )
+                      .toList();
 
                   if (audio.isEmpty && video.isEmpty) {
                     return Center(
@@ -139,7 +154,6 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                             ...audio.map((item) => _itemTile(item, list)),
                             const SizedBox(height: 18),
                           ],
-
                           if (video.isNotEmpty) ...[
                             Text(
                               'Videos',
@@ -178,7 +192,6 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   child: AppBottomNav(
                     currentIndex: 4,
                     onTap: (index) {
-                      final HomeController home = Get.find<HomeController>();
                       switch (index) {
                         case 1:
                           home.goToPlaylists();
@@ -208,7 +221,8 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
   }
 
   Widget _itemTile(MediaItem item, List<MediaItem> queue) {
-    final v = item.audioVariant ?? item.variants.first;
+    final v =
+        item.localAudioVariant ?? item.localVideoVariant ?? item.variants.first;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -232,19 +246,28 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
               icon: const Icon(Icons.play_arrow_rounded),
               onPressed: () {
                 final idx = queue.indexWhere((e) => e.id == item.id);
+                final safeIdx = idx == -1 ? 0 : idx;
+
                 Get.to(
                   () => const AudioPlayerPage(),
-                  arguments: {'queue': queue, 'index': idx == -1 ? 0 : idx},
+                  arguments: {
+                    'queue': queue,
+                    'index': safeIdx,
+                    'playableUrl': item.playableUrl, // ✅ FIX LINK
+                  },
                 );
               },
             ),
-
             IconButton(
               icon: const Icon(Icons.cloud_download_rounded),
               tooltip: 'Descargar',
               onPressed: () async {
-                final hasAudio = item.hasAudio;
-                final hasVideo = item.hasVideo;
+                final hasAudio = item.variants.any(
+                  (v) => v.kind == MediaVariantKind.audio,
+                );
+                final hasVideo = item.variants.any(
+                  (v) => v.kind == MediaVariantKind.video,
+                );
 
                 final options = <String>[];
                 if (hasAudio) options.addAll(['mp3', 'm4a']);
@@ -292,12 +315,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                     ? item.publicId
                     : item.id;
 
-                // feedback: muestra diálogo de progreso
-                showDialog(
-                  context: Get.context!,
+                Get.dialog(
+                  const Center(child: CircularProgressIndicator()),
                   barrierDismissible: false,
-                  builder: (_) =>
-                      const Center(child: CircularProgressIndicator()),
                 );
 
                 final ok = await _repo.requestAndFetchMedia(
@@ -307,20 +327,21 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   format: choice,
                 );
 
-                // dismiss progress dialog
-                if (Get.isDialogOpen ?? false) Navigator.of(Get.context!).pop();
+                if (Get.isDialogOpen ?? false) Get.back();
 
                 if (ok) {
                   Get.snackbar(
                     'Download',
                     'Descarga guardada en downloads ✅',
                     snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.green,
                   );
                 } else {
                   Get.snackbar(
                     'Download',
                     'Falló la descarga',
                     snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.orange,
                   );
                 }
               },

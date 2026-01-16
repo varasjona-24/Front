@@ -121,7 +121,10 @@ class AudioService extends GetxService {
     // -----------------------------------------------------------------------
     // ✅ LOCAL
     // -----------------------------------------------------------------------
-    if (item.source == MediaSource.local) {
+    final hasLocal =
+        variant.localPath != null && variant.localPath!.trim().isNotEmpty;
+
+    if (hasLocal) {
       // ✅ CLAVE: usar localPath (si no existe, fallback a fileName)
       final path =
           (variant.localPath != null && variant.localPath!.trim().isNotEmpty)
@@ -179,8 +182,10 @@ class AudioService extends GetxService {
     // -----------------------------------------------------------------------
     // 🌐 REMOTO (backend)
     // -----------------------------------------------------------------------
+    final kind = (variant.kind == MediaVariantKind.video) ? 'video' : 'audio';
+
     final url =
-        '${ApiConfig.baseUrl}/api/v1/media/file/${item.id}/audio/${variant.format}';
+        '${ApiConfig.baseUrl}/api/v1/media/file/${item.fileId}/$kind/${variant.format}';
 
     print('🎵 AudioService.play');
     print('🌐 Audio URL: $url');

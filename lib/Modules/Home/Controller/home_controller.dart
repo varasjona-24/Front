@@ -7,17 +7,17 @@ import '../../../app/routes/app_routes.dart';
 enum HomeMode { audio, video }
 
 class HomeController extends GetxController {
-  // 🔌 Repo
   final MediaRepository _repo = Get.find();
 
-  // 🧭 Estado UI
   final Rx<HomeMode> mode = HomeMode.audio.obs;
   final RxBool isLoading = false.obs;
 
-  // 📦 Secciones
   final RxList<MediaItem> recentlyPlayed = <MediaItem>[].obs;
   final RxList<MediaItem> latestDownloads = <MediaItem>[].obs;
   final RxList<MediaItem> favorites = <MediaItem>[].obs;
+
+  // Cache para no recargar del backend al alternar modo
+  final RxList<MediaItem> _allItems = <MediaItem>[].obs;
 
   @override
   void onInit() {
@@ -25,15 +25,12 @@ class HomeController extends GetxController {
     loadHome();
   }
 
-  // ----------------------------
-  // CARGA PRINCIPAL
-  // ----------------------------
   Future<void> loadHome() async {
     isLoading.value = true;
-
     try {
       final items = await _repo.getLibrary();
-      _splitHomeSections(items);
+      _allItems.assignAll(items);
+      _splitHomeSections(_allItems);
     } catch (e) {
       print('Error loading home: $e');
     } finally {
@@ -41,73 +38,58 @@ class HomeController extends GetxController {
     }
   }
 
-  // ----------------------------
-  // FILTRADO POR MODO
-  // ----------------------------
   void _splitHomeSections(List<MediaItem> items) {
     final isAudioMode = mode.value == HomeMode.audio;
 
-    bool matchesMode(MediaItem item) {
-      return isAudioMode ? item.hasAudio : item.hasVideo;
-    }
+    bool matchesMode(MediaItem item) =>
+        isAudioMode ? item.hasAudioLocal : item.hasVideoLocal;
 
-    recentlyPlayed.assignAll(items.where(matchesMode).take(10));
+    final filtered = items.where(matchesMode).toList();
 
+    // Si luego metes "recently played" real, aquí debería venir ordenado por lastPlayedAt
+    recentlyPlayed.assignAll(filtered.take(10));
+
+    // Descargas locales (limítalo también)
     latestDownloads.assignAll(
-      items.where((e) => matchesMode(e) && e.source == MediaSource.local),
+      filtered.where((e) => e.source == MediaSource.local).take(10),
     );
 
+    // ⚠️ Esto NO son "favoritos" reales, esto es "de YouTube"
+    // Si tu modelo tiene isFavorite, cámbialo por eso.
     favorites.assignAll(
-      items.where((e) => matchesMode(e) && e.source == MediaSource.youtube),
+      filtered.where((e) => e.source == MediaSource.youtube).take(10),
     );
   }
 
-  // ----------------------------
-  // ACCIONES UI
-  // ----------------------------
   void toggleMode() {
     mode.value = mode.value == HomeMode.audio ? HomeMode.video : HomeMode.audio;
-    loadHome();
+
+    // No vuelvas a pegarle a la API si ya tienes data
+    _splitHomeSections(_allItems);
   }
 
   void onSearch() {
-    // TODO: implementar búsqueda
+    // TODO
   }
-
-  // ----------------------------
-  // ABRIR MEDIA (🔥 CLAVE)
-  // ----------------------------
 
   void openMedia(MediaItem item, int index, List<MediaItem> list) {
-    if (mode.value == HomeMode.audio) {
-      Get.toNamed(
-        AppRoutes.audioPlayer,
-        arguments: {'queue': list, 'index': index},
-      );
-      return;
-    }
+    final route = mode.value == HomeMode.audio
+        ? AppRoutes.audioPlayer
+        : AppRoutes.videoPlayer;
 
-    // Video: abre el reproductor de vídeo y reproduce
-    Get.toNamed(
-      AppRoutes.videoPlayer,
-      arguments: {'queue': list, 'index': index},
-    );
+    Get.toNamed(route, arguments: {'queue': list, 'index': index});
   }
 
-  // ----------------------------
-  // NAVEGACIÓN
-  // ----------------------------
   void goToPlaylists() => Get.toNamed(AppRoutes.playlists);
   void goToArtists() => Get.toNamed(AppRoutes.artists);
   void goToDownloads() => Get.toNamed(AppRoutes.downloads);
+
   void goToSources() async {
     await Get.toNamed(AppRoutes.sources);
-    loadHome();
+    loadHome(); // aquí sí: porque puede cambiar la librería
   }
 
   void goToSettings() => Get.toNamed(AppRoutes.settings);
 
-  void enterHome() {
-    Get.offAllNamed(AppRoutes.home);
-  }
+  void enterHome() => Get.offAllNamed(AppRoutes.home);
 }

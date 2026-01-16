@@ -5,55 +5,188 @@ enum MediaSource { local, youtube }
 
 enum MediaVariantKind { audio, video }
 
+// ============================================================================
+// MediaItem
+// ============================================================================
+
 class MediaItem {
-  final String id; // interno (hash)
-  final String publicId; // backend / variantes
+  // ============================
+  // 🧾 CAMPOS
+  // ============================
+  final String id; // interno (hash/local)
+  final String publicId; // id “estable” para backend/variantes
   final String title;
   final String subtitle;
   final MediaSource source;
+
+  /// Thumbnail remoto (URL)
   final String? thumbnail;
+
+  /// Thumbnail local (ruta en disco) para offline (Opción B)
+  final String? thumbnailLocalPath;
+
   final List<MediaVariant> variants;
   final SourceOrigin origin;
 
-  /// Duración base del media
+  /// Duración base del media (si viene del backend/metadata)
   final int? durationSeconds;
 
-  MediaItem({
+  const MediaItem({
     required this.id,
     required this.publicId,
     required this.title,
     required this.subtitle,
     required this.source,
     required this.variants,
-    this.thumbnail,
-    this.durationSeconds,
     required this.origin,
+    this.thumbnail,
+    this.thumbnailLocalPath,
+    this.durationSeconds,
   });
 
+  // ============================
+  // 🧬 COPY WITH
+  // ============================
+  MediaItem copyWith({
+    String? id,
+    String? publicId,
+    String? title,
+    String? subtitle,
+    MediaSource? source,
+    String? thumbnail,
+    String? thumbnailLocalPath,
+    List<MediaVariant>? variants,
+    SourceOrigin? origin,
+    int? durationSeconds,
+  }) {
+    return MediaItem(
+      id: id ?? this.id,
+      publicId: publicId ?? this.publicId,
+      title: title ?? this.title,
+      subtitle: subtitle ?? this.subtitle,
+      source: source ?? this.source,
+      thumbnail: thumbnail ?? this.thumbnail,
+      thumbnailLocalPath: thumbnailLocalPath ?? this.thumbnailLocalPath,
+      variants: variants ?? this.variants,
+      origin: origin ?? this.origin,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+    );
+  }
+
+  // ============================
+  // ✅ GETTERS / ESTADO
+  // ============================
   /// ID preferido para endpoints / archivos
   String get fileId => publicId.trim().isNotEmpty ? publicId.trim() : id.trim();
 
-  bool get hasAudio => variants.any((v) => v.kind == MediaVariantKind.audio);
-  bool get hasVideo => variants.any((v) => v.kind == MediaVariantKind.video);
+  bool _hasLocal(MediaVariant v) => (v.localPath?.trim().isNotEmpty ?? false);
 
-  MediaVariant? get audioVariant =>
-      variants.firstWhereOrNull((v) => v.kind == MediaVariantKind.audio);
+  bool get hasAudioLocal =>
+      variants.any((v) => v.kind == MediaVariantKind.audio && _hasLocal(v));
 
-  MediaVariant? get videoVariant =>
-      variants.firstWhereOrNull((v) => v.kind == MediaVariantKind.video);
+  bool get hasVideoLocal =>
+      variants.any((v) => v.kind == MediaVariantKind.video && _hasLocal(v));
 
-  /// Duración preferida
+  MediaVariant? get localAudioVariant => variants.firstWhereOrNull(
+    (v) => v.kind == MediaVariantKind.audio && _hasLocal(v),
+  );
+
+  MediaVariant? get localVideoVariant => variants.firstWhereOrNull(
+    (v) => v.kind == MediaVariantKind.video && _hasLocal(v),
+  );
+
+  /// Duración preferida (mejor: audio -> video -> item)
   int? get effectiveDurationSeconds =>
-      audioVariant?.durationSeconds ?? durationSeconds;
+      localAudioVariant?.durationSeconds ??
+      localVideoVariant?.durationSeconds ??
+      durationSeconds;
 
-  /// Indica si alguna variante tiene un path local (almacenado offline)
-  bool get isOfflineStored =>
-      variants.any((v) => v.localPath != null && v.localPath!.isNotEmpty);
+  /// Indica si alguna variante está almacenada offline
+  bool get isOfflineStored => variants.any(_hasLocal);
 
-  // ---------------------------------------------------------------------------
-  // JSON
-  // ---------------------------------------------------------------------------
+  /// Thumbnail preferido: local -> remoto
+  String? get effectiveThumbnail {
+    final lp = thumbnailLocalPath?.trim();
+    if (lp != null && lp.isNotEmpty) return lp;
 
+    final t = thumbnail?.trim();
+    if (t != null && t.isNotEmpty) return t;
+
+    return null;
+  }
+
+  // ============================
+  // ✅ FIX CLAVE: URL / PATH reproducible
+  // ============================
+
+  /// Mejor path local disponible (audio primero, luego video)
+  String? get bestLocalPath =>
+      localAudioVariant?.localPath?.trim().isNotEmpty == true
+      ? localAudioVariant!.localPath!.trim()
+      : (localVideoVariant?.localPath?.trim().isNotEmpty == true
+            ? localVideoVariant!.localPath!.trim()
+            : null);
+
+  /// Si es local: devuelve **file:///...**
+  /// Si no es local: intenta usar un URL remoto si existe en la data.
+  ///
+  /// Importante: esto evita que el player use `fileName` como si fuese link.
+  String get playableUrl {
+    final lp = bestLocalPath;
+    if (lp != null && lp.isNotEmpty) {
+      return Uri.file(lp).toString(); // ✅ aquí se arregla el "link"
+    }
+
+    // Fallback remoto (si en algún flujo `fileName` ya viene como URL)
+    final anyUrl = variants
+        .map((v) => v.fileName.trim())
+        .firstWhereOrNull(
+          (s) => s.startsWith('http://') || s.startsWith('https://'),
+        );
+
+    return anyUrl ?? '';
+  }
+
+  // ============================
+  // 🧩 HELPERS
+  // ============================
+  static int? _parseDurationToSeconds(dynamic raw) {
+    if (raw == null) return null;
+
+    if (raw is num) {
+      var v = raw.toInt();
+      if (v > 100000) v = (v / 1000).round(); // ms -> s
+      return v >= 0 ? v : null;
+    }
+
+    if (raw is String) {
+      final s = raw.trim();
+      if (s.isEmpty) return null;
+
+      if (s.contains(':')) {
+        final parts = s.split(':').map((p) => int.tryParse(p.trim())).toList();
+        if (parts.any((e) => e == null)) return null;
+
+        if (parts.length == 3) {
+          return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
+        }
+        if (parts.length == 2) {
+          return parts[0]! * 60 + parts[1]!;
+        }
+      }
+
+      var v = int.tryParse(s);
+      if (v == null) return null;
+      if (v > 100000) v = (v / 1000).round();
+      return v >= 0 ? v : null;
+    }
+
+    return null;
+  }
+
+  // ============================
+  // 🔁 JSON
+  // ============================
   factory MediaItem.fromJson(Map<String, dynamic> json) {
     final variantsJson = (json['variants'] as List?) ?? const [];
     final variants = variantsJson
@@ -94,6 +227,7 @@ class MediaItem {
       subtitle: subtitle,
       source: source,
       thumbnail: (json['thumbnail'] as String?)?.trim(),
+      thumbnailLocalPath: (json['thumbnailLocalPath'] as String?)?.trim(),
       variants: variants,
       durationSeconds: durationSeconds,
       origin: SourceOriginX.fromKey(json['origin'] as String?),
@@ -108,47 +242,10 @@ class MediaItem {
     'source': source == MediaSource.local ? 'local' : 'youtube',
     'origin': origin.key,
     'thumbnail': thumbnail,
+    'thumbnailLocalPath': thumbnailLocalPath,
     'duration': durationSeconds,
     'variants': variants.map((v) => v.toJson()).toList(),
   };
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
-
-  static int? _parseDurationToSeconds(dynamic raw) {
-    if (raw == null) return null;
-
-    if (raw is num) {
-      var v = raw.toInt();
-      if (v > 100000) v = (v / 1000).round(); // ms -> s
-      return v >= 0 ? v : null;
-    }
-
-    if (raw is String) {
-      final s = raw.trim();
-      if (s.isEmpty) return null;
-
-      if (s.contains(':')) {
-        final parts = s.split(':').map((p) => int.tryParse(p.trim())).toList();
-        if (parts.any((e) => e == null)) return null;
-
-        if (parts.length == 3) {
-          return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
-        }
-        if (parts.length == 2) {
-          return parts[0]! * 60 + parts[1]!;
-        }
-      }
-
-      var v = int.tryParse(s);
-      if (v == null) return null;
-      if (v > 100000) v = (v / 1000).round();
-      return v >= 0 ? v : null;
-    }
-
-    return null;
-  }
 }
 
 // ============================================================================
@@ -156,10 +253,13 @@ class MediaItem {
 // ============================================================================
 
 class MediaVariant {
+  // ============================
+  // 🧾 CAMPOS
+  // ============================
   final MediaVariantKind kind;
   final String format;
 
-  /// Nombre del archivo (ej: song.mp3)
+  /// Nombre del archivo (ej: song.mp3) o en algunos flujos un URL remoto
   final String fileName;
 
   /// Ruta REAL del archivo en el dispositivo (picker o storage interno)
@@ -169,7 +269,7 @@ class MediaVariant {
   final int? size;
   final int? durationSeconds;
 
-  MediaVariant({
+  const MediaVariant({
     required this.kind,
     required this.format,
     required this.fileName,
@@ -179,6 +279,9 @@ class MediaVariant {
     this.durationSeconds,
   });
 
+  // ============================
+  // 🔁 JSON
+  // ============================
   factory MediaVariant.fromJson(Map<String, dynamic> json) {
     final fileName =
         (json['fileName'] as String?)?.trim() ??
@@ -226,8 +329,27 @@ class MediaVariant {
     'durationSeconds': durationSeconds,
   };
 
+  // ============================
+  // ✅ VALIDACIÓN / HELPERS
+  // ============================
   bool get isValid => fileName.isNotEmpty && format.isNotEmpty;
 
-  /// Ruta usable por el player (si es local)
-  String? get playablePath => localPath;
+  /// Path local “limpio”
+  String? get playablePath {
+    final lp = localPath?.trim();
+    return (lp != null && lp.isNotEmpty) ? lp : null;
+  }
+
+  /// URL reproducible:
+  /// - si localPath existe => file:///...
+  /// - si no => si fileName ya es URL remoto => lo devuelve
+  String get playableUrl {
+    final lp = playablePath;
+    if (lp != null) return Uri.file(lp).toString();
+
+    final f = fileName.trim();
+    if (f.startsWith('http://') || f.startsWith('https://')) return f;
+
+    return '';
+  }
 }

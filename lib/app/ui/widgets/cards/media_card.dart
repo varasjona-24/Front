@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../../models/media_item.dart';
@@ -71,25 +73,43 @@ class MediaCard extends StatelessWidget {
   Widget _buildThumbnail(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    if (item.thumbnail != null && item.thumbnail!.isNotEmpty) {
+    // 1) ✅ Preferir thumbnail local si existe
+    final local = item.thumbnailLocalPath?.trim();
+    if (local != null && local.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          item.thumbnail!,
+        child: Image.file(
+          File(local),
           fit: BoxFit.cover,
           width: double.infinity,
           height: double.infinity,
-          errorBuilder: (_, __, ___) {
-            return _fallbackIcon(colors);
-          },
+          errorBuilder: (_, __, ___) => _fallbackIcon(colors),
         ),
       );
     }
 
+    // 2) 🌐 Fallback a thumbnail remoto
+    final remote = item.thumbnail?.trim();
+    if (remote != null && remote.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.network(
+          remote,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (_, __, ___) => _fallbackIcon(colors),
+        ),
+      );
+    }
+
+    // 3) 🎵 Placeholder
     return _fallbackIcon(colors);
   }
 
   Widget _fallbackIcon(ColorScheme colors) {
+    final isVideo = item.hasVideoLocal || item.localVideoVariant != null;
+
     return Container(
       decoration: BoxDecoration(
         color: colors.surface,
@@ -97,9 +117,7 @@ class MediaCard extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: Icon(
-        item.source == MediaVariantKind.audio
-            ? Icons.music_note_rounded
-            : Icons.videocam_rounded,
+        isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
         size: 42,
         color: colors.onSurface.withOpacity(0.6),
       ),

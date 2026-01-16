@@ -24,8 +24,6 @@ class SourcesPage extends GetView<SourcesController> {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final pills = _buildPills(controller);
-
     final bg = Color.alphaBlend(
       scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
       scheme.surface,
@@ -37,6 +35,7 @@ class SourcesPage extends GetView<SourcesController> {
     );
 
     final HomeController home = Get.find<HomeController>();
+    final pills = _buildPills(controller);
 
     return Obx(() {
       final mode = home.mode.value;
@@ -67,239 +66,319 @@ class SourcesPage extends GetView<SourcesController> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Fuentes',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-
-                          // Menu rápido de navegación
-                          PopupMenuButton<int>(
-                            icon: Icon(Icons.menu, color: scheme.onSurface),
-                            onSelected: (i) {
-                              switch (i) {
-                                case 0:
-                                  home.enterHome();
-                                  break;
-                                case 1:
-                                  home.goToPlaylists();
-                                  break;
-                                case 2:
-                                  home.goToArtists();
-                                  break;
-                                case 3:
-                                  home.goToDownloads();
-                                  break;
-                                case 4:
-                                  home.goToSources();
-                                  break;
-                                case 5:
-                                  home.goToSettings();
-                                  break;
-                              }
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(value: 0, child: Text('Home')),
-                              PopupMenuItem(value: 1, child: Text('Playlists')),
-                              PopupMenuItem(value: 2, child: Text('Artists')),
-                              PopupMenuItem(value: 3, child: Text('Downloads')),
-                              PopupMenuItem(value: 4, child: Text('Sources')),
-                              PopupMenuItem(value: 5, child: Text('Settings')),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Explora tu contenido por origen o por lo que está guardado offline.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                      _header(theme: theme, scheme: scheme, home: home),
                       const SizedBox(height: 14),
 
-                      ...pills.map(
-                        (p) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: SourcePillTile(data: p),
-                        ),
-                      ),
-
+                      _pillsSection(pills),
                       const SizedBox(height: 18),
-                      Text(
-                        'Seleccionados (Dispositivo)',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
+
+                      _selectedSectionTitle(theme),
                       const SizedBox(height: 8),
 
-                      Obx(() {
-                        final list = controller.localFiles;
-
-                        if (list.isEmpty) {
-                          return Text(
-                            'No hay archivos seleccionados.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          );
-                        }
-
-                        return Column(
-                          children: List.generate(list.length, (i) {
-                            final item = list[i];
-                            final variant = item.variants.first;
-                            final isVideo =
-                                variant.kind == MediaVariantKind.video;
-
-                            final displayPath =
-                                variant.localPath ?? variant.fileName;
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Card(
-                                elevation: 0,
-                                color: theme.colorScheme.surfaceContainer,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: ListTile(
-                                  leading: Icon(
-                                    isVideo
-                                        ? Icons.videocam_rounded
-                                        : Icons.music_note_rounded,
-                                  ),
-                                  title: Text(
-                                    item.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  subtitle: Text(
-                                    displayPath,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  trailing: Wrap(
-                                    spacing: 6,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.save_alt_rounded,
-                                        ),
-                                        tooltip: 'Importar a la app (offline)',
-                                        onPressed: () async {
-                                          final imported = await controller
-                                              .importToAppStorage(item);
-
-                                          if (imported == null) {
-                                            Get.snackbar(
-                                              'Import',
-                                              'Falló la importación',
-                                              snackPosition:
-                                                  SnackPosition.BOTTOM,
-                                              margin: const EdgeInsets.all(12),
-                                            );
-                                            return;
-                                          }
-
-                                          final idx = controller.localFiles
-                                              .indexWhere(
-                                                (e) => e.id == item.id,
-                                              );
-                                          if (idx != -1)
-                                            controller.localFiles[idx] =
-                                                imported;
-
-                                          Get.snackbar(
-                                            'Import',
-                                            'Guardado en Biblioteca offline ✅',
-                                            snackPosition: SnackPosition.BOTTOM,
-                                            margin: const EdgeInsets.all(12),
-                                          );
-                                        },
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                          Icons.play_arrow_rounded,
-                                        ),
-                                        tooltip: 'Reproducir',
-                                        onPressed: () {
-                                          final queue = List.of(list);
-                                          Get.to(
-                                            () => const AudioPlayerPage(),
-                                            arguments: {
-                                              'queue': queue,
-                                              'index': i,
-                                            },
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        );
-                      }),
+                      _selectedSectionList(theme),
                     ],
                   ),
                 ),
               ),
             ),
 
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: barBg,
-                  border: Border(
-                    top: BorderSide(
-                      color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
-                      width: 56,
-                    ),
-                  ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: AppBottomNav(
-                    currentIndex: 4,
-                    onTap: (index) {
-                      switch (index) {
-                        case 1:
-                          home.goToPlaylists();
-                          break;
-                        case 2:
-                          home.goToArtists();
-                          break;
-                        case 3:
-                          home.goToDownloads();
-                          break;
-                        case 4:
-                          home.goToSources();
-                          break;
-                        case 5:
-                          home.goToSettings();
-                          break;
-                      }
-                    },
-                  ),
-                ),
-              ),
+            _bottomNav(
+              barBg: barBg,
+              scheme: scheme,
+              isDark: isDark,
+              home: home,
             ),
           ],
         ),
       );
     });
   }
+
+  // ===========================================================================
+  // UI SECTIONS
+  // ===========================================================================
+
+  Widget _header({
+    required ThemeData theme,
+    required ColorScheme scheme,
+    required HomeController home,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Fuentes',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            _quickMenu(scheme: scheme, home: home),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Explora tu contenido por origen o por lo que está guardado offline.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _quickMenu({
+    required ColorScheme scheme,
+    required HomeController home,
+  }) {
+    return PopupMenuButton<int>(
+      icon: Icon(Icons.menu, color: scheme.onSurface),
+      onSelected: (i) {
+        switch (i) {
+          case 0:
+            home.enterHome();
+            break;
+          case 1:
+            home.goToPlaylists();
+            break;
+          case 2:
+            home.goToArtists();
+            break;
+          case 3:
+            home.goToDownloads();
+            break;
+          case 4:
+            home.goToSources();
+            break;
+          case 5:
+            home.goToSettings();
+            break;
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 0, child: Text('Home')),
+        PopupMenuItem(value: 1, child: Text('Playlists')),
+        PopupMenuItem(value: 2, child: Text('Artists')),
+        PopupMenuItem(value: 3, child: Text('Downloads')),
+        PopupMenuItem(value: 4, child: Text('Sources')),
+        PopupMenuItem(value: 5, child: Text('Settings')),
+      ],
+    );
+  }
+
+  Widget _pillsSection(List<SourcePillData> pills) {
+    return Column(
+      children: pills
+          .map(
+            (p) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: SourcePillTile(data: p),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Widget _selectedSectionTitle(ThemeData theme) {
+    return Text(
+      'Seleccionados (Dispositivo)',
+      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+    );
+  }
+
+  Widget _selectedSectionList(ThemeData theme) {
+    return Obx(() {
+      final list = controller.localFiles;
+
+      if (list.isEmpty) {
+        return Text(
+          'No hay archivos seleccionados.',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        );
+      }
+
+      return Column(
+        children: List.generate(
+          list.length,
+          (i) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _selectedItemTile(
+              theme: theme,
+              item: list[i],
+              index: i,
+              list: list,
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _selectedItemTile({
+    required ThemeData theme,
+    required MediaItem item,
+    required int index,
+    required List<MediaItem> list,
+  }) {
+    final variant = item.variants.first;
+    final isVideo = variant.kind == MediaVariantKind.video;
+
+    // Solo para display (no dependas de esto para reproducir)
+    final displaySubtitle = _displayLocalSubtitle(item);
+
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        leading: Icon(
+          isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
+        ),
+        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(
+          displaySubtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Wrap(
+          spacing: 6,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.save_alt_rounded),
+              tooltip: 'Importar a la app (offline)',
+              onPressed: () => _onImportPressed(item),
+            ),
+            IconButton(
+              icon: const Icon(Icons.play_arrow_rounded),
+              tooltip: 'Reproducir',
+              onPressed: () => _onPlayPressed(list: list, index: index),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bottomNav({
+    required Color barBg,
+    required ColorScheme scheme,
+    required bool isDark,
+    required HomeController home,
+  }) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: barBg,
+          border: Border(
+            top: BorderSide(
+              color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
+              width: 56,
+            ),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: AppBottomNav(
+            currentIndex: 4,
+            onTap: (index) {
+              switch (index) {
+                case 1:
+                  home.goToPlaylists();
+                  break;
+                case 2:
+                  home.goToArtists();
+                  break;
+                case 3:
+                  home.goToDownloads();
+                  break;
+                case 4:
+                  home.goToSources();
+                  break;
+                case 5:
+                  home.goToSettings();
+                  break;
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ===========================================================================
+  // ACTIONS
+  // ===========================================================================
+
+  Future<void> _onImportPressed(MediaItem item) async {
+    final imported = await controller.importToAppStorage(item);
+
+    if (imported == null) {
+      Get.snackbar(
+        'Import',
+        'Falló la importación',
+        snackPosition: SnackPosition.BOTTOM,
+        margin: const EdgeInsets.all(12),
+      );
+      return;
+    }
+
+    final idx = controller.localFiles.indexWhere((e) => e.id == item.id);
+    if (idx != -1) controller.localFiles[idx] = imported;
+
+    Get.snackbar(
+      'Import',
+      'Guardado en Biblioteca offline ✅',
+      snackPosition: SnackPosition.BOTTOM,
+      margin: const EdgeInsets.all(12),
+    );
+  }
+
+  void _onPlayPressed({required List<MediaItem> list, required int index}) {
+    final item = list[index];
+
+    // ✅ AQUÍ está el fix de “link/url”: usar playableUrl (file:///... si es local)
+    final playableUrl = item.playableUrl;
+
+    Get.to(
+      () => const AudioPlayerPage(),
+      arguments: {
+        'queue': list,
+        'index': index,
+        // Si tu player no usa esto, no pasa nada.
+        // Pero si lo soportas, ya queda listo.
+        'playableUrl': playableUrl,
+      },
+    );
+  }
+
+  String _displayLocalSubtitle(MediaItem item) {
+    final v = item.variants.first;
+
+    // Preferimos mostrar el nombre del archivo si existe.
+    final name = v.fileName.trim();
+    if (name.isNotEmpty) return name;
+
+    // Si no, mostramos el final del path.
+    final lp = v.localPath?.trim() ?? '';
+    if (lp.isEmpty) return '';
+
+    // recorta para que no se vea todo el path
+    final parts = lp.split(RegExp(r'[\\/]+'));
+    if (parts.isEmpty) return lp;
+    return parts.last;
+  }
+
+  // ===========================================================================
+  // PILLS
+  // ===========================================================================
 
   List<SourcePillData> _buildPills(SourcesController controller) {
     SourcePillData pill({
@@ -334,7 +413,6 @@ class SourcesPage extends GetView<SourcesController> {
     }
 
     return [
-      // ✅ Dispositivo local (picker/import)
       pill(
         origin: SourceOrigin.device,
         title: 'Dispositivo local',
@@ -344,7 +422,6 @@ class SourcesPage extends GetView<SourcesController> {
         onTap: () async => controller.pickLocalFiles(),
       ),
 
-      // ✅ Biblioteca offline (ubicación: guardado en app)
       pill(
         origin: SourceOrigin.generic,
         title: 'Biblioteca offline',
@@ -359,7 +436,6 @@ class SourcesPage extends GetView<SourcesController> {
         ),
       ),
 
-      // Orígenes internet (por ahora listan lo que exista en librería)
       pill(
         origin: SourceOrigin.youtube,
         title: 'YouTube',

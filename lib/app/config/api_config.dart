@@ -2,17 +2,25 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 class ApiConfig {
+  static const _port = 3000;
+  static const _devHost = '172.30.5.139';
+
   static String get baseUrl {
     if (kIsWeb) {
-      return 'http://localhost:3000';
+      return 'http://localhost:$_port';
     }
 
-    if (Platform.isAndroid) {
-      // Android emulator
-      return 'http://10.0.2.2:3000';
+    if (kDebugMode) {
+      if (Platform.isAndroid) {
+        // ✅ Android real apuntando al Mac
+        return 'http://$_devHost:$_port';
+      }
+
+      // ✅ iOS (simulator/real)
+      return 'http://$_devHost:$_port';
     }
 
-    // 🔥 iOS (simulator y real) → IP DEL MAC
-    return 'http://172.30.5.139:3000';
+    // Producción
+    return 'https://api.listenfy.com';
   }
 }

@@ -5,7 +5,6 @@ class DioClient {
   late final Dio dio;
 
   DioClient() {
-    print('🌐 ApiConfig.baseUrl = ${ApiConfig.baseUrl}');
     dio = Dio(
       BaseOptions(
         baseUrl: '${ApiConfig.baseUrl}/api/v1',
@@ -25,5 +24,23 @@ class DioClient {
 
   Future<Response<T>> post<T>(String path, {dynamic data}) {
     return dio.post<T>(path, data: data);
+  }
+
+  // 👇 ESTE MÉTODO SÍ VA AQUÍ
+  Future<void> download(
+    String path,
+    String savePath, {
+    void Function(int received, int total)? onProgress,
+  }) {
+    return dio.download(
+      path,
+      savePath,
+      onReceiveProgress: onProgress,
+      options: Options(
+        responseType: ResponseType.bytes,
+        followRedirects: true,
+        receiveTimeout: const Duration(minutes: 5),
+      ),
+    );
   }
 }

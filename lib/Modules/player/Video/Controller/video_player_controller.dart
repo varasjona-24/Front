@@ -103,7 +103,7 @@ class VideoPlayerController extends GetxController {
           v.kind == MediaVariantKind.video && v.format.toLowerCase() == 'mp4',
     );
     if (mp4 != null) return mp4;
-    return item.videoVariant;
+    return item.localVideoVariant;
   }
 
   Future<void> togglePlay() async {
