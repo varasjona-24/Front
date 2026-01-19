@@ -13,6 +13,8 @@ import 'source_library_page.dart';
 // UI widgets
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
+import '../../../app/ui/themes/app_spacing.dart';
+import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 
 class SourcesPage extends GetView<SourcesController> {
@@ -44,7 +46,7 @@ class SourcesPage extends GetView<SourcesController> {
         backgroundColor: bg,
         extendBody: true,
         appBar: AppTopBar(
-          title: const Text('Sources'),
+          title: ListenfyLogo(size: 28, color: scheme.primary),
           onSearch: home.onSearch,
           onToggleMode: home.toggleMode,
           mode: mode == HomeMode.audio
@@ -58,24 +60,25 @@ class SourcesPage extends GetView<SourcesController> {
                 behavior: const _NoGlowScrollBehavior(),
                 child: SingleChildScrollView(
                   padding: EdgeInsets.only(
-                    top: 12,
+                    top: AppSpacing.md,
                     bottom: kBottomNavigationBarHeight + 18,
-                    left: 16,
-                    right: 16,
+                    left: AppSpacing.md,
+                    right: AppSpacing.md,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _header(theme: theme, scheme: scheme, home: home),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: AppSpacing.lg),
 
                       _pillsSection(pills),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: AppSpacing.lg),
 
                       _selectedSectionTitle(theme),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: AppSpacing.sm),
 
                       _selectedSectionList(theme),
+                      const SizedBox(height: AppSpacing.lg),
                     ],
                   ),
                 ),
@@ -290,6 +293,9 @@ class SourcesPage extends GetView<SourcesController> {
             currentIndex: 4,
             onTap: (index) {
               switch (index) {
+                case 0:
+                  home.enterHome();
+                  break;
                 case 1:
                   home.goToPlaylists();
                   break;

@@ -3,6 +3,11 @@ import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
 import '../controller/downloads_controller.dart';
+import '../../../app/ui/widgets/navigation/app_top_bar.dart';
+import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
+import '../../../app/ui/themes/app_spacing.dart';
+import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 
 class DownloadsPage extends GetView<DownloadsController> {
   const DownloadsPage({super.key});
@@ -10,67 +15,142 @@ class DownloadsPage extends GetView<DownloadsController> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Downloads'),
-        actions: [
-          Obx(() {
-            final loading = controller.isLoading.value;
-            return IconButton(
-              tooltip: 'Recargar',
-              onPressed: loading ? null : controller.loadDownloads,
-              icon: const Icon(Icons.refresh_rounded),
-            );
-          }),
-        ],
-      ),
+    final bg = Color.alphaBlend(
+      scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
+      scheme.surface,
+    );
 
-      // ============================
-      // ➕ NUEVA DESCARGA
-      // ============================
-      floatingActionButton: FloatingActionButton.extended(
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Descargar'),
-        tooltip: 'Nueva descarga',
-        onPressed: () => _openDownloadDialog(context),
-      ),
+    final barBg = Color.alphaBlend(
+      scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
+      scheme.surface,
+    );
 
-      // ============================
-      // 📄 LISTA
-      // ============================
-      body: Obx(() {
-        if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    final HomeController home = Get.find<HomeController>();
 
-        final list = controller.downloads;
-        if (list.isEmpty) {
-          return Center(
-            child: Text(
-              'No hay descargas.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+    return Obx(() {
+      final mode = home.mode.value;
+
+      return Scaffold(
+        backgroundColor: bg,
+        extendBody: true,
+        appBar: AppTopBar(
+          title: ListenfyLogo(size: 28, color: scheme.primary),
+          onSearch: home.onSearch,
+          onToggleMode: home.toggleMode,
+          mode: mode == HomeMode.audio
+              ? AppMediaMode.audio
+              : AppMediaMode.video,
+        ),
+
+        // ============================
+        // 📄 LISTA
+        // ============================
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: Obx(() {
+                if (controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final list = controller.downloads;
+
+                return ScrollConfiguration(
+                  behavior: const _NoGlowScrollBehavior(),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(
+                      top: AppSpacing.md,
+                      bottom: kBottomNavigationBarHeight + 18,
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _header(theme: theme, context: context),
+                        const SizedBox(height: AppSpacing.lg),
+                        if (list.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.lg),
+                              child: Text(
+                                'No hay descargas aún.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
+                          Column(
+                            children: List.generate(
+                              list.length,
+                              (i) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: _DownloadTile(
+                                  item: list[i],
+                                  onPlay: controller.play,
+                                  onDelete: (item) =>
+                                      _confirmDelete(context, item),
+                                ),
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+            ),
+
+            _bottomNav(
+              barBg: barBg,
+              scheme: scheme,
+              isDark: isDark,
+              home: home,
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  // ============================
+  // UI SECTIONS
+  // ============================
+  Widget _header({required ThemeData theme, required BuildContext context}) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Descargas',
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async => controller.loadDownloads(),
-          child: ListView.separated(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(12),
-            itemCount: list.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (context, i) => _DownloadTile(
-              item: list[i],
-              onPlay: controller.play,
-              onDelete: (item) => _confirmDelete(context, item),
-            ),
+              const SizedBox(height: 6),
+              Text(
+                'Archivos descargados en tu dispositivo',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
-        );
-      }),
+        ),
+        FilledButton.tonalIcon(
+          onPressed: () => _openDownloadDialog(context),
+          icon: const Icon(Icons.add_rounded),
+          label: const Text('Descargar'),
+        ),
+      ],
     );
   }
 
@@ -224,6 +304,58 @@ class DownloadsPage extends GetView<DownloadsController> {
 
     if (ok == true) controller.delete(item);
   }
+
+  Widget _bottomNav({
+    required Color barBg,
+    required ColorScheme scheme,
+    required bool isDark,
+    required HomeController home,
+  }) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: barBg,
+          border: Border(
+            top: BorderSide(
+              color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
+              width: 56,
+            ),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: AppBottomNav(
+            currentIndex: 3,
+            onTap: (index) {
+              switch (index) {
+                case 0:
+                  home.enterHome();
+                  break;
+                case 1:
+                  home.goToPlaylists();
+                  break;
+                case 2:
+                  home.goToArtists();
+                  break;
+                case 3:
+                  home.goToDownloads();
+                  break;
+                case 4:
+                  home.goToSources();
+                  break;
+                case 5:
+                  home.goToSettings();
+                  break;
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ============================================================================
@@ -243,6 +375,7 @@ class _DownloadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final v = item.variants.isNotEmpty ? item.variants.first : null;
 
     final isVideo = v?.kind == MediaVariantKind.video;
@@ -252,25 +385,43 @@ class _DownloadTile extends StatelessWidget {
         ? item.subtitle
         : (v?.localPath ?? v?.fileName ?? '');
 
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-      trailing: Wrap(
-        spacing: 4,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.play_arrow_rounded),
-            tooltip: 'Reproducir',
-            onPressed: () => onPlay(item),
-          ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline_rounded),
-            tooltip: 'Eliminar descarga',
-            onPressed: () => onDelete(item),
-          ),
-        ],
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        leading: Icon(icon),
+        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: Wrap(
+          spacing: 4,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.play_arrow_rounded),
+              tooltip: 'Reproducir',
+              onPressed: () => onPlay(item),
+            ),
+            IconButton(
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: 'Eliminar descarga',
+              onPressed: () => onDelete(item),
+            ),
+          ],
+        ),
       ),
     );
+  }
+}
+
+class _NoGlowScrollBehavior extends ScrollBehavior {
+  const _NoGlowScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) {
+    return child;
   }
 }

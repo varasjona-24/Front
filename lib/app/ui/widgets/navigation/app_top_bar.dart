@@ -32,7 +32,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       foregroundColor: scheme.onSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
-
+      automaticallyImplyLeading: false,
       // ✅ “highlight” sutil + borde inferior muy leve
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),
