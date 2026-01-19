@@ -18,18 +18,22 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
         child: Obx(() {
           final queue = controller.queue;
           final idx = controller.currentIndex.value;
+
           final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
               ? queue[idx]
               : null;
 
-          if (item == null) return const Center(child: Text('No hay vídeo'));
-
-          final vpCtrl = controller.player;
+          if (item == null) {
+            return const Center(child: Text('No hay vídeo'));
+          }
 
           return Column(
             children: [
+              // ───────────────────────────────────────────────────────────────
+              // Top bar
+              // ───────────────────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 child: Row(
                   children: [
                     IconButton(
@@ -54,67 +58,71 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
-              // Video area / Error handling
+              // ───────────────────────────────────────────────────────────────
+              // Video area (robust layout)
+              // ───────────────────────────────────────────────────────────────
               Expanded(
-                child: Center(
-                  child: Obx(() {
-                    final err = controller.error.value;
-                    if (err != null) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              size: 64,
-                              color: theme.colorScheme.error,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              err,
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ElevatedButton(
-                                  onPressed: () =>
-                                      Get.to(() => const QueuePage()),
-                                  child: const Text('Seleccionar otro'),
-                                ),
-                                const SizedBox(width: 12),
-                                OutlinedButton(
-                                  onPressed: controller.retry,
-                                  child: const Text('Reintentar'),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      );
-                    }
+                child: Obx(() {
+                  // Fuerza rebuild cuando cambia el estado de reproducción
+                  final _ = controller.state.value;
 
-                    if (vpCtrl == null || vpCtrl.value.isInitialized == false) {
-                      return Container(
-                        color: theme.colorScheme.surfaceVariant,
-                        child: const Center(child: CircularProgressIndicator()),
-                      );
-                    }
-
-                    return AspectRatio(
-                      aspectRatio: vpCtrl.value.aspectRatio,
-                      child: vp.VideoPlayer(vpCtrl),
+                  final err = controller.error.value;
+                  if (err != null) {
+                    return _ErrorPanel(
+                      message: err,
+                      onPickOther: () => Get.to(() => const QueuePage()),
+                      onRetry: controller.retry,
                     );
-                  }),
-                ),
+                  }
+
+                  final vpCtrl = controller.playerController;
+
+                  // Loader si aún no hay controller o no inicializa
+                  if (vpCtrl == null || !vpCtrl.value.isInitialized) {
+                    return Container(
+                      color: theme.colorScheme.surfaceVariant,
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  }
+
+                  // Size del video (si es 0, algo raro pasa)
+                  final size = vpCtrl.value.size;
+                  if (size.width <= 0 || size.height <= 0) {
+                    return Container(
+                      color: theme.colorScheme.surfaceVariant,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: const Center(
+                        child: Text(
+                          'No se pudo obtener el tamaño del vídeo.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }
+
+                  // ✅ Layout ultra robusto: evita AspectRatio unbounded constraints
+                  return Container(
+                    color: Colors.black,
+                    child: SizedBox.expand(
+                      child: FittedBox(
+                        fit: BoxFit.contain,
+                        alignment: Alignment.center,
+                        child: SizedBox(
+                          width: size.width,
+                          height: size.height,
+                          child: vp.VideoPlayer(vpCtrl),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
               ),
 
+              // ───────────────────────────────────────────────────────────────
               // Controls
+              // ───────────────────────────────────────────────────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 16,
@@ -123,44 +131,39 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
                 child: Column(
                   children: [
                     // Progress + timestamps
-                    Row(
-                      children: [
-                        Obx(
-                          () => Text(
-                            _fmt(controller.position.value),
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                        Expanded(
-                          child: Obx(() {
-                            final maxSeconds =
-                                controller.duration.value.inSeconds <= 0
-                                ? 1.0
-                                : controller.duration.value.inSeconds
-                                      .toDouble();
-                            final pos = controller.position.value.inSeconds
-                                .toDouble()
-                                .clamp(0.0, maxSeconds)
-                                .toDouble();
+                    Obx(() {
+                      final dur = controller.duration.value;
+                      final pos = controller.position.value;
 
-                            return Slider(
-                              value: pos,
+                      final maxSeconds = dur.inSeconds > 0
+                          ? dur.inSeconds.toDouble()
+                          : 1.0;
+                      final posSeconds = pos.inSeconds.toDouble().clamp(
+                        0.0,
+                        maxSeconds,
+                      );
+
+                      return Row(
+                        children: [
+                          Text(_fmt(pos), style: theme.textTheme.bodySmall),
+                          Expanded(
+                            child: Slider(
+                              value: posSeconds,
                               min: 0.0,
                               max: maxSeconds,
-                              onChanged: (v) {
+                              // 👇 NO spamear seek en cada pixel, mejor al soltar
+                              onChanged: (_) {},
+                              onChangeEnd: (v) {
                                 controller.seek(Duration(seconds: v.toInt()));
                               },
-                            );
-                          }),
-                        ),
-                        Obx(
-                          () => Text(
-                            _fmt(controller.duration.value),
-                            style: theme.textTheme.bodySmall,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                          Text(_fmt(dur), style: theme.textTheme.bodySmall),
+                        ],
+                      );
+                    }),
+
+                    const SizedBox(height: 6),
 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -205,15 +208,64 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
     );
   }
 
-  String _fmt(Duration d) {
+  static String _fmt(Duration d) {
+    final h = d.inHours;
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    final h = d.inHours;
-
     if (h > 0) {
       final hh = h.toString().padLeft(2, '0');
       return '$hh:$m:$s';
     }
     return '$m:$s';
+  }
+}
+
+class _ErrorPanel extends StatelessWidget {
+  const _ErrorPanel({
+    required this.message,
+    required this.onPickOther,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onPickOther;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: theme.colorScheme.error),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ElevatedButton(
+                  onPressed: onPickOther,
+                  child: const Text('Seleccionar otro'),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton(
+                  onPressed: onRetry,
+                  child: const Text('Reintentar'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

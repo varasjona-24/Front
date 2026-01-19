@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart' as dio;
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as p;
@@ -45,7 +46,7 @@ class DownloadsController extends GetxController {
         });
       }).toList();
 
-      // Ordenar por fecha más reciente primero
+      // Ordenar por fecha más reciente
       list.sort((a, b) {
         final aTime = a.variants.firstOrNull?.createdAt ?? 0;
         final bTime = b.variants.firstOrNull?.createdAt ?? 0;
@@ -54,13 +55,13 @@ class DownloadsController extends GetxController {
 
       downloads.assignAll(list);
     } catch (e) {
-      print('Error loading downloads: $e');
+      debugPrint('Error loading downloads: $e');
     } finally {
       isLoading.value = false;
     }
   }
 
-  // Alias opcional para la page mejorada (si la usas)
+  // Alias
   Future<void> loadDownloads() => load();
 
   // ============================
@@ -72,7 +73,7 @@ class DownloadsController extends GetxController {
 
     Get.toNamed(
       AppRoutes.audioPlayer,
-      arguments: {'queue': queue, 'index': idx == -1 ? 0 : idx},
+      arguments: {'queue': queue, 'index': idx < 0 ? 0 : idx},
     );
   }
 
@@ -81,7 +82,7 @@ class DownloadsController extends GetxController {
   // ============================
   Future<void> delete(MediaItem item) async {
     try {
-      // 1) borrar archivos en disco
+      // 1) borrar archivos
       for (final v in item.variants) {
         final pth = v.localPath;
         if (pth != null && pth.isNotEmpty) {
@@ -90,7 +91,7 @@ class DownloadsController extends GetxController {
         }
       }
 
-      // 2) borrar de la librería local
+      // 2) borrar de store
       await _store.remove(item.id);
 
       // 3) recargar
@@ -102,25 +103,23 @@ class DownloadsController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
+      debugPrint('Error deleting download: $e');
       Get.snackbar(
         'Downloads',
         'Error al eliminar',
         snackPosition: SnackPosition.BOTTOM,
       );
-      print('Error deleting download: $e');
     }
   }
 
   // ============================
   // ⬇️ DESCARGAR DESDE URL
   // ============================
-  /// Solicita al backend descargar a partir de la URL y guarda el resultado en downloads
   Future<void> downloadFromUrl({
     String? mediaId,
     required String url,
     required String format,
   }) async {
-    // Validar URL
     if (url.trim().isEmpty) {
       Get.snackbar(
         'Download',
@@ -131,23 +130,21 @@ class DownloadsController extends GetxController {
       return;
     }
 
-    final kind = (format == 'mp4') ? 'video' : 'audio';
+    final kind = (format.toLowerCase() == 'mp4') ? 'video' : 'audio';
 
     try {
-      // mostrar progreso con Get.dialog para no depender de BuildContext
       Get.dialog(
         const Center(child: CircularProgressIndicator()),
         barrierDismissible: false,
       );
 
       final ok = await _repo.requestAndFetchMedia(
-        mediaId: mediaId?.isEmpty == true ? null : mediaId,
+        mediaId: mediaId?.trim().isEmpty == true ? null : mediaId,
         url: url.trim(),
         kind: kind,
         format: format,
       );
 
-      // ocultar progreso
       if (Get.isDialogOpen ?? false) Get.back();
 
       if (ok) {
@@ -161,7 +158,7 @@ class DownloadsController extends GetxController {
       } else {
         Get.snackbar(
           'Download',
-          'Falló la descarga. Verifica la URL e intenta de nuevo.',
+          'Falló la descarga. La web puede ser lenta o no compatible.',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.orange,
         );
@@ -169,13 +166,33 @@ class DownloadsController extends GetxController {
     } catch (e) {
       if (Get.isDialogOpen ?? false) Get.back();
 
+      String msg = 'Error inesperado';
+
+      if (e is dio.DioException) {
+        switch (e.type) {
+          case dio.DioExceptionType.receiveTimeout:
+            msg =
+                'El servidor tardó demasiado en responder. Intenta nuevamente.';
+            break;
+          case dio.DioExceptionType.connectionTimeout:
+          case dio.DioExceptionType.sendTimeout:
+            msg = 'No se pudo conectar con el servidor.';
+            break;
+          default:
+            msg = e.message ?? 'Error de red';
+        }
+      } else {
+        msg = e.toString();
+      }
+
       Get.snackbar(
         'Download',
-        'Error inesperado: ${e.toString()}',
+        msg,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
       );
-      print('downloadFromUrl error: $e');
+
+      debugPrint('downloadFromUrl error: $e');
     }
   }
 }

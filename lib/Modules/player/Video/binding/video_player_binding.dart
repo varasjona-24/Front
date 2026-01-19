@@ -1,6 +1,8 @@
 import 'package:get/get.dart';
+
 import '../../../../app/models/media_item.dart';
-import 'package:flutter_listenfy/Modules/player/Video/Controller/video_player_controller.dart';
+import '../../../../app/services/video_service.dart';
+import '../Controller/video_player_controller.dart';
 
 class VideoPlayerBinding extends Bindings {
   @override
@@ -14,12 +16,21 @@ class VideoPlayerBinding extends Bindings {
 
     final index = (args['index'] is int) ? args['index'] as int : 0;
 
+    // Asegurar que VideoService está disponible
+    if (!Get.isRegistered<VideoService>()) {
+      Get.put<VideoService>(VideoService(), permanent: true);
+    }
+
     if (Get.isRegistered<VideoPlayerController>()) {
       Get.delete<VideoPlayerController>(force: true);
     }
 
     Get.put<VideoPlayerController>(
-      VideoPlayerController(queue: queue, initialIndex: index),
+      VideoPlayerController(
+        videoService: Get.find<VideoService>(),
+        queue: queue,
+        initialIndex: index,
+      ),
       permanent: false,
     );
   }

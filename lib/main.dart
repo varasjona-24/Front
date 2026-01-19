@@ -9,6 +9,7 @@ import 'app/ui/themes/app_theme_factory.dart';
 import 'app/data/network/dio_client.dart';
 import 'app/data/repo/media_repository.dart';
 import 'app/services/audio_service.dart';
+import 'app/services/video_service.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,9 @@ void main() {
 
   // 🎵 Audio global (CLAVE)
   Get.put<AudioService>(AudioService(), permanent: true);
+
+  // 🎬 Video global (CLAVE)
+  Get.put<VideoService>(VideoService(), permanent: true);
 
   // 🌐 Cliente HTTP
   Get.lazyPut<DioClient>(() => DioClient(), fenix: true);

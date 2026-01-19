@@ -1,26 +1,31 @@
-import 'dart:async';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import '../../../../app/models/media_item.dart';
-import '../../../../app/config/api_config.dart';
+import '../../../../app/services/video_service.dart';
 
 class VideoPlayerController extends GetxController {
+  final VideoService videoService;
   final List<MediaItem> queue;
   final int initialIndex;
 
   final RxInt currentIndex = 0.obs;
-  final Rx<Duration> position = Duration.zero.obs;
-  final Rx<Duration> duration = Duration.zero.obs;
-  final RxBool isPlaying = false.obs;
   final Rxn<String> error = Rxn<String>();
 
-  vp.VideoPlayerController? _player;
-  Timer? _posTimer;
+  VideoPlayerController({
+    required this.videoService,
+    required this.queue,
+    required this.initialIndex,
+  });
 
-  VideoPlayerController({required this.queue, required this.initialIndex});
+  // Delegación de streams al VideoService
+  Rx<Duration> get position => videoService.position;
+  Rx<Duration> get duration => videoService.duration;
+  RxBool get isPlaying => videoService.isPlaying;
+  Rx<VideoPlaybackState> get state => videoService.state;
 
-  vp.VideoPlayerController? get player => _player;
+  vp.VideoPlayerController? get playerController =>
+      videoService.playerController;
 
   @override
   void onInit() {
@@ -29,11 +34,66 @@ class VideoPlayerController extends GetxController {
     final safeIndex = initialIndex.clamp(0, queue.length - 1).toInt();
     currentIndex.value = safeIndex;
 
-    _loadAndPlayCurrent();
+    _playCurrent();
   }
 
-  Future<void> _loadAndPlayCurrent() async {
-    // limpia estado previo
+  // ===========================================================================
+  // STATE / GETTERS
+  // ===========================================================================
+
+  MediaItem? get currentItemOrNull {
+    if (queue.isEmpty) return null;
+    final i = currentIndex.value;
+    if (i < 0 || i >= queue.length) return null;
+    return queue[i];
+  }
+
+  MediaItem get currentItem {
+    final item = currentItemOrNull;
+    if (item == null) throw StateError('currentItem is null');
+    return item;
+  }
+
+  /// Lógica para seleccionar la variante de video preferida
+  /// Prioridad:
+  /// 1) video local con localPath válido
+  /// 2) mp4 remoto
+  /// 3) cualquier video válido
+  MediaVariant? get currentVideoVariant {
+    final item = currentItemOrNull;
+    if (item == null) return null;
+
+    // 1️⃣ Buscar video local con localPath válido
+    final localVideo = item.variants.firstWhereOrNull(
+      (v) =>
+          v.kind == MediaVariantKind.video &&
+          v.localPath != null &&
+          v.localPath!.trim().isNotEmpty &&
+          v.isValid,
+    );
+    if (localVideo != null) return localVideo;
+
+    // 2️⃣ Preferir mp4 formato si disponible (remoto)
+    final mp4 = item.variants.firstWhereOrNull(
+      (v) =>
+          v.kind == MediaVariantKind.video &&
+          v.format.toLowerCase() == 'mp4' &&
+          v.isValid,
+    );
+    if (mp4 != null) return mp4;
+
+    // 3️⃣ Buscar cualquier video válido
+    final anyVideo = item.variants.firstWhereOrNull(
+      (v) => v.kind == MediaVariantKind.video && v.isValid,
+    );
+    return anyVideo;
+  }
+
+  // ===========================================================================
+  // PLAYBACK CONTROL
+  // ===========================================================================
+
+  Future<void> _playCurrent() async {
     error.value = null;
 
     final item = currentItemOrNull;
@@ -43,118 +103,61 @@ class VideoPlayerController extends GetxController {
       return;
     }
 
-    await _disposePlayer();
+    await _playItem(item, variant);
+  }
 
-    final url =
-        '${ApiConfig.baseUrl}/api/v1/media/file/${item.id}/video/${variant.format}';
-
-    _player = vp.VideoPlayerController.network(url);
+  Future<void> _playItem(MediaItem item, MediaVariant variant) async {
+    // Validar variante
+    if (!variant.isValid) {
+      error.value = 'Variante de video no válida.';
+      return;
+    }
 
     try {
-      // evita bloqueo indefinido en initialize
-      await _player!.initialize().timeout(const Duration(seconds: 12));
-
-      final dur = _player!.value.duration;
-      duration.value = dur;
-      await _player!.play();
-      isPlaying.value = true;
-
-      _posTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
-        if (_player == null) return;
-        position.value = _player!.value.position;
-        isPlaying.value = _player!.value.isPlaying;
-      });
+      print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
+      await videoService.play(item, variant);
+      error.value = null;
     } catch (e) {
-      // Si falla la inicialización, limpiamos y mostramos mensaje
-      await _disposePlayer();
-      isPlaying.value = false;
-      error.value = 'Este archivo está corrupto o no existe, selecciona otro.';
-      print('Video init error: $e');
+      print('❌ Error in _playItem: $e');
+      error.value = 'Error al reproducir: $e';
     }
-  }
-
-  Future<void> _disposePlayer() async {
-    _posTimer?.cancel();
-    _posTimer = null;
-    if (_player != null) {
-      try {
-        await _player!.pause();
-      } catch (_) {}
-      try {
-        await _player!.dispose();
-      } catch (_) {}
-      _player = null;
-    }
-  }
-
-  MediaItem? get currentItemOrNull {
-    if (queue.isEmpty) return null;
-    final i = currentIndex.value;
-    if (i < 0 || i >= queue.length) return null;
-    return queue[i];
-  }
-
-  MediaVariant? get currentVideoVariant {
-    final item = currentItemOrNull;
-    if (item == null) return null;
-    // Prefer mp4 format if available
-    final mp4 = item.variants.firstWhereOrNull(
-      (v) =>
-          v.kind == MediaVariantKind.video && v.format.toLowerCase() == 'mp4',
-    );
-    if (mp4 != null) return mp4;
-    return item.localVideoVariant;
   }
 
   Future<void> togglePlay() async {
-    if (_player == null) return;
-    if (_player!.value.isPlaying) {
-      await _player!.pause();
-      isPlaying.value = false;
-      return;
-    }
-    await _player!.play();
-    isPlaying.value = true;
+    await videoService.toggle();
   }
 
   Future<void> seek(Duration value) async {
-    if (_player == null) return;
-    await _player!.seekTo(value);
-    position.value = value;
+    await videoService.seek(value);
   }
 
   Future<void> next() async {
     if (currentIndex.value < queue.length - 1) {
       currentIndex.value++;
-      await _loadAndPlayCurrent();
+      await _playCurrent();
     }
   }
 
   Future<void> previous() async {
     if (currentIndex.value > 0) {
       currentIndex.value--;
-      await _loadAndPlayCurrent();
+      await _playCurrent();
     }
   }
 
   Future<void> playAt(int index) async {
     if (index < 0 || index >= queue.length) return;
     currentIndex.value = index;
-    await _loadAndPlayCurrent();
+    await _playCurrent();
   }
 
-  /// Reintentar cargar el mismo vídeo (UI puede llamar esto)
+  /// Reintentar cargar el mismo vídeo
   Future<void> retry() async {
-    await _loadAndPlayCurrent();
+    await _playCurrent();
   }
-
-  /// Helpers legibles desde UI (evita problemas de resolución ocasional)
-  String? get errorMessage => error.value;
-  Future<void> retryLoad() => retry();
 
   @override
   void onClose() {
-    _disposePlayer();
     super.onClose();
   }
 }
