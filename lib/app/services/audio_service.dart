@@ -121,29 +121,32 @@ class AudioService extends GetxService {
     // -----------------------------------------------------------------------
     // ✅ LOCAL
     // -----------------------------------------------------------------------
-    final hasLocal =
-        variant.localPath != null && variant.localPath!.trim().isNotEmpty;
+    final localPath = variant.localPath?.trim();
+    final hasLocal = localPath != null && localPath.isNotEmpty;
 
     if (hasLocal) {
-      // ✅ CLAVE: usar localPath (si no existe, fallback a fileName)
-      final path =
-          (variant.localPath != null && variant.localPath!.trim().isNotEmpty)
-          ? variant.localPath!.trim()
-          : variant.fileName.trim();
-
-      final f = File(path);
+      final f = File(localPath);
       if (!f.existsSync()) {
         // debug útil
         print('❌ Local file not found');
         print('fileName = ${variant.fileName}');
         print('localPath = ${variant.localPath}');
-        print('using path = $path');
-        throw Exception('Archivo local no encontrado: $path');
+        print('using path = $localPath');
+
+        await _player.stop();
+        isLoading.value = false;
+        isPlaying.value = false;
+        state.value = PlaybackState.stopped;
+
+        throw Exception('Archivo local no encontrado: $localPath');
       }
 
       try {
+        final fileUri = Uri.file(localPath);
+        print('🎵 Playing local file: $fileUri');
+
         await _player.setAudioSource(
-          AudioSource.uri(Uri.file(path), tag: item.title),
+          AudioSource.uri(fileUri, tag: item.title),
           initialPosition: Duration.zero,
         );
 
@@ -161,6 +164,7 @@ class AudioService extends GetxService {
         isPlaying.value = false;
         state.value = PlaybackState.stopped;
 
+        print('❌ PlayerException: ${pe.message} (code: ${pe.code})');
         throw Exception(
           'Error al reproducir: ${pe.message} (code: ${pe.code})',
         );
@@ -173,6 +177,7 @@ class AudioService extends GetxService {
         isPlaying.value = false;
         state.value = PlaybackState.stopped;
 
+        print('❌ Error playing local file: $e');
         rethrow;
       } finally {
         isLoading.value = false;
@@ -183,11 +188,23 @@ class AudioService extends GetxService {
     // 🌐 REMOTO (backend)
     // -----------------------------------------------------------------------
     final kind = (variant.kind == MediaVariantKind.video) ? 'video' : 'audio';
+    final fileId = item.fileId.trim();
+    final format = variant.format.trim();
 
-    final url =
-        '${ApiConfig.baseUrl}/api/v1/media/file/${item.fileId}/$kind/${variant.format}';
+    if (fileId.isEmpty || format.isEmpty) {
+      await _player.stop();
+      isLoading.value = false;
+      isPlaying.value = false;
+      state.value = PlaybackState.stopped;
 
-    print('🎵 AudioService.play');
+      throw Exception(
+        'Faltan datos para reproducción remota (fileId o format vacíos)',
+      );
+    }
+
+    final url = '${ApiConfig.baseUrl}/api/v1/media/file/$fileId/$kind/$format';
+
+    print('🎵 AudioService.play (remote)');
     print('🌐 Audio URL: $url');
 
     try {
@@ -209,6 +226,7 @@ class AudioService extends GetxService {
       isPlaying.value = false;
       state.value = PlaybackState.stopped;
 
+      print('❌ PlayerException (remote): ${pe.message} (code: ${pe.code})');
       throw Exception('Error al reproducir: ${pe.message} (code: ${pe.code})');
     } catch (e) {
       await _player.stop();
@@ -219,6 +237,7 @@ class AudioService extends GetxService {
       isPlaying.value = false;
       state.value = PlaybackState.stopped;
 
+      print('❌ Error playing remote file: $e');
       rethrow;
     } finally {
       isLoading.value = false;

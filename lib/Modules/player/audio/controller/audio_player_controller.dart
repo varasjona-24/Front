@@ -147,15 +147,28 @@ class AudioPlayerController extends GetxController {
 
   /// ✅ “peluche”: siempre intenta conseguir una variante reproducible.
   /// Prioridad:
-  /// 1) audio local
-  /// 2) cualquier audio (remoto o metadata)
-  /// 3) si no hay audio, null
+  /// 1) audio local (debe tener localPath válido)
+  /// 2) cualquier audio válido (remoto o no)
+  /// 3) si no hay audio válido, null
   MediaVariant? get currentAudioVariant {
     final item = currentItemOrNull;
     if (item == null) return null;
 
-    return item.localAudioVariant ??
-        item.variants.firstWhereOrNull((v) => v.kind == MediaVariantKind.audio);
+    // 1️⃣ Buscar audio local con localPath válido
+    final localAudio = item.variants.firstWhereOrNull(
+      (v) =>
+          v.kind == MediaVariantKind.audio &&
+          v.localPath != null &&
+          v.localPath!.trim().isNotEmpty &&
+          v.isValid,
+    );
+    if (localAudio != null) return localAudio;
+
+    // 2️⃣ Buscar cualquier audio válido (local o remoto)
+    final anyAudio = item.variants.firstWhereOrNull(
+      (v) => v.kind == MediaVariantKind.audio && v.isValid,
+    );
+    return anyAudio;
   }
 
   bool get isPlaying => audioService.isPlaying.value;
@@ -199,26 +212,21 @@ class AudioPlayerController extends GetxController {
     position.value = Duration.zero;
     duration.value = Duration.zero;
 
-    // ✅ FIX LINK: obligamos a que el service reciba un URL reproducible.
-    // Si tu AudioService.play ya arma internamente la URL, aún así esto ayuda
-    // porque variant.playableUrl devuelve file:///... si local.
-    final url = variant.playableUrl.isNotEmpty
-        ? variant.playableUrl
-        : item.playableUrl;
-
-    // Si tu AudioService soporta playByUrl, úsalo. Si no, cae a play(item, variant).
-    if (audioService is dynamic &&
-        (audioService as dynamic).playByUrl != null) {
-      await (audioService as dynamic).playByUrl(
-        url: url,
-        item: item,
-        variant: variant,
-      );
-      return;
+    // ✅ Validar que tenemos una variante reproducible
+    if (!variant.isValid) {
+      print('❌ Cannot play: variant is not valid');
+      throw Exception('Variante no válida para reproducción');
     }
 
-    // fallback: tu método actual
-    await audioService.play(item, variant);
+    try {
+      print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
+      await audioService.play(item, variant);
+    } catch (e) {
+      print('❌ Error in _playItem: $e');
+      position.value = Duration.zero;
+      duration.value = Duration.zero;
+      rethrow;
+    }
   }
 
   // ===========================================================================
