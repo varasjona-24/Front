@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:audio_session/audio_session.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../app/controllers/theme_controller.dart';
+import '../../../app/data/local/local_library_store.dart';
+import '../../../app/models/media_item.dart';
 
 class SettingsController extends GetxController {
   final GetStorage _storage = GetStorage();
@@ -31,11 +37,13 @@ class SettingsController extends GetxController {
 
   // 🔄 Forzar refresco de datos de almacenamiento
   final RxInt storageTick = 0.obs;
+  final RxInt bluetoothTick = 0.obs;
 
   @override
   void onInit() {
     super.onInit();
     _loadSettings();
+    _configureAudioSession();
   }
 
   /// 📂 Cargar configuración guardada
@@ -54,6 +62,15 @@ class SettingsController extends GetxController {
       themeCtrl.setPalette(selectedPalette.value);
       themeCtrl.setBrightness(brightness.value);
     } catch (_) {}
+  }
+
+  Future<void> _configureAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+    } catch (e) {
+      print('Audio session init error: $e');
+    }
   }
 
   /// 🎨 Cambiar paleta
@@ -104,6 +121,44 @@ class SettingsController extends GetxController {
     _storage.write('autoPlayNext', value);
   }
 
+  Future<void> resetSettings() async {
+    selectedPalette.value = 'olive';
+    brightness.value = Brightness.dark;
+    defaultVolume.value = 100.0;
+    downloadQuality.value = 'high';
+    dataUsage.value = 'all';
+    autoPlayNext.value = true;
+
+    await _storage.write('selectedPalette', selectedPalette.value);
+    await _storage.write(
+      'brightness',
+      brightness.value == Brightness.light ? 'light' : 'dark',
+    );
+    await _storage.write('defaultVolume', defaultVolume.value);
+    await _storage.write('downloadQuality', downloadQuality.value);
+    await _storage.write('dataUsage', dataUsage.value);
+    await _storage.write('autoPlayNext', autoPlayNext.value);
+
+    try {
+      final themeCtrl = Get.find<ThemeController>();
+      themeCtrl.setPalette(selectedPalette.value);
+      themeCtrl.setBrightness(brightness.value);
+    } catch (_) {}
+  }
+
+  void refreshBluetoothDevices() {
+    bluetoothTick.value++;
+  }
+
+  Future<List<BluetoothDevice>> getConnectedBluetoothDevices() async {
+    try {
+      return await FlutterBluePlus.connectedDevices;
+    } catch (e) {
+      print('Bluetooth devices error: $e');
+      return const <BluetoothDevice>[];
+    }
+  }
+
   /// 🗑️ Limpiar caché (descargas/medios locales)
   Future<void> clearCache() async {
     try {
@@ -131,6 +186,77 @@ class SettingsController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
       print('clearCache error: $e');
+    }
+  }
+
+  Future<void> exportLibrary() async {
+    try {
+      final store = Get.find<LocalLibraryStore>();
+      final items = await store.readAll();
+
+      final appDir = await getApplicationDocumentsDirectory();
+      final exportPath = p.join(
+        appDir.path,
+        'listenfy_library_export.json',
+      );
+      final file = File(exportPath);
+      await file.writeAsString(
+        jsonEncode(items.map((e) => e.toJson()).toList()),
+        flush: true,
+      );
+
+      Get.snackbar(
+        'Biblioteca',
+        'Exportado en $exportPath',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Biblioteca',
+        'No se pudo exportar',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      print('exportLibrary error: $e');
+    }
+  }
+
+  Future<void> importLibrary() async {
+    try {
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+      );
+      final file = res?.files.first;
+      final path = file?.path;
+      if (path == null || path.trim().isEmpty) return;
+
+      final raw = await File(path).readAsString();
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        throw Exception('Invalid library file');
+      }
+
+      final store = Get.find<LocalLibraryStore>();
+      for (final entry in decoded) {
+        if (entry is! Map) continue;
+        final item = MediaItem.fromJson(
+          Map<String, dynamic>.from(entry),
+        );
+        await store.upsert(item);
+      }
+
+      Get.snackbar(
+        'Biblioteca',
+        'Importacion completada',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Biblioteca',
+        'No se pudo importar',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      print('importLibrary error: $e');
     }
   }
 

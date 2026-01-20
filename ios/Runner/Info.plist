@@ -17,6 +17,8 @@
 <array>
   <string>_http._tcp</string>
 </array>
+<key>NSBluetoothAlwaysUsageDescription</key>
+<string>Listenfy necesita acceso a Bluetooth para detectar dispositivos de audio.</string>
   <key>CFBundleDevelopmentRegion</key>
   <string>$(DEVELOPMENT_LANGUAGE)</string>
 

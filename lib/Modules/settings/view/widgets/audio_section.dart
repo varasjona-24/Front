@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_settings/app_settings.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../../controller/settings_controller.dart';
 
@@ -82,11 +83,65 @@ class AudioSection extends GetView<SettingsController> {
                     'Selecciona el dispositivo Bluetooth',
                   ),
                   trailing: OutlinedButton(
-                    onPressed: () =>
-                        AppSettings.openAppSettings(type: AppSettingsType.bluetooth),
+                    onPressed: () => AppSettings.openAppSettings(
+                      type: AppSettingsType.bluetooth,
+                    ),
                     child: const Text('Cambiar'),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Obx(() {
+                  controller.bluetoothTick.value;
+                  return FutureBuilder<List<BluetoothDevice>>(
+                    future: controller.getConnectedBluetoothDevices(),
+                    builder: (context, snap) {
+                      if (snap.connectionState != ConnectionState.done) {
+                        return const ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.sync_rounded),
+                          title: Text('Buscando dispositivos...'),
+                        );
+                      }
+
+                      final devices = snap.data ?? const <BluetoothDevice>[];
+                      if (devices.isEmpty) {
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.bluetooth_disabled_rounded),
+                          title: const Text('Sin dispositivos conectados'),
+                          trailing: IconButton(
+                            onPressed: controller.refreshBluetoothDevices,
+                            icon: const Icon(Icons.refresh_rounded),
+                          ),
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          for (final device in devices)
+                            ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.bluetooth_connected_rounded),
+                              title: Text(
+                                device.platformName.isNotEmpty
+                                    ? device.platformName
+                                    : device.remoteId.str,
+                              ),
+                              subtitle: const Text('Conectado'),
+                            ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: controller.refreshBluetoothDevices,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: const Text('Actualizar'),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                }),
               ],
             ),
           ),

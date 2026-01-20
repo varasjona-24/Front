@@ -52,6 +52,15 @@ class AboutSection extends GetView<SettingsController> {
                   'Última actualización',
                   '20 de enero de 2026',
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => controller.resetSettings(),
+                    icon: const Icon(Icons.restart_alt_rounded),
+                    label: const Text('Restablecer ajustes'),
+                  ),
+                ),
               ],
             ),
           ),

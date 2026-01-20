@@ -106,6 +106,26 @@ class DataSection extends GetView<SettingsController> {
                     label: const Text('🗑️ Limpiar caché'),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => controller.exportLibrary(),
+                        icon: const Icon(Icons.upload_file_rounded),
+                        label: const Text('Exportar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => controller.importLibrary(),
+                        icon: const Icon(Icons.download_rounded),
+                        label: const Text('Importar'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
