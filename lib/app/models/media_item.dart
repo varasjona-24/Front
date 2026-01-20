@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:flutter_listenfy/Modules/sources/domain/source_origin.dart';
+import 'package:flutter_listenfy/Modules/sources/domain/detect_source_origin.dart';
 
 enum MediaSource { local, youtube }
 
@@ -115,6 +116,18 @@ class MediaItem {
     return null;
   }
 
+  /// Subtitle legible en UI: usa subtitle -> origin -> fileName
+  String get displaySubtitle {
+    final s = subtitle.trim();
+    if (s.isNotEmpty) return s;
+
+    if (origin != SourceOrigin.generic) return origin.key;
+
+    final v = localAudioVariant ?? localVideoVariant ?? variants.firstOrNull;
+    final name = v?.fileName.trim() ?? '';
+    return name;
+  }
+
   // ============================
   // ✅ FIX CLAVE: URL / PATH reproducible
   // ============================
@@ -220,6 +233,8 @@ class MediaItem {
           json['lengthSeconds'],
     );
 
+    final origin = _parseOrigin(json);
+
     return MediaItem(
       id: id,
       publicId: publicId,
@@ -230,7 +245,7 @@ class MediaItem {
       thumbnailLocalPath: (json['thumbnailLocalPath'] as String?)?.trim(),
       variants: variants,
       durationSeconds: durationSeconds,
-      origin: SourceOriginX.fromKey(json['origin'] as String?),
+      origin: origin,
     );
   }
 
@@ -246,6 +261,39 @@ class MediaItem {
     'duration': durationSeconds,
     'variants': variants.map((v) => v.toJson()).toList(),
   };
+}
+
+SourceOrigin _parseOrigin(Map<String, dynamic> json) {
+  final originRaw = json['origin'] as String?;
+  var origin = SourceOriginX.fromKey(originRaw);
+  if (origin != SourceOrigin.generic) return origin;
+
+  final sourceRaw = (json['source'] as String?)?.toLowerCase().trim();
+  if (sourceRaw != null && sourceRaw.isNotEmpty) {
+    origin = SourceOriginX.fromKey(sourceRaw);
+    if (origin != SourceOrigin.generic) return origin;
+  }
+
+  final candidates = [
+    json['url'],
+    json['webpageUrl'],
+    json['webpage_url'],
+    json['sourceUrl'],
+    json['source_url'],
+    json['originalUrl'],
+    json['original_url'],
+    json['thumbnail'],
+  ];
+
+  for (final c in candidates) {
+    if (c is! String) continue;
+    final s = c.trim();
+    if (s.isEmpty) continue;
+    origin = detectSourceOriginFromUrl(s);
+    if (origin != SourceOrigin.generic) return origin;
+  }
+
+  return SourceOrigin.generic;
 }
 
 // ============================================================================

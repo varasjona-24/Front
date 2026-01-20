@@ -59,7 +59,7 @@ class MediaCard extends StatelessWidget {
 
             // 🏷 SUBTITLE
             Text(
-              item.subtitle,
+              item.displaySubtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall,

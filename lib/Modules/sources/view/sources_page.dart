@@ -580,6 +580,14 @@ class SourcesPage extends GetView<SourcesController> {
         onTap: openOrigin(SourceOrigin.chan4, '4chan'),
       ),
       pill(
+        origin: SourceOrigin.mega,
+        title: 'Mega',
+        subtitle: 'mega.nz',
+        icon: Icons.cloud_rounded,
+        colors: const [Color(0xFFE53935), Color(0xFFFF8A80)],
+        onTap: openOrigin(SourceOrigin.mega, 'Mega'),
+      ),
+      pill(
         origin: SourceOrigin.generic,
         title: 'Genérico',
         subtitle: 'Cualquier URL soportada',

@@ -9,6 +9,7 @@ import '../../models/media_item.dart';
 import '../local/local_library_store.dart';
 import '../network/dio_client.dart';
 import 'package:flutter_listenfy/Modules/sources/domain/source_origin.dart';
+import 'package:flutter_listenfy/Modules/sources/domain/detect_source_origin.dart';
 
 class MediaRepository {
   // ============================
@@ -27,9 +28,30 @@ class MediaRepository {
   }) async {
     // 1) siempre algo local
     final localItems = await _store.readAll();
+    final normalizedItems = <MediaItem>[];
+    final itemsToUpdate = <MediaItem>[];
+
+    for (final item in localItems) {
+      if (item.origin == SourceOrigin.generic) {
+        final inferred = _inferOriginFromItem(item);
+        if (inferred != SourceOrigin.generic) {
+          final updated = item.copyWith(origin: inferred);
+          normalizedItems.add(updated);
+          itemsToUpdate.add(updated);
+          continue;
+        }
+      }
+      normalizedItems.add(item);
+    }
+
+    if (itemsToUpdate.isNotEmpty) {
+      for (final item in itemsToUpdate) {
+        await _store.upsert(item);
+      }
+    }
 
     // 2) filtros opcionales
-    Iterable<MediaItem> result = localItems;
+    Iterable<MediaItem> result = normalizedItems;
 
     if (source != null && source.trim().isNotEmpty) {
       final s = source.toLowerCase().trim();
@@ -357,6 +379,32 @@ class MediaRepository {
     return MediaSource.local;
   }
 
+  SourceOrigin _detectOrigin(String? url) {
+    if (url == null || url.trim().isEmpty) return SourceOrigin.generic;
+    return detectSourceOriginFromUrl(url);
+  }
+
+  SourceOrigin _inferOriginFromItem(MediaItem item) {
+    final candidates = <String?>[item.thumbnail, item.subtitle];
+    for (final candidate in candidates) {
+      final s = candidate?.trim() ?? '';
+      if (s.isEmpty || !_looksLikeUrl(s)) continue;
+      final detected = detectSourceOriginFromUrl(s);
+      if (detected != SourceOrigin.generic) return detected;
+    }
+    return SourceOrigin.generic;
+  }
+
+  bool _looksLikeUrl(String value) {
+    final s = value.toLowerCase();
+    return s.contains('http://') ||
+        s.contains('https://') ||
+        s.contains('www.') ||
+        s.contains('.com') ||
+        s.contains('.net') ||
+        s.contains('.org');
+  }
+
   Future<void> _upsertItemWithVariant({
     required String resolvedId,
     required String? url,
@@ -406,6 +454,15 @@ class MediaRepository {
 
       final r = resolved ?? resolvedFallback;
 
+      final detectedOrigin = _detectOrigin(url);
+      final resolvedOrigin =
+          (r?.origin != null && r!.origin != SourceOrigin.generic)
+              ? r!.origin
+              : detectedOrigin;
+      final finalOrigin = existing.origin != SourceOrigin.generic
+          ? existing.origin
+          : resolvedOrigin;
+
       final updated = existing.copyWith(
         // NO toco title/subtitle si ya existen, solo si están vacíos
         title: (existing.title.trim().isEmpty)
@@ -426,7 +483,7 @@ class MediaRepository {
         durationSeconds: (existing.durationSeconds == null)
             ? r?.durationSeconds
             : existing.durationSeconds,
-        origin: r?.origin ?? existing.origin,
+        origin: finalOrigin,
         source: existing.source, // respeta el original
         variants: merged,
         publicId: resolvedId, // asegurar consistencia
@@ -443,6 +500,14 @@ class MediaRepository {
       resolvedFallback = await _fetchResolvedInfo(u);
     }
 
+    final detectedOrigin = _detectOrigin(url);
+    final resolvedForOrigin = resolved ?? resolvedFallback;
+    final resolvedOrigin =
+        (resolvedForOrigin?.origin != null &&
+                resolvedForOrigin!.origin != SourceOrigin.generic)
+            ? resolvedForOrigin!.origin
+            : detectedOrigin;
+
     final base =
         resolved ??
         resolvedFallback ??
@@ -452,7 +517,7 @@ class MediaRepository {
           title: resolvedId, // luego lo reemplazas por title real si lo tienes
           subtitle: u ?? 'Descarga local',
           source: source,
-          origin: SourceOrigin.generic,
+          origin: resolvedOrigin,
           thumbnail: null,
           thumbnailLocalPath: null,
           durationSeconds: null,

@@ -159,4 +159,5 @@ extension SettingsControllerQuality on SettingsController {
       'data_usage': dataUsage.value,
       'wifi_only': dataUsage.value == 'wifi_only',
     };
-  }}
+  }
+}

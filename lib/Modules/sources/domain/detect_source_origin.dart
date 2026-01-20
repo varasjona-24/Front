@@ -23,6 +23,7 @@ SourceOrigin detectSourceOriginFromUrl(String url) {
   if (u.contains('threads.net')) return SourceOrigin.threads;
   if (u.contains('vk.com')) return SourceOrigin.vk;
   if (u.contains('4chan.org')) return SourceOrigin.chan4;
+  if (u.contains('mega.nz')) return SourceOrigin.mega;
 
   return SourceOrigin.generic;
 }

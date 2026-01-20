@@ -261,8 +261,7 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
           child: Text(
             label,
             style: theme.textTheme.labelSmall?.copyWith(
-              color:
-                  isSelected ? scheme.onSecondary : scheme.onSurfaceVariant,
+              color: isSelected ? scheme.onSecondary : scheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),

@@ -18,6 +18,7 @@ enum SourceOrigin {
   threads,
   vk,
   chan4,
+  mega,
   generic,
 }
 
@@ -42,6 +43,7 @@ extension SourceOriginX on SourceOrigin {
       case SourceOrigin.threads: return 'threads';
       case SourceOrigin.vk: return 'vk';
       case SourceOrigin.chan4: return '4chan';
+      case SourceOrigin.mega: return 'mega';
       case SourceOrigin.generic: return 'generic';
     }
   }
@@ -70,6 +72,8 @@ extension SourceOriginX on SourceOrigin {
       case 'vk': return SourceOrigin.vk;
       case '4chan':
       case 'chan4': return SourceOrigin.chan4;
+      case 'mega':
+      case 'mega.nz': return SourceOrigin.mega;
       default: return SourceOrigin.generic;
     }
   }
