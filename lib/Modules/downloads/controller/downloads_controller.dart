@@ -128,6 +128,7 @@ class DownloadsController extends GetxController {
     String? mediaId,
     required String url,
     required String format,
+    String? quality,
   }) async {
     if (url.trim().isEmpty) {
       Get.snackbar(
@@ -152,6 +153,7 @@ class DownloadsController extends GetxController {
         url: url.trim(),
         kind: kind,
         format: format,
+        quality: quality,
       );
 
       if (Get.isDialogOpen ?? false) Get.back();

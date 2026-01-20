@@ -90,6 +90,7 @@ class MediaRepository {
     String? url,
     required String kind, // 'audio' | 'video'
     required String format, // 'mp3' | 'm4a' | 'mp4'...
+    String? quality, // 'low' | 'medium' | 'high'
   }) async {
     try {
       // ----------------------------
@@ -112,6 +113,7 @@ class MediaRepository {
         url: url,
         kind: normalizedKind,
         format: normalizedFormat,
+        quality: quality,
       );
 
       if (resolvedId.isEmpty) return false;
@@ -205,6 +207,7 @@ class MediaRepository {
     required String? url,
     required String kind,
     required String format,
+    String? quality,
   }) async {
     try {
       final resp = await _client.post(
@@ -215,18 +218,24 @@ class MediaRepository {
           if (url != null && url.trim().isNotEmpty) 'url': url.trim(),
           'kind': kind,
           'format': format,
+          if (quality != null && quality.trim().isNotEmpty)
+            'quality': quality.trim(),
         },
       );
 
-      // resolvedId = prefer mediaId param, else resp.data.mediaId, else fallback
-      String resolvedId = (mediaId ?? '').trim();
+      // resolvedId = prefer backend response, then client mediaId, then fallback
+      String resolvedId = '';
 
       final data = resp.data;
-      if (resolvedId.isEmpty && data is Map) {
+      if (data is Map) {
         final v = data['mediaId'];
         if (v is String && v.trim().isNotEmpty) {
           resolvedId = v.trim();
         }
+      }
+
+      if (resolvedId.isEmpty) {
+        resolvedId = (mediaId ?? '').trim();
       }
 
       if (resolvedId.isEmpty) {

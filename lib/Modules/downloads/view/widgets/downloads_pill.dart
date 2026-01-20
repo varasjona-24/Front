@@ -202,6 +202,7 @@ class DownloadsPill extends GetView<DownloadsController> {
           mediaId: mid.isEmpty ? null : mid,
           url: url,
           format: format,
+          quality: settingsCtrl.downloadQuality.value,
         );
       }
     } finally {

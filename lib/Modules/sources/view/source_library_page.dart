@@ -5,6 +5,7 @@ import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../player/audio/view/audio_player_page.dart';
 import '../domain/source_origin.dart';
+import '../../settings/controller/settings_controller.dart';
 
 // UI
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
@@ -29,6 +30,7 @@ class SourceLibraryPage extends StatefulWidget {
 
 class _SourceLibraryPageState extends State<SourceLibraryPage> {
   final MediaRepository _repo = Get.find<MediaRepository>();
+  final SettingsController _settings = Get.find<SettingsController>();
 
   Future<List<MediaItem>> _load([HomeMode? mode]) async {
     final all = await _repo.getLibrary();
@@ -325,6 +327,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   url: null,
                   kind: kind,
                   format: choice,
+                  quality: _settings.downloadQuality.value,
                 );
 
                 if (Get.isDialogOpen ?? false) Get.back();
