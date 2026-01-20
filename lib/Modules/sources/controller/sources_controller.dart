@@ -139,6 +139,48 @@ class SourcesController extends GetxController {
 
   void clearLocal() => localFiles.clear();
 
+  /// 🗑️ Limpia el caché de descargas y archivos temporales
+  Future<void> clearCache() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final mediaDir = Directory(p.join(appDir.path, 'media'));
+
+      if (await mediaDir.exists()) {
+        await mediaDir.delete(recursive: true);
+        await mediaDir.create(recursive: true);
+      }
+
+      print('✅ Caché limpiado correctamente');
+    } catch (e) {
+      print('❌ Error al limpiar caché: $e');
+    }
+  }
+
+  /// 📊 Obtiene el tamaño total del almacenamiento usado
+  Future<String> getStorageUsage() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final mediaDir = Directory(p.join(appDir.path, 'media'));
+
+      if (!await mediaDir.exists()) return '0 MB';
+
+      int totalSize = 0;
+      final files = mediaDir.listSync(recursive: true);
+
+      for (var file in files) {
+        if (file is File) {
+          totalSize += await file.length();
+        }
+      }
+
+      final mb = totalSize / (1024 * 1024);
+      return '${mb.toStringAsFixed(2)} MB';
+    } catch (e) {
+      print('Error getting storage usage: $e');
+      return '0 MB';
+    }
+  }
+
   // -------------------------
   // Helpers
   // -------------------------

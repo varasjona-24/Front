@@ -1,0 +1,297 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../controller/downloads_controller.dart';
+import '../../../../Modules/settings/controller/settings_controller.dart';
+import '../../../../app/ui/themes/app_spacing.dart';
+
+/// Panel de configuración de descargas dinámico (audio vs video)
+class DownloadSettingsPanel extends GetView<DownloadsController> {
+  const DownloadSettingsPanel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final settingsCtrl = Get.find<SettingsController>();
+
+    return Card(
+      elevation: 0,
+      color: scheme.surfaceContainer,
+      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 📥 Header
+            Row(
+              children: [
+                Icon(Icons.cloud_download_rounded, color: scheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Configuración de descargas',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // 📊 Calidad de descarga (DINÁMICA)
+            Obx(
+              () => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Calidad de descarga',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _getQualityDescription(settingsCtrl.downloadQuality.value),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _buildQualityChip(
+                          context: context,
+                          label: 'Baja',
+                          value: 'low',
+                          audioKbps: '128 kbps',
+                          videoP: '360p',
+                          current: settingsCtrl.downloadQuality.value,
+                          onTap: () => settingsCtrl.setDownloadQuality('low'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildQualityChip(
+                          context: context,
+                          label: 'Media',
+                          value: 'medium',
+                          audioKbps: '192 kbps',
+                          videoP: '720p',
+                          current: settingsCtrl.downloadQuality.value,
+                          onTap: () =>
+                              settingsCtrl.setDownloadQuality('medium'),
+                        ),
+                        const SizedBox(width: 8),
+                        _buildQualityChip(
+                          context: context,
+                          label: 'Alta',
+                          value: 'high',
+                          audioKbps: '320 kbps',
+                          videoP: '1080p',
+                          current: settingsCtrl.downloadQuality.value,
+                          onTap: () => settingsCtrl.setDownloadQuality('high'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // 📡 Uso de datos
+            Obx(
+              () => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Uso de datos',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _getDataUsageDescription(settingsCtrl.dataUsage.value),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildDataUsageChip(
+                          context: context,
+                          label: '📶 Solo Wi-Fi',
+                          value: 'wifi_only',
+                          current: settingsCtrl.dataUsage.value,
+                          onTap: () => settingsCtrl.setDataUsage('wifi_only'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildDataUsageChip(
+                          context: context,
+                          label: '🌐 Wi-Fi + Móvil',
+                          value: 'all',
+                          current: settingsCtrl.dataUsage.value,
+                          onTap: () => settingsCtrl.setDataUsage('all'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+
+            // ℹ️ Información
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: scheme.primaryContainer.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_rounded, color: scheme.primary, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Las descargas usarán diferentes estándares según el tipo: audio (MP3/M4A) o video (MP4/MKV).',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQualityChip({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required String audioKbps,
+    required String videoP,
+    required String current,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = current == value;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? scheme.primary : scheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: scheme.primary.withOpacity(isSelected ? 1 : 0.3),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: isSelected ? scheme.onPrimary : scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '🎵 $audioKbps',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: isSelected
+                    ? scheme.onPrimary.withOpacity(0.8)
+                    : scheme.onSurfaceVariant.withOpacity(0.7),
+                fontSize: 10,
+              ),
+            ),
+            Text(
+              '🎬 $videoP',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: isSelected
+                    ? scheme.onPrimary.withOpacity(0.8)
+                    : scheme.onSurfaceVariant.withOpacity(0.7),
+                fontSize: 10,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDataUsageChip({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required String current,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = current == value;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? scheme.secondary : scheme.surfaceVariant,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: scheme.secondary.withOpacity(isSelected ? 1 : 0.3),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color:
+                  isSelected ? scheme.onSecondary : scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getQualityDescription(String quality) {
+    switch (quality) {
+      case 'low':
+        return 'Baja: 128 kbps (audio) / 360p (video) - Menor consumo de datos';
+      case 'medium':
+        return 'Media: 192 kbps (audio) / 720p (video) - Balance calidad/datos';
+      case 'high':
+        return 'Alta: 320 kbps (audio) / 1080p (video) - Máxima calidad';
+      default:
+        return 'Alta: 320 kbps (audio) / 1080p (video) - Máxima calidad';
+    }
+  }
+
+  String _getDataUsageDescription(String usage) {
+    switch (usage) {
+      case 'wifi_only':
+        return 'Solo descargas en redes Wi-Fi';
+      case 'all':
+        return 'Descargas en Wi-Fi y conexiones móviles';
+      default:
+        return 'Descargas en Wi-Fi y conexiones móviles';
+    }
+  }
+}

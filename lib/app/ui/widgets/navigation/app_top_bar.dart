@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../../../../../app/routes/app_routes.dart';
 
 enum AppMediaMode { audio, video }
 
@@ -62,6 +65,10 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                 : scheme.onSurface.withOpacity(0.50),
           ),
           onPressed: onToggleMode,
+        ),
+        IconButton(
+          icon: const Icon(Icons.settings),
+          onPressed: () => Get.toNamed(AppRoutes.settings),
         ),
       ],
     );

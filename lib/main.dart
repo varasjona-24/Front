@@ -10,12 +10,16 @@ import 'app/data/network/dio_client.dart';
 import 'app/data/repo/media_repository.dart';
 import 'app/services/audio_service.dart';
 import 'app/services/video_service.dart';
+import 'Modules/settings/controller/settings_controller.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 🎨 Controller global de tema
   Get.put(ThemeController(), permanent: true);
+
+  // ⚙️ Controller global de configuración
+  Get.put(SettingsController(), permanent: true);
 
   // 🎵 Audio global (CLAVE)
   Get.put<AudioService>(AudioService(), permanent: true);

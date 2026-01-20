@@ -7,6 +7,7 @@ import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import 'widgets/download_settings_panel.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 
 class DownloadsPage extends GetView<DownloadsController> {
@@ -72,6 +73,11 @@ class DownloadsPage extends GetView<DownloadsController> {
                       children: [
                         _header(theme: theme, context: context),
                         const SizedBox(height: AppSpacing.lg),
+
+                        // 📥 Panel de configuración de descargas
+                        const DownloadSettingsPanel(),
+                        const SizedBox(height: AppSpacing.lg),
+
                         if (list.isEmpty)
                           Center(
                             child: Padding(
