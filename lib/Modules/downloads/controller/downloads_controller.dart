@@ -122,6 +122,36 @@ class DownloadsController extends GetxController {
   }
 
   // ============================
+  // ✏️ EDITAR METADATOS
+  // ============================
+  Future<void> updateMetadata(
+    MediaItem item, {
+    required String title,
+    required String subtitle,
+    required String thumbnail,
+    int? durationSeconds,
+  }) async {
+    try {
+      final updated = item.copyWith(
+        title: title,
+        subtitle: subtitle,
+        thumbnail: thumbnail.isEmpty ? null : thumbnail,
+        durationSeconds: durationSeconds ?? item.durationSeconds,
+      );
+
+      await _store.upsert(updated);
+      await load();
+    } catch (e) {
+      debugPrint('Error updating metadata: $e');
+      Get.snackbar(
+        'Metadata',
+        'No se pudo actualizar',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  // ============================
   // ⬇️ DESCARGAR DESDE URL
   // ============================
   Future<void> downloadFromUrl({

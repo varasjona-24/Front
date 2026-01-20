@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,66 +6,103 @@ import 'package:flutter/material.dart';
 import '../../../models/media_item.dart';
 import '../../themes/app_spacing.dart';
 
-class MediaCard extends StatelessWidget {
+class MediaCard extends StatefulWidget {
   final MediaItem item;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final double width;
 
   const MediaCard({
     super.key,
     required this.item,
     this.onTap,
+    this.onLongPress,
     this.width = 140,
   });
+
+  @override
+  State<MediaCard> createState() => _MediaCardState();
+}
+
+class _MediaCardState extends State<MediaCard> {
+  Timer? _holdTimer;
+  bool _fired = false;
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startHold() {
+    if (widget.onLongPress == null) return;
+    _holdTimer?.cancel();
+    _fired = false;
+    _holdTimer = Timer(const Duration(seconds: 2), () {
+      _fired = true;
+      widget.onLongPress?.call();
+    });
+  }
+
+  void _cancelHold() {
+    if (_fired) return;
+    _holdTimer?.cancel();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      splashColor: colors.primary.withOpacity(0.1),
-      highlightColor: colors.primary.withOpacity(0.05),
-      child: SizedBox(
-        width: width,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 🎨 THUMBNAIL / COVER
-            AspectRatio(
-              aspectRatio: 1,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: colors.surface,
-                  borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _startHold(),
+      onTapUp: (_) => _cancelHold(),
+      onTapCancel: _cancelHold,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: widget.onTap,
+        splashColor: colors.primary.withOpacity(0.1),
+        highlightColor: colors.primary.withOpacity(0.05),
+        child: SizedBox(
+          width: widget.width,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 🎨 THUMBNAIL / COVER
+              AspectRatio(
+                aspectRatio: 1,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  alignment: Alignment.center,
+                  child: _buildThumbnail(context),
                 ),
-                alignment: Alignment.center,
-                child: _buildThumbnail(context),
               ),
-            ),
 
-            const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.sm),
 
-            // 🏷 TITLE
-            Text(
-              item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium,
-            ),
+              // 🏷 TITLE
+              Text(
+                widget.item.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodyMedium,
+              ),
 
-            const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpacing.xs),
 
-            // 🏷 SUBTITLE
-            Text(
-              item.displaySubtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall,
-            ),
-          ],
+              // 🏷 SUBTITLE
+              Text(
+                widget.item.displaySubtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -74,7 +112,7 @@ class MediaCard extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     // 1) ✅ Preferir thumbnail local si existe
-    final local = item.thumbnailLocalPath?.trim();
+    final local = widget.item.thumbnailLocalPath?.trim();
     if (local != null && local.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -89,7 +127,7 @@ class MediaCard extends StatelessWidget {
     }
 
     // 2) 🌐 Fallback a thumbnail remoto
-    final remote = item.thumbnail?.trim();
+    final remote = widget.item.thumbnail?.trim();
     if (remote != null && remote.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
@@ -108,7 +146,7 @@ class MediaCard extends StatelessWidget {
   }
 
   Widget _fallbackIcon(ColorScheme colors) {
-    final isVideo = item.hasVideoLocal || item.localVideoVariant != null;
+    final isVideo = widget.item.hasVideoLocal || widget.item.localVideoVariant != null;
 
     return Container(
       decoration: BoxDecoration(

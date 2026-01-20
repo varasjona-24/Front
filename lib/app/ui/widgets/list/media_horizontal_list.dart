@@ -10,12 +10,14 @@ class MediaHorizontalList extends StatelessWidget {
   final List<MediaItem> items;
   final bool isLoading;
   final void Function(MediaItem item, int index) onItemTap;
+  final void Function(MediaItem item, int index)? onItemLongPress;
 
   const MediaHorizontalList({
     super.key,
     required this.title,
     required this.items,
     required this.onItemTap,
+    this.onItemLongPress,
     this.isLoading = false,
   });
 
@@ -68,10 +70,16 @@ class MediaHorizontalList extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              return MediaCard(item: item, onTap: () => onItemTap(item, index));
-            },
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return MediaCard(
+                  item: item,
+                  onTap: () => onItemTap(item, index),
+                  onLongPress: onItemLongPress == null
+                      ? null
+                      : () => onItemLongPress!(item, index),
+                );
+              },
           ),
         ),
       ],

@@ -3,7 +3,7 @@ import 'package:get_storage/get_storage.dart';
 
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
-import '../controller/home_controller.dart';
+import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 
 class HomeBinding extends Bindings {
   @override

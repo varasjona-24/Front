@@ -1,0 +1,338 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:get/get.dart';
+
+import '../../../app/models/media_item.dart';
+import '../../sources/domain/source_origin.dart';
+import '../controller/downloads_controller.dart';
+import '../../../app/data/local/local_library_store.dart';
+import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
+
+class EditMediaMetadataPage extends StatefulWidget {
+  const EditMediaMetadataPage({super.key, required this.item});
+
+  final MediaItem item;
+
+  @override
+  State<EditMediaMetadataPage> createState() => _EditMediaMetadataPageState();
+}
+
+class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
+  final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _artistCtrl;
+  late final TextEditingController _thumbCtrl;
+  late final TextEditingController _durationCtrl;
+  String? _localThumbPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.item.title);
+    _artistCtrl = TextEditingController(text: widget.item.subtitle);
+    _thumbCtrl = TextEditingController(text: widget.item.thumbnail ?? '');
+    _durationCtrl = TextEditingController(
+      text: widget.item.durationSeconds?.toString() ?? '',
+    );
+    _localThumbPath = widget.item.thumbnailLocalPath;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _artistCtrl.dispose();
+    _thumbCtrl.dispose();
+    _durationCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      Get.snackbar(
+        'Metadata',
+        'El titulo no puede estar vacio',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final rawDuration = _durationCtrl.text.trim();
+    int? durationSeconds;
+    if (rawDuration.isNotEmpty) {
+      final parsed = int.tryParse(rawDuration);
+      if (parsed == null || parsed < 0) {
+        Get.snackbar(
+          'Metadata',
+          'La duracion debe ser un numero valido',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+      durationSeconds = parsed;
+    }
+
+    final updated = widget.item.copyWith(
+      title: title,
+      subtitle: _artistCtrl.text.trim(),
+      thumbnail: _thumbCtrl.text.trim().isEmpty
+          ? null
+          : _thumbCtrl.text.trim(),
+      thumbnailLocalPath: _localThumbPath,
+      durationSeconds: durationSeconds ?? widget.item.durationSeconds,
+    );
+
+    await _store.upsert(updated);
+
+    if (Get.isRegistered<DownloadsController>()) {
+      await Get.find<DownloadsController>().load();
+    }
+    if (Get.isRegistered<HomeController>()) {
+      await Get.find<HomeController>().loadHome();
+    }
+
+    if (mounted) {
+      Get.back(result: true);
+    }
+  }
+
+  Widget _buildThumbnail(BuildContext context) {
+    final theme = Theme.of(context);
+    final thumb = _localThumbPath?.trim().isNotEmpty == true
+        ? _localThumbPath
+        : widget.item.effectiveThumbnail;
+
+    if (thumb != null && thumb.startsWith('http')) {
+      return Image.network(
+        thumb,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallbackThumb(theme),
+      );
+    }
+
+    if (thumb != null && thumb.isNotEmpty) {
+      return Image.file(
+        File(thumb),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _fallbackThumb(theme),
+      );
+    }
+
+    return _fallbackThumb(theme);
+  }
+
+  Widget _fallbackThumb(ThemeData theme) {
+    final isVideo = widget.item.hasVideoLocal;
+    return Center(
+      child: Icon(
+        isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
+        size: 44,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+
+  Future<void> _pickLocalThumbnail() async {
+    final res = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+    );
+
+    final file = (res != null && res.files.isNotEmpty) ? res.files.first : null;
+    final path = file?.path;
+    if (path == null || path.trim().isEmpty) return;
+
+    setState(() {
+      _localThumbPath = path;
+      _thumbCtrl.text = '';
+    });
+  }
+
+  void _clearThumbnail() {
+    setState(() {
+      _localThumbPath = null;
+      _thumbCtrl.text = '';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Editar metadatos'),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: FilledButton(
+            onPressed: _save,
+            child: const Text('Guardar cambios'),
+          ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: SizedBox(
+                      width: 88,
+                      height: 88,
+                      child: _buildThumbnail(context),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.item.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          widget.item.displaySubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Origen: ${widget.item.origin.key}',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Informacion basica',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+          TextField(
+            controller: _titleCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Titulo',
+              prefixIcon: Icon(Icons.music_note_rounded),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _artistCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Artista',
+              prefixIcon: Icon(Icons.person_rounded),
+            ),
+          ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Extras',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _pickLocalThumbnail,
+                          icon: const Icon(Icons.photo_library_rounded),
+                          label: const Text('Elegir imagen'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton(
+                        onPressed: _clearThumbnail,
+                        child: const Text('Limpiar'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _thumbCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Thumbnail URL (opcional)',
+                      prefixIcon: Icon(Icons.image_rounded),
+                    ),
+                  ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _durationCtrl,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Duracion en segundos (opcional)',
+              prefixIcon: Icon(Icons.timer_rounded),
+            ),
+          ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Fuente: ${widget.item.source.name}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

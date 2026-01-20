@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 
-import 'package:flutter_listenfy/Modules/player/Video/Controller/video_player_controller.dart';
+import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_controller.dart';
 import '../../audio/view/queue_page.dart';
 
 class VideoPlayerPage extends GetView<VideoPlayerController> {

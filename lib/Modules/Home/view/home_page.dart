@@ -1,15 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../controller/home_controller.dart';
+import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
+import '../../../app/models/media_item.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/list/media_horizontal_list.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import '../../downloads/view/edit_media_page.dart';
 
 class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
+
+  void _openEdit(BuildContext context, MediaItem item) {
+    Get.to(() => EditMediaMetadataPage(item: item));
+  }
+
+  Future<void> _showItemActions(BuildContext context, MediaItem item) async {
+    final theme = Theme.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit_rounded),
+                  title: const Text('Editar cancion'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openEdit(context, item);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: const Text('Borrar del dispositivo'),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +119,9 @@ class HomePage extends GetView<HomeController> {
                                       index,
                                       controller.recentlyPlayed,
                                     ),
+                                onItemLongPress: (item, _) {
+                                  _showItemActions(context, item);
+                                },
                               ),
 
                             if (controller.latestDownloads.isNotEmpty) ...[
@@ -86,6 +135,9 @@ class HomePage extends GetView<HomeController> {
                                       index,
                                       controller.latestDownloads,
                                     ),
+                                onItemLongPress: (item, _) {
+                                  _showItemActions(context, item);
+                                },
                               ),
                             ],
 
@@ -100,6 +152,9 @@ class HomePage extends GetView<HomeController> {
                                       index,
                                       controller.favorites,
                                     ),
+                                onItemLongPress: (item, _) {
+                                  _showItemActions(context, item);
+                                },
                               ),
                             ],
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -10,6 +12,7 @@ import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import 'widgets/download_settings_panel.dart';
 import 'widgets/downloads_pill.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
+import 'edit_media_page.dart';
 
 class DownloadsPage extends GetView<DownloadsController> {
   const DownloadsPage({super.key});
@@ -104,8 +107,8 @@ class DownloadsPage extends GetView<DownloadsController> {
                                 child: _DownloadTile(
                                   item: list[i],
                                   onPlay: controller.play,
-                                  onDelete: (item) =>
-                                      _confirmDelete(context, item),
+                                  onHold: (item) =>
+                                      _showItemActions(context, item),
                                 ),
                               ),
                             ),
@@ -128,6 +131,10 @@ class DownloadsPage extends GetView<DownloadsController> {
         ),
       );
     });
+  }
+
+  void _openEdit(BuildContext context, MediaItem item) {
+    Get.to(() => EditMediaMetadataPage(item: item));
   }
 
   // ============================
@@ -177,6 +184,47 @@ class DownloadsPage extends GetView<DownloadsController> {
     );
 
     if (ok == true) controller.delete(item);
+  }
+
+  Future<void> _showItemActions(BuildContext context, MediaItem item) async {
+    final theme = Theme.of(context);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit_rounded),
+                  title: const Text('Editar cancion'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openEdit(context, item);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: const Text('Borrar del dispositivo'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _confirmDelete(context, item);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Widget _bottomNav({
@@ -236,49 +284,88 @@ class DownloadsPage extends GetView<DownloadsController> {
 // Tile
 // ============================================================================
 
-class _DownloadTile extends StatelessWidget {
+class _DownloadTile extends StatefulWidget {
   final MediaItem item;
   final void Function(MediaItem item) onPlay;
-  final void Function(MediaItem item) onDelete;
+  final void Function(MediaItem item) onHold;
 
   const _DownloadTile({
     required this.item,
     required this.onPlay,
-    required this.onDelete,
+    required this.onHold,
   });
+
+  @override
+  State<_DownloadTile> createState() => _DownloadTileState();
+}
+
+class _DownloadTileState extends State<_DownloadTile> {
+  Timer? _holdTimer;
+  bool _fired = false;
+
+  @override
+  void dispose() {
+    _holdTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startHold() {
+    _holdTimer?.cancel();
+    _fired = false;
+    _holdTimer = Timer(const Duration(seconds: 2), () {
+      _fired = true;
+      widget.onHold(widget.item);
+    });
+  }
+
+  void _cancelHold() {
+    if (_fired) return;
+    _holdTimer?.cancel();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final v = item.variants.isNotEmpty ? item.variants.first : null;
+    final v = widget.item.variants.isNotEmpty
+        ? widget.item.variants.first
+        : null;
 
     final isVideo = v?.kind == MediaVariantKind.video;
     final icon = isVideo ? Icons.videocam_rounded : Icons.music_note_rounded;
 
-    final subtitle = item.displaySubtitle;
+    final subtitle = widget.item.displaySubtitle;
 
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        leading: Icon(icon),
-        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: Wrap(
-          spacing: 4,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.play_arrow_rounded),
-              tooltip: 'Reproducir',
-              onPressed: () => onPlay(item),
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline_rounded),
-              tooltip: 'Eliminar descarga',
-              onPressed: () => onDelete(item),
-            ),
-          ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) => _startHold(),
+      onTapUp: (_) => _cancelHold(),
+      onTapCancel: _cancelHold,
+      child: Card(
+        elevation: 0,
+        color: theme.colorScheme.surfaceContainer,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: ListTile(
+          leading: Icon(icon),
+          title: Text(
+            widget.item.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            subtitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Wrap(
+            spacing: 4,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.play_arrow_rounded),
+                tooltip: 'Reproducir',
+                onPressed: () => widget.onPlay(widget.item),
+              ),
+            ],
+          ),
         ),
       ),
     );

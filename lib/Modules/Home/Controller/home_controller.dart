@@ -1,13 +1,17 @@
+import 'dart:io';
+
 import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/routes/app_routes.dart';
+import '../../../app/data/local/local_library_store.dart';
 
 enum HomeMode { audio, video }
 
 class HomeController extends GetxController {
   final MediaRepository _repo = Get.find();
+  final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
 
   final Rx<HomeMode> mode = HomeMode.audio.obs;
   final RxBool isLoading = false.obs;
@@ -78,6 +82,28 @@ class HomeController extends GetxController {
         : AppRoutes.videoPlayer;
 
     Get.toNamed(route, arguments: {'queue': list, 'index': index});
+  }
+
+  Future<void> deleteLocalItem(MediaItem item) async {
+    try {
+      for (final v in item.variants) {
+        final pth = v.localPath;
+        if (pth != null && pth.isNotEmpty) {
+          final f = File(pth);
+          if (await f.exists()) await f.delete();
+        }
+      }
+
+      await _store.remove(item.id);
+      await loadHome();
+    } catch (e) {
+      print('Error deleting local item: $e');
+      Get.snackbar(
+        'Downloads',
+        'Error al eliminar',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 
   void goToPlaylists() => Get.toNamed(AppRoutes.playlists);

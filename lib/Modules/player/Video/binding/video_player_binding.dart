@@ -2,7 +2,7 @@ import 'package:get/get.dart';
 
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/video_service.dart';
-import '../Controller/video_player_controller.dart';
+import '../controller/video_player_controller.dart';
 
 class VideoPlayerBinding extends Bindings {
   @override
