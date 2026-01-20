@@ -207,9 +207,6 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                         case 4:
                           home.goToSources();
                           break;
-                        case 5:
-                          home.goToSettings();
-                          break;
                       }
                     },
                   ),

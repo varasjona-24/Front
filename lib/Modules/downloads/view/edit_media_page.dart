@@ -75,13 +75,14 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
       durationSeconds = parsed;
     }
 
+    final remoteThumb = _thumbCtrl.text.trim();
+    final useRemoteThumb = remoteThumb.isNotEmpty;
+
     final updated = widget.item.copyWith(
       title: title,
       subtitle: _artistCtrl.text.trim(),
-      thumbnail: _thumbCtrl.text.trim().isEmpty
-          ? null
-          : _thumbCtrl.text.trim(),
-      thumbnailLocalPath: _localThumbPath,
+      thumbnail: useRemoteThumb ? remoteThumb : null,
+      thumbnailLocalPath: useRemoteThumb ? null : _localThumbPath,
       durationSeconds: durationSeconds ?? widget.item.durationSeconds,
     );
 

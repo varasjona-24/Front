@@ -198,9 +198,6 @@ class HomePage extends GetView<HomeController> {
                         case 4:
                           controller.goToSources();
                           break;
-                        case 5:
-                          controller.goToSettings();
-                          break;
                       }
                     },
                   ),

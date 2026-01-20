@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:io';
+
 import 'package:get_storage/get_storage.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../app/controllers/theme_controller.dart';
 
@@ -25,6 +29,9 @@ class SettingsController extends GetxController {
   // 🎵 Reproducción automática
   final RxBool autoPlayNext = true.obs;
 
+  // 🔄 Forzar refresco de datos de almacenamiento
+  final RxInt storageTick = 0.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -41,6 +48,12 @@ class SettingsController extends GetxController {
     downloadQuality.value = _storage.read('downloadQuality') ?? 'high';
     dataUsage.value = _storage.read('dataUsage') ?? 'all';
     autoPlayNext.value = _storage.read('autoPlayNext') ?? true;
+
+    try {
+      final themeCtrl = Get.find<ThemeController>();
+      themeCtrl.setPalette(selectedPalette.value);
+      themeCtrl.setBrightness(brightness.value);
+    } catch (_) {}
   }
 
   /// 🎨 Cambiar paleta
@@ -61,12 +74,7 @@ class SettingsController extends GetxController {
     // Aplicar tema globalmente
     try {
       final themeCtrl = Get.find<ThemeController>();
-      if (mode == Brightness.dark) {
-        themeCtrl.brightness.value = Brightness.dark;
-      } else {
-        themeCtrl.brightness.value = Brightness.light;
-      }
-      themeCtrl.brightness.refresh();
+      themeCtrl.setBrightness(mode);
     } catch (e) {
       print('Error applying brightness: $e');
     }
@@ -96,18 +104,63 @@ class SettingsController extends GetxController {
     _storage.write('autoPlayNext', value);
   }
 
-  /// 🗑️ Limpiar caché (placeholder)
-  void clearCache() {
-    Get.snackbar(
-      'Caché',
-      'Caché limpiado correctamente',
-      snackPosition: SnackPosition.BOTTOM,
-    );
+  /// 🗑️ Limpiar caché (descargas/medios locales)
+  Future<void> clearCache() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final downloadsDir = Directory(p.join(appDir.path, 'downloads'));
+      final mediaDir = Directory(p.join(appDir.path, 'media'));
+
+      if (await downloadsDir.exists()) {
+        await downloadsDir.delete(recursive: true);
+      }
+      if (await mediaDir.exists()) {
+        await mediaDir.delete(recursive: true);
+      }
+
+      Get.snackbar(
+        'Caché',
+        'Caché limpiado correctamente',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      storageTick.value++;
+    } catch (e) {
+      Get.snackbar(
+        'Caché',
+        'No se pudo limpiar el caché',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      print('clearCache error: $e');
+    }
   }
 
-  /// 📊 Obtener información de almacenamiento (placeholder)
-  String getStorageInfo() {
-    return 'Almacenamiento: ~500 MB';
+  /// 📊 Obtener información de almacenamiento (descargas/medios)
+  Future<String> getStorageInfo() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final downloadsDir = Directory(p.join(appDir.path, 'downloads'));
+      final mediaDir = Directory(p.join(appDir.path, 'media'));
+
+      final totalBytes =
+          await _dirSize(downloadsDir) + await _dirSize(mediaDir);
+      final mb = totalBytes / (1024 * 1024);
+      return '${mb.toStringAsFixed(2)} MB';
+    } catch (e) {
+      print('storage info error: $e');
+      return '0 MB';
+    }
+  }
+
+  Future<int> _dirSize(Directory dir) async {
+    if (!await dir.exists()) return 0;
+    int total = 0;
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is File) {
+        final len = await entity.length();
+        total += len;
+      }
+    }
+    return total;
   }
 
   /// 🎵 Obtener bitrate de audio según calidad

@@ -153,13 +153,10 @@ class SourcesPage extends GetView<SourcesController> {
           case 3:
             home.goToDownloads();
             break;
-          case 4:
-            home.goToSources();
-            break;
-          case 5:
-            home.goToSettings();
-            break;
-        }
+        case 4:
+          home.goToSources();
+          break;
+      }
       },
       itemBuilder: (_) => const [
         PopupMenuItem(value: 0, child: Text('Home')),
@@ -307,9 +304,6 @@ class SourcesPage extends GetView<SourcesController> {
                   break;
                 case 4:
                   home.goToSources();
-                  break;
-                case 5:
-                  home.goToSettings();
                   break;
               }
             },

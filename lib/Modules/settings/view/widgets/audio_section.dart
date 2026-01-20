@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:app_settings/app_settings.dart';
 
 import '../../controller/settings_controller.dart';
 
@@ -70,6 +71,20 @@ class AudioSection extends GetView<SettingsController> {
                     onChanged: (value) {
                       controller.setAutoPlayNext(value);
                     },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.bluetooth_audio_rounded),
+                  title: const Text('Salida de audio'),
+                  subtitle: const Text(
+                    'Selecciona el dispositivo Bluetooth',
+                  ),
+                  trailing: OutlinedButton(
+                    onPressed: () =>
+                        AppSettings.openAppSettings(type: AppSettingsType.bluetooth),
+                    child: const Text('Cambiar'),
                   ),
                 ),
               ],

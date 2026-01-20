@@ -30,6 +30,12 @@ class ThemeController extends GetxController {
     _applyTheme();
   }
 
+  /// 🌗 Cambiar modo de brillo
+  void setBrightness(Brightness mode) {
+    brightness.value = mode;
+    _applyTheme();
+  }
+
   /// 🔁 Aplica el theme globalmente
   void _applyTheme() {
     Get.changeTheme(

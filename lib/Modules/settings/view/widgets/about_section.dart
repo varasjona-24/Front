@@ -31,11 +31,21 @@ class AboutSection extends GetView<SettingsController> {
               children: [
                 _buildInfoRow(context, 'Versión', '1.0.0'),
                 const Divider(height: 16),
-                _buildInfoRow(
-                  context,
-                  'Almacenamiento',
-                  controller.getStorageInfo(),
-                ),
+                Obx(() {
+                  controller.storageTick.value;
+                  return FutureBuilder<String>(
+                    future: controller.getStorageInfo(),
+                    builder: (context, snap) {
+                      final value =
+                          snap.hasData ? snap.data! : 'Calculando...';
+                      return _buildInfoRow(
+                        context,
+                        'Almacenamiento',
+                        value,
+                      );
+                    },
+                  );
+                }),
                 const Divider(height: 16),
                 _buildInfoRow(
                   context,

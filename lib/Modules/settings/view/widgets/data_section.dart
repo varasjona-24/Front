@@ -75,6 +75,26 @@ class DataSection extends GetView<SettingsController> {
                 ),
                 const SizedBox(height: 16),
 
+                // Almacenamiento usado
+                Obx(() {
+                  controller.storageTick.value;
+                  return FutureBuilder<String>(
+                    future: controller.getStorageInfo(),
+                    builder: (context, snap) {
+                      final value =
+                          snap.hasData ? snap.data! : 'Calculando...';
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.storage_rounded),
+                        title: const Text('Almacenamiento usado'),
+                        subtitle: Text(value),
+                      );
+                    },
+                  );
+                }),
+
+                const SizedBox(height: 8),
+
                 // Limpiar caché
                 SizedBox(
                   width: double.infinity,

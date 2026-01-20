@@ -268,9 +268,6 @@ class DownloadsPage extends GetView<DownloadsController> {
                 case 4:
                   home.goToSources();
                   break;
-                case 5:
-                  home.goToSettings();
-                  break;
               }
             },
           ),
