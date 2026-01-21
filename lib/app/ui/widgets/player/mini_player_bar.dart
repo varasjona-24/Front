@@ -7,6 +7,7 @@ import '../../../models/media_item.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/audio_service.dart';
 import '../../../services/video_service.dart';
+import '../../../controllers/navigation_controller.dart';
 import '../../../../Modules/player/audio/controller/audio_player_controller.dart';
 import '../../../../Modules/player/Video/controller/video_player_controller.dart';
 
@@ -17,8 +18,14 @@ class MiniPlayerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final audio = Get.find<AudioService>();
     final video = Get.find<VideoService>();
+    final nav = Get.find<NavigationController>();
 
     return Obx(() {
+      final route = nav.currentRoute.value;
+      if (route == AppRoutes.audioPlayer || route == AppRoutes.videoPlayer) {
+        return const SizedBox.shrink();
+      }
+
       final audioCtrl = Get.isRegistered<AudioPlayerController>()
           ? Get.find<AudioPlayerController>()
           : null;

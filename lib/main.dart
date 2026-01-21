@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
 import 'app/controllers/theme_controller.dart';
+import 'app/controllers/navigation_controller.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/ui/themes/app_theme_factory.dart';
@@ -20,6 +21,9 @@ Future<void> main() async {
 
   // 🎨 Controller global de tema
   Get.put(ThemeController(), permanent: true);
+
+  // 🧭 Controller global de navegación
+  Get.put(NavigationController(), permanent: true);
 
   // ⚙️ Controller global de configuración
   Get.put(SettingsController(), permanent: true);
@@ -56,6 +60,13 @@ class MyApp extends StatelessWidget {
 
         // 🧭 Rutas GetX
         getPages: AppPages.routes,
+
+        routingCallback: (routing) {
+          final current = routing?.current;
+          if (current != null) {
+            Get.find<NavigationController>().setRoute(current);
+          }
+        },
 
         builder: (context, child) {
           return Overlay(
