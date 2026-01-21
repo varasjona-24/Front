@@ -7,6 +7,8 @@ import '../../../models/media_item.dart';
 import '../../../routes/app_routes.dart';
 import '../../../services/audio_service.dart';
 import '../../../services/video_service.dart';
+import '../../../../Modules/player/audio/controller/audio_player_controller.dart';
+import '../../../../Modules/player/Video/controller/video_player_controller.dart';
 
 class MiniPlayerBar extends StatelessWidget {
   const MiniPlayerBar({super.key});
@@ -17,6 +19,13 @@ class MiniPlayerBar extends StatelessWidget {
     final video = Get.find<VideoService>();
 
     return Obx(() {
+      final audioCtrl = Get.isRegistered<AudioPlayerController>()
+          ? Get.find<AudioPlayerController>()
+          : null;
+      final videoCtrl = Get.isRegistered<VideoPlayerController>()
+          ? Get.find<VideoPlayerController>()
+          : null;
+
       final audioItem = audio.currentItem.value;
       final videoItem = video.currentItem.value;
       final audioActive = audioItem != null &&
@@ -33,10 +42,21 @@ class MiniPlayerBar extends StatelessWidget {
       final isPlaying =
           isVideo ? video.isPlaying.value : audio.isPlaying.value;
 
+      final canPrev = isVideo
+          ? (videoCtrl != null && videoCtrl.currentIndex.value > 0)
+          : (audioCtrl != null && audioCtrl.currentIndex.value > 0);
+      final canNext = isVideo
+          ? (videoCtrl != null &&
+              videoCtrl.currentIndex.value < videoCtrl.queue.length - 1)
+          : (audioCtrl != null &&
+              audioCtrl.currentIndex.value < audioCtrl.queue.length - 1);
+
       return _MiniBar(
         item: item,
         isVideo: isVideo,
         isPlaying: isPlaying,
+        canPrev: canPrev,
+        canNext: canNext,
         onToggle: () async {
           if (isVideo) {
             await video.toggle();
@@ -44,6 +64,24 @@ class MiniPlayerBar extends StatelessWidget {
             await audio.toggle();
           }
         },
+        onPrev: canPrev
+            ? () async {
+                if (isVideo) {
+                  await videoCtrl?.previous();
+                } else {
+                  await audioCtrl?.previous();
+                }
+              }
+            : null,
+        onNext: canNext
+            ? () async {
+                if (isVideo) {
+                  await videoCtrl?.next();
+                } else {
+                  await audioCtrl?.next();
+                }
+              }
+            : null,
         onClose: () async {
           if (isVideo) {
             await video.stop();
@@ -69,7 +107,11 @@ class _MiniBar extends StatelessWidget {
     required this.item,
     required this.isVideo,
     required this.isPlaying,
+    required this.canPrev,
+    required this.canNext,
     required this.onToggle,
+    required this.onPrev,
+    required this.onNext,
     required this.onClose,
     required this.onOpen,
   });
@@ -77,7 +119,11 @@ class _MiniBar extends StatelessWidget {
   final MediaItem item;
   final bool isVideo;
   final bool isPlaying;
+  final bool canPrev;
+  final bool canNext;
   final VoidCallback onToggle;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
   final VoidCallback onClose;
   final VoidCallback onOpen;
 
@@ -86,6 +132,10 @@ class _MiniBar extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final thumb = item.effectiveThumbnail;
+    final bg = Color.alphaBlend(
+      scheme.primary.withOpacity(0.18),
+      scheme.surface,
+    );
 
     return Material(
       color: Colors.transparent,
@@ -96,7 +146,7 @@ class _MiniBar extends StatelessWidget {
           onTap: onOpen,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: scheme.surfaceContainerHigh,
+              color: bg,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: scheme.primary.withOpacity(0.18),
@@ -142,11 +192,21 @@ class _MiniBar extends StatelessWidget {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Anterior',
+                    icon: const Icon(Icons.skip_previous_rounded),
+                    onPressed: canPrev ? onPrev : null,
+                  ),
+                  IconButton(
                     tooltip: isPlaying ? 'Pausar' : 'Reproducir',
                     icon: Icon(
                       isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     ),
                     onPressed: onToggle,
+                  ),
+                  IconButton(
+                    tooltip: 'Siguiente',
+                    icon: const Icon(Icons.skip_next_rounded),
+                    onPressed: canNext ? onNext : null,
                   ),
                   IconButton(
                     tooltip: 'Cerrar',
