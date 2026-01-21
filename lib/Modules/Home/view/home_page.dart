@@ -47,6 +47,7 @@ class HomePage extends GetView<HomeController> {
                   title: const Text('Borrar del dispositivo'),
                   onTap: () async {
                     Navigator.of(ctx).pop();
+                    await controller.deleteLocalItem(item);
                   },
                 ),
               ],

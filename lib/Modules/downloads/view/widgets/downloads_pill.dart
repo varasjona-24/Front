@@ -107,20 +107,7 @@ class DownloadsPill extends GetView<DownloadsController> {
                           prefixIcon: Icon(Icons.link_rounded),
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      // 🏷️ Media ID
-                      TextField(
-                        controller: idCtrl,
-                        textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(
-                          labelText: 'Media ID (opcional)',
-                          helperText:
-                              'Si lo dejas vacío, el backend genera uno.',
-                          prefixIcon: Icon(Icons.tag_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 18),
 
                       // 📁 Formato
                       DropdownButtonFormField<String>(
@@ -158,12 +145,6 @@ class DownloadsPill extends GetView<DownloadsController> {
                         ),
                       ),
                       const Divider(height: 24),
-
-                      // ⚙️ Configuración de descargas
-                      _buildQualityConfig(
-                        context: ctx2,
-                        settingsCtrl: settingsCtrl,
-                      ),
                     ],
                   ),
                 ),
@@ -315,76 +296,6 @@ class DownloadsPill extends GetView<DownloadsController> {
         snackPosition: SnackPosition.BOTTOM,
       );
     }
-  }
-
-  /// ⚙️ Widget de configuración de descargas
-  Widget _buildQualityConfig({
-    required BuildContext context,
-    required SettingsController settingsCtrl,
-  }) {
-    final theme = Theme.of(context);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '⚙️ Configuración',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 12),
-        Obx(
-          () => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Calidad: ${settingsCtrl.getQualityDescription(null)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                children: [
-                  _buildQualityOption(context, 'Baja', 'low', settingsCtrl),
-                  _buildQualityOption(context, 'Media', 'medium', settingsCtrl),
-                  _buildQualityOption(context, 'Alta', 'high', settingsCtrl),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        Obx(
-          () => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Datos: ${settingsCtrl.dataUsage.value == 'wifi_only' ? 'Solo Wi-Fi' : 'Wi-Fi + Móvil'}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                children: [
-                  _buildDataUsageOption(
-                    context,
-                    'Wi-Fi',
-                    'wifi_only',
-                    settingsCtrl,
-                  ),
-                  _buildDataUsageOption(context, 'Móvil', 'all', settingsCtrl),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   Widget _buildQualityOption(

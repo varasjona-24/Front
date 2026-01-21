@@ -2,111 +2,157 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controller/settings_controller.dart';
+import 'section_header.dart';
+import 'value_pill.dart';
+import 'palette_tile.dart';
 
 class AppearanceSection extends GetView<SettingsController> {
   const AppearanceSection({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 🎨 Título
+        // Title
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0),
-          child: Text(
-            '🎨 Apariencia',
-            style: Theme.of(context).textTheme.titleLarge,
+          child: Row(
+            children: [
+              const Icon(Icons.palette_rounded, size: 18),
+              const SizedBox(width: 8),
+              Text(
+                'Apariencia',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 12),
 
-        // 🌗 Modo claro/oscuro
         Card(
           margin: const EdgeInsets.symmetric(horizontal: 16.0),
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: theme.dividerColor.withOpacity(.12)),
+          ),
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
+            padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
+                // Theme mode
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('🌗 Modo'),
+                    const Expanded(
+                      child: SectionHeader(
+                        title: 'Modo',
+                        subtitle: 'Cambia entre claro y oscuro.',
+                      ),
+                    ),
                     Obx(
                       () => SegmentedButton<Brightness>(
                         segments: const [
                           ButtonSegment(
                             value: Brightness.light,
-                            label: Text('☀️'),
+                            label: Text('Claro'),
+                            icon: Icon(Icons.light_mode_rounded),
                           ),
                           ButtonSegment(
                             value: Brightness.dark,
-                            label: Text('🌙'),
+                            label: Text('Oscuro'),
+                            icon: Icon(Icons.dark_mode_rounded),
                           ),
                         ],
                         selected: {controller.brightness.value},
-                        onSelectionChanged: (Set<Brightness> newSelection) {
-                          controller.setBrightness(newSelection.first);
+                        onSelectionChanged: (selection) {
+                          controller.setBrightness(selection.first);
                         },
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
 
-                // 🎨 Selector de paleta
-                Obx(
-                  () => Column(
+                const SizedBox(height: 12),
+                Divider(color: theme.dividerColor.withOpacity(.12)),
+                const SizedBox(height: 12),
+
+                // Palette selector
+                Obx(() {
+                  final selected = controller.selectedPalette.value;
+
+                  return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Paleta: ${controller.selectedPalette.value.toUpperCase()}',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                      Row(
+                        children: [
+                          const Expanded(
+                            child: SectionHeader(
+                              title: 'Paleta',
+                              subtitle: 'Personaliza el estilo de la app.',
+                            ),
+                          ),
+                          ValuePill(text: selected.toUpperCase()),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
+                      const SizedBox(height: 12),
+
+                      SizedBox(
+                        height: 54,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
                           children: [
-                            _buildPaletteOption('red', '🔴'),
-                            _buildPaletteOption('green', ' 🟢'),
-                            _buildPaletteOption('blue', ' 🔵 '),
-                            _buildPaletteOption('yellow', '🟡 '),
-                            _buildPaletteOption('purple', '🟣'),
-                            _buildPaletteOption('gray', '⚫'),
+                            PaletteTile(
+                              label: 'Rojo',
+                              color: const Color(0xFFE53935),
+                              selected: selected == 'red',
+                              onTap: () => controller.setPalette('red'),
+                            ),
+                            PaletteTile(
+                              label: 'Verde',
+                              color: const Color(0xFF43A047),
+                              selected: selected == 'green',
+                              onTap: () => controller.setPalette('green'),
+                            ),
+                            PaletteTile(
+                              label: 'Azul',
+                              color: const Color(0xFF1E88E5),
+                              selected: selected == 'blue',
+                              onTap: () => controller.setPalette('blue'),
+                            ),
+                            PaletteTile(
+                              label: 'Amarillo',
+                              color: const Color(0xFFFDD835),
+                              selected: selected == 'yellow',
+                              onTap: () => controller.setPalette('yellow'),
+                            ),
+                            PaletteTile(
+                              label: 'Morado',
+                              color: const Color(0xFF8E24AA),
+                              selected: selected == 'purple',
+                              onTap: () => controller.setPalette('purple'),
+                            ),
+                            PaletteTile(
+                              label: 'Gris',
+                              color: const Color(0xFF616161),
+                              selected: selected == 'gray',
+                              onTap: () => controller.setPalette('gray'),
+                            ),
                           ],
                         ),
                       ),
                     ],
-                  ),
-                ),
+                  );
+                }),
               ],
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPaletteOption(String key, String emoji) {
-    return Obx(
-      () => GestureDetector(
-        onTap: () => controller.setPalette(key),
-        child: Container(
-          margin: const EdgeInsets.only(right: 8.0),
-          padding: const EdgeInsets.all(12.0),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: controller.selectedPalette.value == key
-                  ? Colors.white
-                  : Colors.transparent,
-              width: 2,
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(emoji, style: const TextStyle(fontSize: 24)),
-        ),
-      ),
     );
   }
 }

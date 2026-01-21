@@ -86,15 +86,30 @@ class HomeController extends GetxController {
 
   Future<void> deleteLocalItem(MediaItem item) async {
     try {
-      for (final v in item.variants) {
-        final pth = v.localPath;
-        if (pth != null && pth.isNotEmpty) {
-          final f = File(pth);
-          if (await f.exists()) await f.delete();
+      print('Home delete requested id=${item.id} variants=${item.variants.length}');
+
+      _allItems.removeWhere((e) => e.id == item.id);
+      recentlyPlayed.removeWhere((e) => e.id == item.id);
+      latestDownloads.removeWhere((e) => e.id == item.id);
+      favorites.removeWhere((e) => e.id == item.id);
+
+      final all = await _store.readAll();
+      final related = all.where((e) {
+        if (e.id == item.id) return true;
+        final pid = item.publicId.trim();
+        return pid.isNotEmpty && e.publicId.trim() == pid;
+      }).toList();
+
+      if (related.isEmpty) {
+        await _deleteItemFiles(item);
+        await _store.remove(item.id);
+      } else {
+        for (final entry in related) {
+          await _deleteItemFiles(entry);
+          await _store.remove(entry.id);
         }
       }
 
-      await _store.remove(item.id);
       await loadHome();
     } catch (e) {
       print('Error deleting local item: $e');
@@ -104,6 +119,20 @@ class HomeController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
     }
+  }
+
+  Future<void> _deleteItemFiles(MediaItem item) async {
+    for (final v in item.variants) {
+      await _deleteFile(v.localPath);
+    }
+    await _deleteFile(item.thumbnailLocalPath);
+  }
+
+  Future<void> _deleteFile(String? path) async {
+    final pth = path?.trim();
+    if (pth == null || pth.isEmpty) return;
+    final f = File(pth);
+    if (await f.exists()) await f.delete();
   }
 
   void goToPlaylists() => Get.toNamed(AppRoutes.playlists);

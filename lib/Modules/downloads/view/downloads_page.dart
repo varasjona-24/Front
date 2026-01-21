@@ -44,10 +44,6 @@ class DownloadsPage extends GetView<DownloadsController> {
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
           onSearch: home.onSearch,
-          onToggleMode: home.toggleMode,
-          mode: mode == HomeMode.audio
-              ? AppMediaMode.audio
-              : AppMediaMode.video,
         ),
 
         // ============================

@@ -27,8 +27,7 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
             // 📥 Header
             Row(
               children: [
-                Icon(Icons.cloud_download_rounded, color: scheme.primary),
-                const SizedBox(width: 8),
+                const SizedBox(width: 1),
                 Text(
                   'Configuración de descargas',
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -57,44 +56,6 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
                       color: scheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildQualityChip(
-                          context: context,
-                          label: 'Baja',
-                          value: 'low',
-                          audioKbps: '128 kbps',
-                          videoP: '360p',
-                          current: settingsCtrl.downloadQuality.value,
-                          onTap: () => settingsCtrl.setDownloadQuality('low'),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildQualityChip(
-                          context: context,
-                          label: 'Media',
-                          value: 'medium',
-                          audioKbps: '192 kbps',
-                          videoP: '720p',
-                          current: settingsCtrl.downloadQuality.value,
-                          onTap: () =>
-                              settingsCtrl.setDownloadQuality('medium'),
-                        ),
-                        const SizedBox(width: 8),
-                        _buildQualityChip(
-                          context: context,
-                          label: 'Alta',
-                          value: 'high',
-                          audioKbps: '320 kbps',
-                          videoP: '1080p',
-                          current: settingsCtrl.downloadQuality.value,
-                          onTap: () => settingsCtrl.setDownloadQuality('high'),
-                        ),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -119,29 +80,6 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDataUsageChip(
-                          context: context,
-                          label: '📶 Solo Wi-Fi',
-                          value: 'wifi_only',
-                          current: settingsCtrl.dataUsage.value,
-                          onTap: () => settingsCtrl.setDataUsage('wifi_only'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _buildDataUsageChip(
-                          context: context,
-                          label: '🌐 Wi-Fi + Móvil',
-                          value: 'all',
-                          current: settingsCtrl.dataUsage.value,
-                          onTap: () => settingsCtrl.setDataUsage('all'),
-                        ),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),

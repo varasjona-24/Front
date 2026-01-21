@@ -159,6 +159,7 @@ class SettingsController extends GetxController {
         return const BluetoothAudioSnapshot(
           bluetoothOn: false,
           devices: <BluetoothAudioDevice>[],
+          outputs: <String>[],
         );
       }
 
@@ -168,6 +169,7 @@ class SettingsController extends GetxController {
       return const BluetoothAudioSnapshot(
         bluetoothOn: false,
         devices: <BluetoothAudioDevice>[],
+        outputs: <String>[],
       );
     }
   }

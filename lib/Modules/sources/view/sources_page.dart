@@ -48,10 +48,6 @@ class SourcesPage extends GetView<SourcesController> {
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
           onSearch: home.onSearch,
-          onToggleMode: home.toggleMode,
-          mode: mode == HomeMode.audio
-              ? AppMediaMode.audio
-              : AppMediaMode.video,
         ),
         body: Stack(
           children: [
@@ -119,52 +115,15 @@ class SourcesPage extends GetView<SourcesController> {
                 ),
               ),
             ),
-            _quickMenu(scheme: scheme, home: home),
           ],
         ),
         const SizedBox(height: 6),
         Text(
-          'Explora tu contenido por origen o por lo que está guardado offline.',
+          'Explora tu contenido organizado por origen.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _quickMenu({
-    required ColorScheme scheme,
-    required HomeController home,
-  }) {
-    return PopupMenuButton<int>(
-      icon: Icon(Icons.menu, color: scheme.onSurface),
-      onSelected: (i) {
-        switch (i) {
-          case 0:
-            home.enterHome();
-            break;
-          case 1:
-            home.goToPlaylists();
-            break;
-          case 2:
-            home.goToArtists();
-            break;
-          case 3:
-            home.goToDownloads();
-            break;
-        case 4:
-          home.goToSources();
-          break;
-      }
-      },
-      itemBuilder: (_) => const [
-        PopupMenuItem(value: 0, child: Text('Home')),
-        PopupMenuItem(value: 1, child: Text('Playlists')),
-        PopupMenuItem(value: 2, child: Text('Artists')),
-        PopupMenuItem(value: 3, child: Text('Downloads')),
-        PopupMenuItem(value: 4, child: Text('Sources')),
-        PopupMenuItem(value: 5, child: Text('Settings')),
       ],
     );
   }

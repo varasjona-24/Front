@@ -59,6 +59,7 @@ class _MediaCardState extends State<MediaCard> {
       onTapDown: (_) => _startHold(),
       onTapUp: (_) => _cancelHold(),
       onTapCancel: _cancelHold,
+      onPanStart: (_) => _cancelHold(),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: widget.onTap,
@@ -146,7 +147,8 @@ class _MediaCardState extends State<MediaCard> {
   }
 
   Widget _fallbackIcon(ColorScheme colors) {
-    final isVideo = widget.item.hasVideoLocal || widget.item.localVideoVariant != null;
+    final isVideo =
+        widget.item.hasVideoLocal || widget.item.localVideoVariant != null;
 
     return Container(
       decoration: BoxDecoration(
