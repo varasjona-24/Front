@@ -19,6 +19,8 @@ class VideoService extends GetxService {
 
   MediaItem? _currentItem;
   MediaVariant? _currentVariant;
+  final Rxn<MediaItem> currentItem = Rxn<MediaItem>();
+  final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
 
   vp.VideoPlayerController? _player;
   Timer? _posTimer;
@@ -102,6 +104,8 @@ class VideoService extends GetxService {
         );
         _currentItem = item;
         _currentVariant = variant;
+        currentItem.value = item;
+        currentVariant.value = variant;
 
         _setupPlayerListener();
 
@@ -152,6 +156,8 @@ class VideoService extends GetxService {
 
       _currentItem = item;
       _currentVariant = variant;
+      currentItem.value = item;
+      currentVariant.value = variant;
 
       _setupPlayerListener();
 
@@ -205,6 +211,8 @@ class VideoService extends GetxService {
     duration.value = Duration.zero;
     _currentItem = null;
     _currentVariant = null;
+    currentItem.value = null;
+    currentVariant.value = null;
   }
 
   Future<void> toggle() async {

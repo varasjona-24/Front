@@ -19,6 +19,8 @@ class AudioService extends GetxService {
 
   MediaItem? _currentItem;
   MediaVariant? _currentVariant;
+  final Rxn<MediaItem> currentItem = Rxn<MediaItem>();
+  final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
 
   StreamSubscription<PlayerState>? _playerStateSub;
 
@@ -56,6 +58,8 @@ class AudioService extends GetxService {
           proc == ProcessingState.idle) {
         state.value = PlaybackState.stopped;
         isPlaying.value = false;
+        currentItem.value = null;
+        currentVariant.value = null;
       }
     });
   }
@@ -152,6 +156,8 @@ class AudioService extends GetxService {
 
         _currentItem = item;
         _currentVariant = variant;
+        currentItem.value = item;
+        currentVariant.value = variant;
 
         await _player.play();
         return;
@@ -215,6 +221,8 @@ class AudioService extends GetxService {
 
       _currentItem = item;
       _currentVariant = variant;
+      currentItem.value = item;
+      currentVariant.value = variant;
 
       await _player.play();
     } on PlayerException catch (pe) {
@@ -260,8 +268,13 @@ class AudioService extends GetxService {
 
   Future<void> stop() async {
     await _player.stop();
+    state.value = PlaybackState.stopped;
+    isPlaying.value = false;
+    isLoading.value = false;
     _currentItem = null;
     _currentVariant = null;
+    currentItem.value = null;
+    currentVariant.value = null;
   }
 
   @override

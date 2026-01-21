@@ -6,6 +6,7 @@ import 'app/controllers/theme_controller.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/ui/themes/app_theme_factory.dart';
+import 'app/ui/widgets/player/mini_player_bar.dart';
 
 import 'app/data/network/dio_client.dart';
 import 'app/data/repo/media_repository.dart';
@@ -55,6 +56,30 @@ class MyApp extends StatelessWidget {
 
         // 🧭 Rutas GetX
         getPages: AppPages.routes,
+
+        builder: (context, child) {
+          return Overlay(
+            initialEntries: [
+              OverlayEntry(
+                builder: (_) => child ?? const SizedBox.shrink(),
+              ),
+              OverlayEntry(
+                builder: (overlayContext) {
+                  final safeBottom =
+                      MediaQuery.of(overlayContext).padding.bottom;
+                  final bottomOffset =
+                      safeBottom + kBottomNavigationBarHeight + 12;
+                  return Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: bottomOffset,
+                    child: const MiniPlayerBar(),
+                  );
+                },
+              ),
+            ],
+          );
+        },
 
         // 🎨 Theme dinámico
         theme: buildTheme(
