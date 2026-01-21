@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_controller.dart';
-import '../../audio/view/queue_page.dart';
+import 'video_queue_page.dart';
 
 class VideoPlayerPage extends GetView<VideoPlayerController> {
   const VideoPlayerPage({super.key});
@@ -52,7 +52,7 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
                     IconButton(
                       tooltip: 'Ver cola',
                       icon: const Icon(Icons.playlist_play),
-                      onPressed: () => Get.to(() => const QueuePage()),
+                      onPressed: () => Get.to(() => const VideoQueuePage()),
                     ),
                   ],
                 ),
@@ -72,7 +72,7 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
                   if (err != null) {
                     return _ErrorPanel(
                       message: err,
-                      onPickOther: () => Get.to(() => const QueuePage()),
+                      onPickOther: () => Get.to(() => const VideoQueuePage()),
                       onRetry: controller.retry,
                     );
                   }

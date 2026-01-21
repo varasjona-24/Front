@@ -40,10 +40,6 @@ class ArtistsPage extends GetView<ArtistsController> {
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
           onSearch: home.onSearch,
-          onToggleMode: home.toggleMode,
-          mode: home.mode.value == HomeMode.audio
-              ? AppMediaMode.audio
-              : AppMediaMode.video,
         ),
         body: Stack(
           children: [

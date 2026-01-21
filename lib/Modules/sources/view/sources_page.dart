@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controller/sources_controller.dart';
-import '../../../app/models/media_item.dart';
-import '../../player/audio/view/audio_player_page.dart';
 
 import '../domain/source_origin.dart';
 import '../domain/source_pill_data.dart';
@@ -70,10 +68,6 @@ class SourcesPage extends GetView<SourcesController> {
                       _pillsSection(pills),
                       const SizedBox(height: AppSpacing.lg),
 
-                      _selectedSectionTitle(theme),
-                      const SizedBox(height: AppSpacing.sm),
-
-                      _selectedSectionList(theme),
                       const SizedBox(height: AppSpacing.lg),
                     ],
                   ),
@@ -141,87 +135,6 @@ class SourcesPage extends GetView<SourcesController> {
     );
   }
 
-  Widget _selectedSectionTitle(ThemeData theme) {
-    return Text(
-      'Seleccionados (Dispositivo)',
-      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-    );
-  }
-
-  Widget _selectedSectionList(ThemeData theme) {
-    return Obx(() {
-      final list = controller.localFiles;
-
-      if (list.isEmpty) {
-        return Text(
-          'No hay archivos seleccionados.',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        );
-      }
-
-      return Column(
-        children: List.generate(
-          list.length,
-          (i) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _selectedItemTile(
-              theme: theme,
-              item: list[i],
-              index: i,
-              list: list,
-            ),
-          ),
-        ),
-      );
-    });
-  }
-
-  Widget _selectedItemTile({
-    required ThemeData theme,
-    required MediaItem item,
-    required int index,
-    required List<MediaItem> list,
-  }) {
-    final variant = item.variants.first;
-    final isVideo = variant.kind == MediaVariantKind.video;
-
-    // Solo para display (no dependas de esto para reproducir)
-    final displaySubtitle = _displayLocalSubtitle(item);
-
-    return Card(
-      elevation: 0,
-      color: theme.colorScheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        leading: Icon(
-          isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
-        ),
-        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(
-          displaySubtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Wrap(
-          spacing: 6,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.save_alt_rounded),
-              tooltip: 'Importar a la app (offline)',
-              onPressed: () => _onImportPressed(item),
-            ),
-            IconButton(
-              icon: const Icon(Icons.play_arrow_rounded),
-              tooltip: 'Reproducir',
-              onPressed: () => _onPlayPressed(list: list, index: index),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _bottomNav({
     required Color barBg,
@@ -276,64 +189,6 @@ class SourcesPage extends GetView<SourcesController> {
   // ACTIONS
   // ===========================================================================
 
-  Future<void> _onImportPressed(MediaItem item) async {
-    final imported = await controller.importToAppStorage(item);
-
-    if (imported == null) {
-      Get.snackbar(
-        'Import',
-        'Falló la importación',
-        snackPosition: SnackPosition.BOTTOM,
-        margin: const EdgeInsets.all(12),
-      );
-      return;
-    }
-
-    final idx = controller.localFiles.indexWhere((e) => e.id == item.id);
-    if (idx != -1) controller.localFiles[idx] = imported;
-
-    Get.snackbar(
-      'Import',
-      'Guardado en Biblioteca offline ✅',
-      snackPosition: SnackPosition.BOTTOM,
-      margin: const EdgeInsets.all(12),
-    );
-  }
-
-  void _onPlayPressed({required List<MediaItem> list, required int index}) {
-    final item = list[index];
-
-    // ✅ AQUÍ está el fix de “link/url”: usar playableUrl (file:///... si es local)
-    final playableUrl = item.playableUrl;
-
-    Get.to(
-      () => const AudioPlayerPage(),
-      arguments: {
-        'queue': list,
-        'index': index,
-        // Si tu player no usa esto, no pasa nada.
-        // Pero si lo soportas, ya queda listo.
-        'playableUrl': playableUrl,
-      },
-    );
-  }
-
-  String _displayLocalSubtitle(MediaItem item) {
-    final v = item.variants.first;
-
-    // Preferimos mostrar el nombre del archivo si existe.
-    final name = v.fileName.trim();
-    if (name.isNotEmpty) return name;
-
-    // Si no, mostramos el final del path.
-    final lp = v.localPath?.trim() ?? '';
-    if (lp.isEmpty) return '';
-
-    // recorta para que no se vea todo el path
-    final parts = lp.split(RegExp(r'[\\/]+'));
-    if (parts.isEmpty) return lp;
-    return parts.last;
-  }
 
   // ===========================================================================
   // PILLS
@@ -373,15 +228,6 @@ class SourcesPage extends GetView<SourcesController> {
 
     return [
       pill(
-        origin: SourceOrigin.device,
-        title: 'Dispositivo local',
-        subtitle: 'Selecciona música o videos del teléfono',
-        icon: Icons.folder_open_rounded,
-        colors: const [Color(0xFF00C6FF), Color(0xFF0072FF)],
-        onTap: () async => controller.pickLocalFiles(),
-      ),
-
-      pill(
         origin: SourceOrigin.generic,
         title: 'Biblioteca offline',
         subtitle: 'Todo lo guardado dentro de la app',
@@ -393,6 +239,14 @@ class SourcesPage extends GetView<SourcesController> {
             onlyOffline: true,
           ),
         ),
+      ),
+      pill(
+        origin: SourceOrigin.device,
+        title: 'Dispositivo local',
+        subtitle: 'Archivos importados desde el dispositivo',
+        icon: Icons.folder_open_rounded,
+        colors: const [Color(0xFF00C6FF), Color(0xFF0072FF)],
+        onTap: openOrigin(SourceOrigin.device, 'Dispositivo local'),
       ),
 
       pill(
