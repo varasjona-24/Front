@@ -1,0 +1,217 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import '../controller/artists_controller.dart';
+
+class EditArtistPage extends StatefulWidget {
+  const EditArtistPage({super.key, required this.artist});
+
+  final ArtistGroup artist;
+
+  @override
+  State<EditArtistPage> createState() => _EditArtistPageState();
+}
+
+class _EditArtistPageState extends State<EditArtistPage> {
+  final ArtistsController _controller = Get.find<ArtistsController>();
+
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _thumbCtrl;
+  String? _localThumbPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.artist.name);
+    _thumbCtrl = TextEditingController(text: widget.artist.thumbnail ?? '');
+    _localThumbPath = widget.artist.thumbnailLocalPath;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _thumbCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickLocalThumbnail() async {
+    final res = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+    );
+
+    final file = (res != null && res.files.isNotEmpty) ? res.files.first : null;
+    final path = file?.path;
+    if (path == null || path.trim().isEmpty) return;
+
+    setState(() {
+      _localThumbPath = path;
+      _thumbCtrl.text = '';
+    });
+  }
+
+  void _clearThumbnail() {
+    setState(() {
+      _localThumbPath = null;
+      _thumbCtrl.text = '';
+    });
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      Get.snackbar(
+        'Artista',
+        'El nombre no puede estar vacio',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final remote = _thumbCtrl.text.trim();
+    final useRemote = remote.isNotEmpty;
+
+    await _controller.updateArtist(
+      key: widget.artist.key,
+      newName: name,
+      thumbnail: useRemote ? remote : null,
+      thumbnailLocalPath: useRemote ? null : _localThumbPath,
+    );
+
+    if (mounted) {
+      Get.back(result: true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final thumb = _localThumbPath ?? widget.artist.thumbnail;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Editar artista'),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: FilledButton(
+            onPressed: _save,
+            child: const Text('Guardar cambios'),
+          ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  _ArtistAvatar(thumb: thumb),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      widget.artist.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            elevation: 0,
+            color: theme.colorScheme.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _nameCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre del artista',
+                      prefixIcon: Icon(Icons.person_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _pickLocalThumbnail,
+                          icon: const Icon(Icons.photo_library_rounded),
+                          label: const Text('Elegir imagen'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton(
+                        onPressed: _clearThumbnail,
+                        child: const Text('Limpiar'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _thumbCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Thumbnail URL (opcional)',
+                      prefixIcon: Icon(Icons.image_rounded),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ArtistAvatar extends StatelessWidget {
+  const _ArtistAvatar({required this.thumb});
+
+  final String? thumb;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    if (thumb != null && thumb!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 32,
+        backgroundColor: scheme.surface,
+        backgroundImage: thumb!.startsWith('http')
+            ? NetworkImage(thumb!)
+            : FileImage(File(thumb!)) as ImageProvider,
+      );
+    }
+
+    return CircleAvatar(
+      radius: 32,
+      backgroundColor: scheme.surface,
+      child: Icon(
+        Icons.person_rounded,
+        color: scheme.onSurfaceVariant,
+      ),
+    );
+  }
+}

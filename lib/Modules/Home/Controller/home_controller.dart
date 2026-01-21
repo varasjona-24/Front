@@ -3,16 +3,16 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../app/models/media_item.dart';
-import '../../../app/data/repo/media_repository.dart';
-import '../../../app/routes/app_routes.dart';
 import '../../../app/data/local/local_library_store.dart';
+import '../../../app/data/repo/media_repository.dart';
+import '../../../app/models/media_item.dart';
+import '../../../app/routes/app_routes.dart';
 import '../view/media_search_delegate.dart';
 
 enum HomeMode { audio, video }
 
 class HomeController extends GetxController {
-  final MediaRepository _repo = Get.find();
+  final MediaRepository _repo = Get.find<MediaRepository>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
 
   final Rx<HomeMode> mode = HomeMode.audio.obs;
@@ -22,7 +22,6 @@ class HomeController extends GetxController {
   final RxList<MediaItem> latestDownloads = <MediaItem>[].obs;
   final RxList<MediaItem> favorites = <MediaItem>[].obs;
 
-  // Cache para no recargar del backend al alternar modo
   final RxList<MediaItem> _allItems = <MediaItem>[].obs;
 
   @override
@@ -52,16 +51,10 @@ class HomeController extends GetxController {
 
     final filtered = items.where(matchesMode).toList();
 
-    // Si luego metes "recently played" real, aquí debería venir ordenado por lastPlayedAt
     recentlyPlayed.assignAll(filtered.take(10));
-
-    // Descargas locales (limítalo también)
     latestDownloads.assignAll(
       filtered.where((e) => e.source == MediaSource.local).take(10),
     );
-
-    // ⚠️ Esto NO son "favoritos" reales, esto es "de YouTube"
-    // Si tu modelo tiene isFavorite, cámbialo por eso.
     favorites.assignAll(
       filtered.where((e) => e.source == MediaSource.youtube).take(10),
     );
@@ -69,8 +62,6 @@ class HomeController extends GetxController {
 
   void toggleMode() {
     mode.value = mode.value == HomeMode.audio ? HomeMode.video : HomeMode.audio;
-
-    // No vuelvas a pegarle a la API si ya tienes data
     _splitHomeSections(_allItems);
   }
 
@@ -148,7 +139,7 @@ class HomeController extends GetxController {
 
   void goToSources() async {
     await Get.toNamed(AppRoutes.sources);
-    loadHome(); // aquí sí: porque puede cambiar la librería
+    loadHome();
   }
 
   void goToSettings() => Get.toNamed(AppRoutes.settings);

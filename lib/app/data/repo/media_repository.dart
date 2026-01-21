@@ -466,8 +466,8 @@ class MediaRepository {
       final detectedOrigin = _detectOrigin(url);
       final resolvedOrigin =
           (r?.origin != null && r!.origin != SourceOrigin.generic)
-              ? r!.origin
-              : detectedOrigin;
+          ? r.origin
+          : detectedOrigin;
       final finalOrigin = existing.origin != SourceOrigin.generic
           ? existing.origin
           : resolvedOrigin;
@@ -513,9 +513,9 @@ class MediaRepository {
     final resolvedForOrigin = resolved ?? resolvedFallback;
     final resolvedOrigin =
         (resolvedForOrigin?.origin != null &&
-                resolvedForOrigin!.origin != SourceOrigin.generic)
-            ? resolvedForOrigin!.origin
-            : detectedOrigin;
+            resolvedForOrigin!.origin != SourceOrigin.generic)
+        ? resolvedForOrigin.origin
+        : detectedOrigin;
 
     final base =
         resolved ??
