@@ -92,8 +92,8 @@ class AudioSection extends GetView<SettingsController> {
                 const SizedBox(height: 8),
                 Obx(() {
                   controller.bluetoothTick.value;
-                  return FutureBuilder<List<BluetoothDevice>>(
-                    future: controller.getConnectedBluetoothDevices(),
+                  return FutureBuilder<BluetoothSnapshot>(
+                    future: controller.getBluetoothSnapshot(),
                     builder: (context, snap) {
                       if (snap.connectionState != ConnectionState.done) {
                         return const ListTile(
@@ -103,7 +103,24 @@ class AudioSection extends GetView<SettingsController> {
                         );
                       }
 
-                      final devices = snap.data ?? const <BluetoothDevice>[];
+                      final data = snap.data;
+                      final devices = data?.devices ?? const <BluetoothDevice>[];
+                      final state = data?.state ?? BluetoothAdapterState.unknown;
+
+                      if (state != BluetoothAdapterState.on) {
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.bluetooth_disabled_rounded),
+                          title: const Text('Bluetooth desactivado'),
+                          trailing: IconButton(
+                            onPressed: () => AppSettings.openAppSettings(
+                              type: AppSettingsType.bluetooth,
+                            ),
+                            icon: const Icon(Icons.settings_rounded),
+                          ),
+                        );
+                      }
+
                       if (devices.isEmpty) {
                         return ListTile(
                           contentPadding: EdgeInsets.zero,

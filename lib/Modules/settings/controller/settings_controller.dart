@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -150,13 +151,52 @@ class SettingsController extends GetxController {
     bluetoothTick.value++;
   }
 
-  Future<List<BluetoothDevice>> getConnectedBluetoothDevices() async {
+  Future<BluetoothSnapshot> getBluetoothSnapshot() async {
     try {
-      return await FlutterBluePlus.connectedDevices;
+      final status = await _ensureBluetoothPermissions();
+      if (!status) {
+        return const BluetoothSnapshot(
+          state: BluetoothAdapterState.unknown,
+          devices: <BluetoothDevice>[],
+        );
+      }
+
+      final state = await FlutterBluePlus.adapterState.first;
+      if (state != BluetoothAdapterState.on) {
+        return BluetoothSnapshot(state: state, devices: const []);
+      }
+
+      final List<BluetoothDevice> connected =
+          await FlutterBluePlus.connectedDevices;
+      final List<BluetoothDevice> systemDevices =
+          await FlutterBluePlus.systemDevices(const []);
+
+      final merged = <BluetoothDevice>[];
+      merged.addAll(connected);
+      merged.addAll(systemDevices);
+      final unique = <String, BluetoothDevice>{};
+      for (final device in merged) {
+        unique[device.remoteId.str] = device;
+      }
+
+      return BluetoothSnapshot(state: state, devices: unique.values.toList());
     } catch (e) {
       print('Bluetooth devices error: $e');
-      return const <BluetoothDevice>[];
+      return const BluetoothSnapshot(
+        state: BluetoothAdapterState.unknown,
+        devices: <BluetoothDevice>[],
+      );
     }
+  }
+
+  Future<bool> _ensureBluetoothPermissions() async {
+    final results = await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.locationWhenInUse,
+    ].request();
+
+    return results.values.every((r) => r.isGranted);
   }
 
   /// 🗑️ Limpiar caché (descargas/medios locales)
@@ -195,10 +235,7 @@ class SettingsController extends GetxController {
       final items = await store.readAll();
 
       final appDir = await getApplicationDocumentsDirectory();
-      final exportPath = p.join(
-        appDir.path,
-        'listenfy_library_export.json',
-      );
+      final exportPath = p.join(appDir.path, 'listenfy_library_export.json');
       final file = File(exportPath);
       await file.writeAsString(
         jsonEncode(items.map((e) => e.toJson()).toList()),
@@ -239,9 +276,7 @@ class SettingsController extends GetxController {
       final store = Get.find<LocalLibraryStore>();
       for (final entry in decoded) {
         if (entry is! Map) continue;
-        final item = MediaItem.fromJson(
-          Map<String, dynamic>.from(entry),
-        );
+        final item = MediaItem.fromJson(Map<String, dynamic>.from(entry));
         await store.upsert(item);
       }
 
@@ -326,6 +361,13 @@ class SettingsController extends GetxController {
     final video = getVideoResolution(q);
     return 'Audio: $audio | Video: $video';
   }
+}
+
+class BluetoothSnapshot {
+  final BluetoothAdapterState state;
+  final List<BluetoothDevice> devices;
+
+  const BluetoothSnapshot({required this.state, required this.devices});
 }
 
 extension SettingsControllerQuality on SettingsController {
