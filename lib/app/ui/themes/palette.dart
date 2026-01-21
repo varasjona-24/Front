@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app_palette.dart';
 
-const earthPalette = AppPalette(
+const terracotaPalette = AppPalette(
   primary: Color.fromARGB(255, 223, 65, 12), // Dark Coffee
   secondary: Color.fromARGB(255, 173, 29, 29), // Khaki Beige
   accent: Color.fromARGB(255, 214, 127, 92), // Powder Blush
@@ -39,10 +39,10 @@ const grayPalette = AppPalette(
 );
 
 const palettes = {
-  'earth': earthPalette,
-  'olive': olivePalette,
+  'red': terracotaPalette,
+  'green': olivePalette,
   'blue': bluePalette,
-  'sunset': sunsetPalette,
+  'yellow': sunsetPalette,
   'purple': purplePalette,
   'gray': grayPalette,
 };

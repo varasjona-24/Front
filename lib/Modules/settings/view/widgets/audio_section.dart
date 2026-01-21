@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:app_settings/app_settings.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../../controller/settings_controller.dart';
+import '../../../../app/services/bluetooth_audio_service.dart';
 
 class AudioSection extends GetView<SettingsController> {
   const AudioSection({super.key});
@@ -92,7 +92,7 @@ class AudioSection extends GetView<SettingsController> {
                 const SizedBox(height: 8),
                 Obx(() {
                   controller.bluetoothTick.value;
-                  return FutureBuilder<BluetoothSnapshot>(
+                  return FutureBuilder<BluetoothAudioSnapshot>(
                     future: controller.getBluetoothSnapshot(),
                     builder: (context, snap) {
                       if (snap.connectionState != ConnectionState.done) {
@@ -104,10 +104,11 @@ class AudioSection extends GetView<SettingsController> {
                       }
 
                       final data = snap.data;
-                      final devices = data?.devices ?? const <BluetoothDevice>[];
-                      final state = data?.state ?? BluetoothAdapterState.unknown;
+                      final devices =
+                          data?.devices ?? const <BluetoothAudioDevice>[];
+                      final bluetoothOn = data?.bluetoothOn ?? false;
 
-                      if (state != BluetoothAdapterState.on) {
+                      if (!bluetoothOn) {
                         return ListTile(
                           contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.bluetooth_disabled_rounded),
@@ -140,11 +141,9 @@ class AudioSection extends GetView<SettingsController> {
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.bluetooth_connected_rounded),
                               title: Text(
-                                device.platformName.isNotEmpty
-                                    ? device.platformName
-                                    : device.remoteId.str,
+                                device.name,
                               ),
-                              subtitle: const Text('Conectado'),
+                              subtitle: Text(device.address),
                             ),
                           Align(
                             alignment: Alignment.centerRight,

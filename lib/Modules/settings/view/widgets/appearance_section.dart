@@ -68,10 +68,10 @@ class AppearanceSection extends GetView<SettingsController> {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            _buildPaletteOption('earth', '🌍'),
-                            _buildPaletteOption('olive', '🌿'),
-                            _buildPaletteOption('blue', '🌊'),
-                            _buildPaletteOption('sunset', '🌅'),
+                            _buildPaletteOption('red', '🔴'),
+                            _buildPaletteOption('green', ' 🟢'),
+                            _buildPaletteOption('blue', ' 🔵 '),
+                            _buildPaletteOption('yellow', '🟡 '),
                             _buildPaletteOption('purple', '🟣'),
                             _buildPaletteOption('gray', '⚫'),
                           ],

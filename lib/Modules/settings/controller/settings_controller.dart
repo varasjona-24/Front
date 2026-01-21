@@ -5,7 +5,6 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
@@ -14,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../app/controllers/theme_controller.dart';
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/models/media_item.dart';
+import '../../../app/services/bluetooth_audio_service.dart';
 
 class SettingsController extends GetxController {
   final GetStorage _storage = GetStorage();
@@ -39,6 +39,7 @@ class SettingsController extends GetxController {
   // 🔄 Forzar refresco de datos de almacenamiento
   final RxInt storageTick = 0.obs;
   final RxInt bluetoothTick = 0.obs;
+  final BluetoothAudioService _bluetoothAudio = BluetoothAudioService();
 
   @override
   void onInit() {
@@ -151,40 +152,22 @@ class SettingsController extends GetxController {
     bluetoothTick.value++;
   }
 
-  Future<BluetoothSnapshot> getBluetoothSnapshot() async {
+  Future<BluetoothAudioSnapshot> getBluetoothSnapshot() async {
     try {
       final status = await _ensureBluetoothPermissions();
       if (!status) {
-        return const BluetoothSnapshot(
-          state: BluetoothAdapterState.unknown,
-          devices: <BluetoothDevice>[],
+        return const BluetoothAudioSnapshot(
+          bluetoothOn: false,
+          devices: <BluetoothAudioDevice>[],
         );
       }
 
-      final state = await FlutterBluePlus.adapterState.first;
-      if (state != BluetoothAdapterState.on) {
-        return BluetoothSnapshot(state: state, devices: const []);
-      }
-
-      final List<BluetoothDevice> connected =
-          await FlutterBluePlus.connectedDevices;
-      final List<BluetoothDevice> systemDevices =
-          await FlutterBluePlus.systemDevices(const []);
-
-      final merged = <BluetoothDevice>[];
-      merged.addAll(connected);
-      merged.addAll(systemDevices);
-      final unique = <String, BluetoothDevice>{};
-      for (final device in merged) {
-        unique[device.remoteId.str] = device;
-      }
-
-      return BluetoothSnapshot(state: state, devices: unique.values.toList());
+      return await _bluetoothAudio.getSnapshot();
     } catch (e) {
       print('Bluetooth devices error: $e');
-      return const BluetoothSnapshot(
-        state: BluetoothAdapterState.unknown,
-        devices: <BluetoothDevice>[],
+      return const BluetoothAudioSnapshot(
+        bluetoothOn: false,
+        devices: <BluetoothAudioDevice>[],
       );
     }
   }
@@ -361,13 +344,6 @@ class SettingsController extends GetxController {
     final video = getVideoResolution(q);
     return 'Audio: $audio | Video: $video';
   }
-}
-
-class BluetoothSnapshot {
-  final BluetoothAdapterState state;
-  final List<BluetoothDevice> devices;
-
-  const BluetoothSnapshot({required this.state, required this.devices});
 }
 
 extension SettingsControllerQuality on SettingsController {
