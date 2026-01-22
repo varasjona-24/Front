@@ -152,6 +152,39 @@ class DownloadsController extends GetxController {
   }
 
   // ============================
+  // ⭐️ FAVORITOS
+  // ============================
+  Future<void> toggleFavorite(MediaItem item) async {
+    try {
+      final next = !item.isFavorite;
+      final all = await _store.readAll();
+      final pid = item.publicId.trim();
+
+      final matches = all.where((e) {
+        if (e.id == item.id) return true;
+        return pid.isNotEmpty && e.publicId.trim() == pid;
+      }).toList();
+
+      if (matches.isEmpty) {
+        await _store.upsert(item.copyWith(isFavorite: next));
+      } else {
+        for (final entry in matches) {
+          await _store.upsert(entry.copyWith(isFavorite: next));
+        }
+      }
+
+      await load();
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      Get.snackbar(
+        'Favoritos',
+        'No se pudo actualizar',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  // ============================
   // ⬇️ DESCARGAR DESDE URL
   // ============================
   Future<void> downloadFromUrl({

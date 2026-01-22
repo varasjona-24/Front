@@ -29,6 +29,15 @@ class MediaItem {
   final List<MediaVariant> variants;
   final SourceOrigin origin;
 
+  /// Favorito en UI
+  final bool isFavorite;
+
+  /// Conteo de reproducciones
+  final int playCount;
+
+  /// Timestamp (ms) última reproducción
+  final int? lastPlayedAt;
+
   /// Duración base del media (si viene del backend/metadata)
   final int? durationSeconds;
 
@@ -43,6 +52,9 @@ class MediaItem {
     this.thumbnail,
     this.thumbnailLocalPath,
     this.durationSeconds,
+    this.isFavorite = false,
+    this.playCount = 0,
+    this.lastPlayedAt,
   });
 
   // ============================
@@ -59,6 +71,9 @@ class MediaItem {
     List<MediaVariant>? variants,
     SourceOrigin? origin,
     int? durationSeconds,
+    bool? isFavorite,
+    int? playCount,
+    int? lastPlayedAt,
   }) {
     return MediaItem(
       id: id ?? this.id,
@@ -71,6 +86,9 @@ class MediaItem {
       variants: variants ?? this.variants,
       origin: origin ?? this.origin,
       durationSeconds: durationSeconds ?? this.durationSeconds,
+      isFavorite: isFavorite ?? this.isFavorite,
+      playCount: playCount ?? this.playCount,
+      lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
     );
   }
 
@@ -234,6 +252,9 @@ class MediaItem {
     );
 
     final origin = _parseOrigin(json);
+    final isFavorite = (json['isFavorite'] as bool?) ?? false;
+    final playCount = (json['playCount'] as num?)?.toInt() ?? 0;
+    final lastPlayedAt = (json['lastPlayedAt'] as num?)?.toInt();
 
     return MediaItem(
       id: id,
@@ -246,6 +267,9 @@ class MediaItem {
       variants: variants,
       durationSeconds: durationSeconds,
       origin: origin,
+      isFavorite: isFavorite,
+      playCount: playCount,
+      lastPlayedAt: lastPlayedAt,
     );
   }
 
@@ -259,6 +283,9 @@ class MediaItem {
     'thumbnail': thumbnail,
     'thumbnailLocalPath': thumbnailLocalPath,
     'duration': durationSeconds,
+    'isFavorite': isFavorite,
+    'playCount': playCount,
+    'lastPlayedAt': lastPlayedAt,
     'variants': variants.map((v) => v.toJson()).toList(),
   };
 }

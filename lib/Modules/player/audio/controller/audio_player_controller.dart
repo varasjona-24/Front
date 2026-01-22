@@ -4,6 +4,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
+import '../../../../app/data/local/local_library_store.dart';
 
 enum CoverStyle { square, vinyl }
 
@@ -11,6 +12,7 @@ enum RepeatMode { off, once, loop }
 
 class AudioPlayerController extends GetxController {
   final AudioService audioService;
+  final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
 
   /// Cola reactiva (para que el UI se actualice bien)
   final RxList<MediaItem> queue = <MediaItem>[].obs;
@@ -221,12 +223,37 @@ class AudioPlayerController extends GetxController {
     try {
       print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
       await audioService.play(item, variant);
+      await _trackPlay(item);
     } catch (e) {
       print('❌ Error in _playItem: $e');
       position.value = Duration.zero;
       duration.value = Duration.zero;
       rethrow;
     }
+  }
+
+  Future<void> _trackPlay(MediaItem item) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final all = await _store.readAll();
+
+    MediaItem updated = item.copyWith(
+      playCount: item.playCount + 1,
+      lastPlayedAt: now,
+    );
+
+    for (final existing in all) {
+      if (existing.id == item.id ||
+          (item.publicId.isNotEmpty &&
+              existing.publicId == item.publicId)) {
+        updated = existing.copyWith(
+          playCount: existing.playCount + 1,
+          lastPlayedAt: now,
+        );
+        break;
+      }
+    }
+
+    await _store.upsert(updated);
   }
 
   // ===========================================================================

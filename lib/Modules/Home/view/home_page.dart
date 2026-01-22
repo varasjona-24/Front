@@ -43,6 +43,22 @@ class HomePage extends GetView<HomeController> {
                   },
                 ),
                 ListTile(
+                  leading: Icon(
+                    item.isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                  ),
+                  title: Text(
+                    item.isFavorite
+                        ? 'Quitar de favoritos'
+                        : 'Agregar a favoritos',
+                  ),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    await controller.toggleFavorite(item);
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.delete_outline_rounded),
                   title: const Text('Borrar del dispositivo'),
                   onTap: () async {

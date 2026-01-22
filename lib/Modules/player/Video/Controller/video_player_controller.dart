@@ -3,9 +3,11 @@ import 'package:video_player/video_player.dart' as vp;
 
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/video_service.dart';
+import '../../../../app/data/local/local_library_store.dart';
 
 class VideoPlayerController extends GetxController {
   final VideoService videoService;
+  final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
   final List<MediaItem> queue;
   final int initialIndex;
 
@@ -116,11 +118,36 @@ class VideoPlayerController extends GetxController {
     try {
       print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
       await videoService.play(item, variant);
+      await _trackPlay(item);
       error.value = null;
     } catch (e) {
       print('❌ Error in _playItem: $e');
       error.value = 'Error al reproducir: $e';
     }
+  }
+
+  Future<void> _trackPlay(MediaItem item) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final all = await _store.readAll();
+
+    MediaItem updated = item.copyWith(
+      playCount: item.playCount + 1,
+      lastPlayedAt: now,
+    );
+
+    for (final existing in all) {
+      if (existing.id == item.id ||
+          (item.publicId.isNotEmpty &&
+              existing.publicId == item.publicId)) {
+        updated = existing.copyWith(
+          playCount: existing.playCount + 1,
+          lastPlayedAt: now,
+        );
+        break;
+      }
+    }
+
+    await _store.upsert(updated);
   }
 
   Future<void> togglePlay() async {

@@ -51,13 +51,36 @@ class HomeController extends GetxController {
 
     final filtered = items.where(matchesMode).toList();
 
-    recentlyPlayed.assignAll(filtered.take(10));
-    latestDownloads.assignAll(
-      filtered.where((e) => e.source == MediaSource.local).take(10),
-    );
+    final recent = filtered
+        .where((e) => (e.lastPlayedAt ?? 0) > 0)
+        .toList()
+      ..sort(
+        (a, b) =>
+            (b.lastPlayedAt ?? 0).compareTo(a.lastPlayedAt ?? 0),
+      );
+    recentlyPlayed.assignAll(recent.take(10));
+
+    final downloads = filtered
+        .where((e) => e.isOfflineStored)
+        .toList()
+      ..sort(
+        (a, b) => _latestVariantCreatedAt(b)
+            .compareTo(_latestVariantCreatedAt(a)),
+      );
+    latestDownloads.assignAll(downloads.take(10));
+
     favorites.assignAll(
-      filtered.where((e) => e.source == MediaSource.youtube).take(10),
+      filtered.where((e) => e.isFavorite).take(10),
     );
+  }
+
+  int _latestVariantCreatedAt(MediaItem item) {
+    var maxTs = 0;
+    for (final v in item.variants) {
+      if (v.localPath?.trim().isNotEmpty != true) continue;
+      if (v.createdAt > maxTs) maxTs = v.createdAt;
+    }
+    return maxTs;
   }
 
   void toggleMode() {
@@ -114,6 +137,36 @@ class HomeController extends GetxController {
       Get.snackbar(
         'Downloads',
         'Error al eliminar',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  Future<void> toggleFavorite(MediaItem item) async {
+    try {
+      final next = !item.isFavorite;
+      final all = await _store.readAll();
+      final pid = item.publicId.trim();
+
+      final matches = all.where((e) {
+        if (e.id == item.id) return true;
+        return pid.isNotEmpty && e.publicId.trim() == pid;
+      }).toList();
+
+      if (matches.isEmpty) {
+        await _store.upsert(item.copyWith(isFavorite: next));
+      } else {
+        for (final entry in matches) {
+          await _store.upsert(entry.copyWith(isFavorite: next));
+        }
+      }
+
+      await loadHome();
+    } catch (e) {
+      print('Error toggling favorite: $e');
+      Get.snackbar(
+        'Favoritos',
+        'No se pudo actualizar',
         snackPosition: SnackPosition.BOTTOM,
       );
     }
