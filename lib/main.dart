@@ -50,15 +50,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(() {
       final themeCtrl = Get.find<ThemeController>();
+      final palette = themeCtrl.palette.value;
+      final mode = themeCtrl.themeMode.value;
 
       return GetMaterialApp(
         title: 'Listenfy',
         debugShowCheckedModeBanner: false,
-
-        // 🚀 Ruta inicial
         initialRoute: AppRoutes.entry,
-
-        // 🧭 Rutas GetX
         getPages: AppPages.routes,
 
         routingCallback: (routing) {
@@ -76,10 +74,8 @@ class MyApp extends StatelessWidget {
               ),
               OverlayEntry(
                 builder: (overlayContext) {
-                  final safeBottom =
-                      MediaQuery.of(overlayContext).padding.bottom;
-                  final bottomOffset =
-                      safeBottom + kBottomNavigationBarHeight + 12;
+                  final safeBottom = MediaQuery.of(overlayContext).padding.bottom;
+                  final bottomOffset = safeBottom + kBottomNavigationBarHeight + 12;
                   return Positioned(
                     left: 0,
                     right: 0,
@@ -92,11 +88,10 @@ class MyApp extends StatelessWidget {
           );
         },
 
-        // 🎨 Theme dinámico
-        theme: buildTheme(
-          palette: themeCtrl.palette.value,
-          brightness: themeCtrl.brightness.value,
-        ),
+        // ✅ Theming correcto
+        theme: buildTheme(palette: palette, brightness: Brightness.light),
+        darkTheme: buildTheme(palette: palette, brightness: Brightness.dark),
+        themeMode: mode,
       );
     });
   }

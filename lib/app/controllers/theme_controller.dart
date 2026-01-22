@@ -8,6 +8,7 @@ import '../../app/ui/themes/palette.dart';
 class ThemeController extends GetxController {
   /// 🎨 Paleta actual
   final Rx<AppPalette> palette = olivePalette.obs;
+  final Rx<ThemeMode> themeMode = ThemeMode.dark.obs;
 
   /// 🌗 Modo de brillo
   final Rx<Brightness> brightness = Brightness.dark.obs;
@@ -27,12 +28,16 @@ class ThemeController extends GetxController {
         ? Brightness.light
         : Brightness.dark;
 
+    themeMode.value =
+        brightness.value == Brightness.dark ? ThemeMode.dark : ThemeMode.light;
     _applyTheme();
   }
 
   /// 🌗 Cambiar modo de brillo
   void setBrightness(Brightness mode) {
     brightness.value = mode;
+    themeMode.value =
+        mode == Brightness.dark ? ThemeMode.dark : ThemeMode.light;
     _applyTheme();
   }
 

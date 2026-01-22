@@ -19,7 +19,7 @@ class SettingsController extends GetxController {
   final GetStorage _storage = GetStorage();
 
   // 🎨 Paleta actual
-  final Rx<String> selectedPalette = 'olive'.obs;
+  final Rx<String> selectedPalette = 'green'.obs;
 
   // 🌗 Modo de brillo
   final Rx<Brightness> brightness = Brightness.dark.obs;
@@ -50,7 +50,9 @@ class SettingsController extends GetxController {
 
   /// 📂 Cargar configuración guardada
   void _loadSettings() {
-    selectedPalette.value = _storage.read('selectedPalette') ?? 'olive';
+    final saved = _storage.read('selectedPalette') ?? 'green';
+    const valid = ['red', 'green', 'blue', 'yellow', 'gray'];
+    selectedPalette.value = valid.contains(saved) ? saved : 'green';
     brightness.value = (_storage.read('brightness') == 'light')
         ? Brightness.light
         : Brightness.dark;

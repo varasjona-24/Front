@@ -13,7 +13,12 @@ class AppGradientBackground extends StatelessWidget {
 
     final topTint = scheme.primary.withOpacity(isDark ? 0.14 : 0.06);
     final midTint = scheme.primary.withOpacity(isDark ? 0.04 : 0.02);
-    final base = scheme.surface;
+    final base = isDark
+        ? Color.alphaBlend(
+            const Color(0xFF000000).withOpacity(0.60),
+            scheme.surface,
+          )
+        : scheme.surface;
 
     return Container(
       decoration: BoxDecoration(

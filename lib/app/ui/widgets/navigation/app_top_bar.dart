@@ -25,7 +25,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final barColor = isDark ? Colors.black : Colors.white;
+    final barColor = isDark ? const Color(0xFF0B0B0B) : Colors.white;
 
     return AppBar(
       backgroundColor: barColor,
@@ -35,11 +35,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       scrolledUnderElevation: 0,
       automaticallyImplyLeading: false,
       bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Container(
-          height: 1,
-          color: scheme.primary,
-        ),
+        preferredSize: const Size.fromHeight(0),
+        child: const SizedBox.shrink(),
       ),
       title: title,
       actions: [

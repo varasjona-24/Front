@@ -14,48 +14,70 @@ class AppBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
-    return BottomNavigationBar(
-      currentIndex: currentIndex,
-      onTap: onTap,
-      type: BottomNavigationBarType.fixed,
+    final navBg = isDark ? const Color(0xFF0B0B0B) : Colors.white;
+    // si tu Flutter no tiene outlineVariant, usa:
+    // final divider = scheme.outline.withOpacity(isDark ? 0.35 : 0.45);
 
-      // ✅ Transparente: el fondo real lo pone el padre (HomePage)
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: navBg,
+      ),
+      child: SafeArea(
+        top: false,
+        child: BottomNavigationBar(
+          currentIndex: currentIndex,
+          onTap: onTap,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
 
-      selectedItemColor: scheme.primary,
-      unselectedItemColor: scheme.onSurface.withOpacity(0.60),
-      selectedLabelStyle: theme.textTheme.bodySmall,
-      unselectedLabelStyle: theme.textTheme.bodySmall,
+          selectedItemColor: scheme.primary,
+          unselectedItemColor: scheme.onSurface.withOpacity(
+            isDark ? 0.70 : 0.62,
+          ),
 
-      items: const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.home_outlined),
-          activeIcon: Icon(Icons.home),
-          label: 'Home',
+          selectedFontSize: 11,
+          unselectedFontSize: 11,
+          selectedLabelStyle: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+          unselectedLabelStyle: theme.textTheme.labelSmall?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+
+          iconSize: 24,
+
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_outlined),
+              activeIcon: Icon(Icons.home),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.queue_music_outlined),
+              activeIcon: Icon(Icons.queue_music),
+              label: 'Playlists',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline),
+              activeIcon: Icon(Icons.person),
+              label: 'Artists',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.download_outlined),
+              activeIcon: Icon(Icons.download),
+              label: 'Downloads',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.source_outlined),
+              activeIcon: Icon(Icons.source),
+              label: 'Sources',
+            ),
+          ],
         ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.queue_music_outlined),
-          activeIcon: Icon(Icons.queue_music),
-          label: 'Playlists',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person_outline),
-          activeIcon: Icon(Icons.person),
-          label: 'Artists',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.download_outlined),
-          activeIcon: Icon(Icons.download),
-          label: 'Downloads',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.source_outlined),
-          activeIcon: Icon(Icons.source),
-          label: 'Sources',
-        ),
-      ],
+      ),
     );
   }
 }

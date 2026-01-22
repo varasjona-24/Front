@@ -14,13 +14,21 @@ import '../../downloads/view/edit_media_page.dart';
 import 'section_list_page.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 
+/// ===============================================================
+/// HOME PAGE (corregida)
+/// - BottomNav ahora pinta su propio fondo/divider/safeArea
+/// - El Scroll deja espacio real (incluye safeArea inferior)
+/// - Eliminado DecoratedBox + border gigante (width 56)
+/// ===============================================================
 class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
 
+  /// Abre la pantalla de edición de metadata
   void _openEdit(BuildContext context, MediaItem item) {
     Get.to(() => EditMediaMetadataPage(item: item));
   }
 
+  /// Modal de acciones (editar / favoritos / borrar)
   Future<void> _showItemActions(BuildContext context, MediaItem item) async {
     final theme = Theme.of(context);
 
@@ -81,22 +89,27 @@ class HomePage extends GetView<HomeController> {
   @override
   Widget build(BuildContext context) {
     return Obx(() {
+      // ===========================================================
+      // 1) Estado del controlador
+      // ===========================================================
       final mode = controller.mode.value;
 
+      // ===========================================================
+      // 2) Theme + safe area (para padding inferior correcto)
+      // ===========================================================
       final theme = Theme.of(context);
       final scheme = theme.colorScheme;
-      final isDark = theme.brightness == Brightness.dark;
 
-      // ✅ Fondo de barra (un poco más marcado)
-      final barBg = Color.alphaBlend(
-        scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
-        scheme.surface,
-      );
+      // 👇 Importante en iPhone (notch): esto evita que el contenido
+      // quede tapado por el nav + safe area inferior.
+      final safeBottom = MediaQuery.of(context).padding.bottom;
 
       return Scaffold(
         backgroundColor: Colors.transparent,
-        extendBody: true, // 🔥 CLAVE: permite pintar debajo del nav
-
+        extendBody: true, // permite que el fondo pinte debajo del nav
+        // ===========================================================
+        // 3) AppBar superior (top bar)
+        // ===========================================================
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
           mode: mode == HomeMode.audio
@@ -106,238 +119,243 @@ class HomePage extends GetView<HomeController> {
           onToggleMode: controller.toggleMode,
         ),
 
-        // ✅ Body con Stack para controlar nav + safe area inferior
+        // ===========================================================
+        // 4) Body con Stack (contenido + bottom nav fijo)
+        // ===========================================================
         body: AppGradientBackground(
           child: Stack(
             children: [
-            // CONTENIDO
-            Positioned.fill(
-              child: controller.isLoading.value
-                  ? const Center(child: CircularProgressIndicator())
-                  : ScrollConfiguration(
-                      behavior: const _NoGlowScrollBehavior(),
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.only(
-                          top: AppSpacing.md,
-                          // ✅ Deja espacio para que el contenido no quede bajo la barra
-                          bottom: kBottomNavigationBarHeight + 18,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _HomePillTabs(),
-                            const SizedBox(height: AppSpacing.lg),
-                            if (controller.recentlyPlayed.isNotEmpty)
-                              MediaHorizontalList(
-                                title: 'Reproducciones recientes',
-                                items: controller.recentlyPlayed,
-                                onHeaderTap: () => Get.to(
-                                  () => SectionListPage(
-                                    title: 'Reproducciones recientes',
-                                    items: controller.recentlyPlayed,
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.recentlyPlayed,
-                                        ),
-                                    onItemLongPress: (item, _) =>
-                                        _showItemActions(context, item),
-                                  ),
-                                ),
-                                onItemTap: (item, index) =>
-                                    controller.openMedia(
-                                      item,
-                                      index,
-                                      controller.recentlyPlayed,
-                                    ),
-                                onItemLongPress: (item, _) {
-                                  _showItemActions(context, item);
-                                },
-                              ),
+              // -------------------------------------------------------
+              // A) CONTENIDO (scroll)
+              // -------------------------------------------------------
+              Positioned.fill(
+                child: controller.isLoading.value
+                    ? const Center(child: CircularProgressIndicator())
+                    : ScrollConfiguration(
+                        behavior: const _NoGlowScrollBehavior(),
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.only(
+                            top: AppSpacing.md,
 
-                            if (controller.latestDownloads.isNotEmpty) ...[
+                            // ✅ espacio real para que nada quede debajo del nav
+                            // - BottomNavigationBarHeight: altura base
+                            // - safeBottom: notch iOS
+                            // - 18: aire extra visual
+                            bottom:
+                                kBottomNavigationBarHeight + safeBottom + 18,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ---- Tabs superiores ----
+                              _HomePillTabs(),
                               const SizedBox(height: AppSpacing.lg),
-                              MediaHorizontalList(
-                                title: 'Últimos agregados',
-                                items: controller.latestDownloads,
-                                onHeaderTap: () => Get.to(
-                                  () => SectionListPage(
-                                    title: 'Últimos agregados',
-                                    items: controller.latestDownloads,
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.latestDownloads,
-                                        ),
-                                    onItemLongPress: (item, _) =>
-                                        _showItemActions(context, item),
+
+                              // ---- Recientes ----
+                              if (controller.recentlyPlayed.isNotEmpty)
+                                MediaHorizontalList(
+                                  title: 'Reproducciones recientes',
+                                  items: controller.recentlyPlayed,
+                                  onHeaderTap: () => Get.to(
+                                    () => SectionListPage(
+                                      title: 'Reproducciones recientes',
+                                      items: controller.recentlyPlayed,
+                                      onItemTap: (item, index) =>
+                                          controller.openMedia(
+                                            item,
+                                            index,
+                                            controller.recentlyPlayed,
+                                          ),
+                                      onItemLongPress: (item, _) =>
+                                          _showItemActions(context, item),
+                                    ),
+                                  ),
+                                  onItemTap: (item, index) =>
+                                      controller.openMedia(
+                                        item,
+                                        index,
+                                        controller.recentlyPlayed,
+                                      ),
+                                  onItemLongPress: (item, _) {
+                                    _showItemActions(context, item);
+                                  },
+                                ),
+
+                              // ---- Últimos agregados ----
+                              if (controller.latestDownloads.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                MediaHorizontalList(
+                                  title: 'Últimos agregados',
+                                  items: controller.latestDownloads,
+                                  onHeaderTap: () => Get.to(
+                                    () => SectionListPage(
+                                      title: 'Últimos agregados',
+                                      items: controller.latestDownloads,
+                                      onItemTap: (item, index) =>
+                                          controller.openMedia(
+                                            item,
+                                            index,
+                                            controller.latestDownloads,
+                                          ),
+                                      onItemLongPress: (item, _) =>
+                                          _showItemActions(context, item),
+                                    ),
+                                  ),
+                                  onItemTap: (item, index) =>
+                                      controller.openMedia(
+                                        item,
+                                        index,
+                                        controller.latestDownloads,
+                                      ),
+                                  onItemLongPress: (item, _) {
+                                    _showItemActions(context, item);
+                                  },
+                                ),
+                              ],
+
+                              // ---- Favoritos ----
+                              if (controller.favorites.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                MediaHorizontalList(
+                                  title: 'Mis favoritos',
+                                  items: controller.favorites,
+                                  onHeaderTap: () => Get.to(
+                                    () => SectionListPage(
+                                      title: 'Mis favoritos',
+                                      items: controller.favorites,
+                                      onItemTap: (item, index) =>
+                                          controller.openMedia(
+                                            item,
+                                            index,
+                                            controller.favorites,
+                                          ),
+                                      onItemLongPress: (item, _) =>
+                                          _showItemActions(context, item),
+                                    ),
+                                  ),
+                                  onItemTap: (item, index) =>
+                                      controller.openMedia(
+                                        item,
+                                        index,
+                                        controller.favorites,
+                                      ),
+                                  onItemLongPress: (item, _) {
+                                    _showItemActions(context, item);
+                                  },
+                                ),
+                              ],
+
+                              // ---- Más reproducido ----
+                              if (controller.mostPlayed.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                _SectionHeader(
+                                  title: 'Más reproducido',
+                                  onTap: () => Get.to(
+                                    () => SectionListPage(
+                                      title: 'Más reproducido',
+                                      items: controller.mostPlayed,
+                                      onItemTap: (item, index) =>
+                                          controller.openMedia(
+                                            item,
+                                            index,
+                                            controller.mostPlayed,
+                                          ),
+                                      onItemLongPress: (item, _) =>
+                                          _showItemActions(context, item),
+                                    ),
                                   ),
                                 ),
-                                onItemTap: (item, index) =>
-                                    controller.openMedia(
-                                      item,
-                                      index,
+                                const SizedBox(height: AppSpacing.sm),
+                                _MostPlayedRow(
+                                  items: controller.mostPlayed,
+                                  onTap: (item, index) => controller.openMedia(
+                                    item,
+                                    index,
+                                    controller.mostPlayed,
+                                  ),
+                                  onLongPress: (item, _) {
+                                    _showItemActions(context, item);
+                                  },
+                                ),
+                              ],
+
+                              // ---- Destacado ----
+                              if (controller.latestDownloads.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                _SectionHeader(
+                                  title: 'Destacado',
+                                  onTap: () => Get.to(
+                                    () => SectionListPage(
+                                      title: 'Destacado',
+                                      items: controller.latestDownloads,
+                                      onItemTap: (item, index) =>
+                                          controller.openMedia(
+                                            item,
+                                            index,
+                                            controller.latestDownloads,
+                                          ),
+                                      onItemLongPress: (item, _) =>
+                                          _showItemActions(context, item),
+                                    ),
+                                  ),
+                                  trailing: _PillButton(
+                                    label: 'Aleatorio',
+                                    icon: Icons.shuffle_rounded,
+                                    onTap: () => controller.openMedia(
+                                      controller.latestDownloads.first,
+                                      0,
                                       controller.latestDownloads,
                                     ),
-                                onItemLongPress: (item, _) {
-                                  _showItemActions(context, item);
-                                },
-                              ),
-                            ],
-
-                            if (controller.favorites.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.lg),
-                              MediaHorizontalList(
-                                title: 'Mis favoritos',
-                                items: controller.favorites,
-                                onHeaderTap: () => Get.to(
-                                  () => SectionListPage(
-                                    title: 'Mis favoritos',
-                                    items: controller.favorites,
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.favorites,
-                                        ),
-                                    onItemLongPress: (item, _) =>
-                                        _showItemActions(context, item),
                                   ),
                                 ),
-                                onItemTap: (item, index) =>
-                                    controller.openMedia(
-                                      item,
-                                      index,
-                                      controller.favorites,
-                                    ),
-                                onItemLongPress: (item, _) {
-                                  _showItemActions(context, item);
-                                },
-                              ),
-                            ],
-
-                            if (controller.mostPlayed.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.lg),
-                              _SectionHeader(
-                                title: 'Más reproducido',
-                                onTap: () => Get.to(
-                                  () => SectionListPage(
-                                    title: 'Más reproducido',
-                                    items: controller.mostPlayed,
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.mostPlayed,
-                                        ),
-                                    onItemLongPress: (item, _) =>
-                                        _showItemActions(context, item),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              _MostPlayedRow(
-                                items: controller.mostPlayed,
-                                onTap: (item, index) => controller.openMedia(
-                                  item,
-                                  index,
-                                  controller.mostPlayed,
-                                ),
-                                onLongPress: (item, _) {
-                                  _showItemActions(context, item);
-                                },
-                              ),
-                            ],
-
-                            if (controller.latestDownloads.isNotEmpty) ...[
-                              const SizedBox(height: AppSpacing.lg),
-                              _SectionHeader(
-                                title: 'Destacado',
-                                onTap: () => Get.to(
-                                  () => SectionListPage(
-                                    title: 'Destacado',
-                                    items: controller.latestDownloads,
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.latestDownloads,
-                                        ),
-                                    onItemLongPress: (item, _) =>
-                                        _showItemActions(context, item),
-                                  ),
-                                ),
-                                trailing: _PillButton(
-                                  label: 'Aleatorio',
-                                  icon: Icons.shuffle_rounded,
-                                  onTap: () => controller.openMedia(
-                                    controller.latestDownloads.first,
-                                    0,
+                                const SizedBox(height: AppSpacing.sm),
+                                _FeaturedList(
+                                  items: controller.latestDownloads,
+                                  onTap: (item, index) => controller.openMedia(
+                                    item,
+                                    index,
                                     controller.latestDownloads,
                                   ),
+                                  onLongPress: (item, _) =>
+                                      _showItemActions(context, item),
                                 ),
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
-                              _FeaturedList(
-                                items: controller.latestDownloads,
-                                onTap: (item, index) => controller.openMedia(
-                                  item,
-                                  index,
-                                  controller.latestDownloads,
-                                ),
-                                onLongPress: (item, _) =>
-                                    _showItemActions(context, item),
-                              ),
-                            ],
+                              ],
 
-                            const SizedBox(height: 28),
-                          ],
+                              const SizedBox(height: 28),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-            ),
+              ),
 
-            // ✅ NAV + SAFE AREA pintado (esto es lo que iOS necesita)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: barBg,
-                  border: Border(
-                    top: BorderSide(
-                      color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
-                      width: 56,
-                    ),
-                  ),
-                ),
-                child: SafeArea(
-                  top: false, // ✅ SOLO safe area inferior
-                  child: AppBottomNav(
-                    currentIndex: 0,
-                    onTap: (index) {
-                      switch (index) {
-                        case 1:
-                          controller.goToPlaylists();
-                          break;
-                        case 2:
-                          controller.goToArtists();
-                          break;
-                        case 3:
-                          controller.goToDownloads();
-                          break;
-                        case 4:
-                          controller.goToSources();
-                          break;
-                      }
-                    },
-                  ),
+              // -------------------------------------------------------
+              // B) BOTTOM NAV (fijo)
+              // - ya pinta su fondo/divider/safeArea internamente
+              // -------------------------------------------------------
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: AppBottomNav(
+                  currentIndex: 0,
+                  onTap: (index) {
+                    switch (index) {
+                      case 1:
+                        controller.goToPlaylists();
+                        break;
+                      case 2:
+                        controller.goToArtists();
+                        break;
+                      case 3:
+                        controller.goToDownloads();
+                        break;
+                      case 4:
+                        controller.goToSources();
+                        break;
+                    }
+                  },
                 ),
               ),
-            ),
             ],
           ),
         ),
@@ -346,6 +364,9 @@ class HomePage extends GetView<HomeController> {
   }
 }
 
+/// ===============================================================
+/// PILL TABS SUPERIORES
+/// ===============================================================
 class _HomePillTabs extends StatefulWidget {
   @override
   State<_HomePillTabs> createState() => _HomePillTabsState();
@@ -369,14 +390,18 @@ class _HomePillTabsState extends State<_HomePillTabs> {
         separatorBuilder: (_, __) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final selected = _selected == i;
+
           return ChoiceChip(
             label: Text(_labels[i]),
             selected: selected,
             onSelected: (_) => setState(() => _selected = i),
+
+            // ✅ Contraste correcto
             labelStyle: theme.textTheme.bodyMedium?.copyWith(
               color: selected ? scheme.onPrimary : scheme.onSurface,
               fontWeight: FontWeight.w600,
             ),
+
             selectedColor: scheme.primary,
             backgroundColor: scheme.surfaceContainerHigh,
             shape: RoundedRectangleBorder(
@@ -390,6 +415,9 @@ class _HomePillTabsState extends State<_HomePillTabs> {
   }
 }
 
+/// ===============================================================
+/// SCROLL SIN GLOW (estilo iOS)
+/// ===============================================================
 class _NoGlowScrollBehavior extends ScrollBehavior {
   const _NoGlowScrollBehavior();
 
@@ -403,6 +431,9 @@ class _NoGlowScrollBehavior extends ScrollBehavior {
   }
 }
 
+/// ===============================================================
+/// HEADER DE SECCIÓN (título + chevron o trailing)
+/// ===============================================================
 class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title, this.trailing, this.onTap});
 
@@ -414,6 +445,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
       child: InkWell(
@@ -431,10 +463,7 @@ class _SectionHeader extends StatelessWidget {
             ),
             if (trailing != null) trailing!,
             if (trailing == null)
-              Icon(
-                Icons.chevron_right_rounded,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
           ],
         ),
       ),
@@ -442,6 +471,9 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+/// ===============================================================
+/// BOTÓN PILL (ej: Aleatorio)
+/// ===============================================================
 class _PillButton extends StatelessWidget {
   const _PillButton({
     required this.label,
@@ -457,6 +489,7 @@ class _PillButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+
     return InkWell(
       borderRadius: BorderRadius.circular(999),
       onTap: onTap,
@@ -485,6 +518,9 @@ class _PillButton extends StatelessWidget {
   }
 }
 
+/// ===============================================================
+/// FILA "MÁS REPRODUCIDO"
+/// ===============================================================
 class _MostPlayedRow extends StatelessWidget {
   const _MostPlayedRow({
     required this.items,
@@ -508,6 +544,7 @@ class _MostPlayedRow extends StatelessWidget {
         itemBuilder: (context, i) {
           final item = items[i];
           final thumb = item.effectiveThumbnail;
+
           return GestureDetector(
             onTap: () => onTap(item, i),
             onLongPress: () => onLongPress(item, i),
@@ -548,6 +585,9 @@ class _MostPlayedRow extends StatelessWidget {
   }
 }
 
+/// ===============================================================
+/// THUMB CIRCULAR (con play overlay)
+/// ===============================================================
 class _CircleThumb extends StatelessWidget {
   const _CircleThumb({required this.thumb});
 
@@ -556,17 +596,16 @@ class _CircleThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
     if (thumb != null && thumb!.isNotEmpty) {
       final provider = thumb!.startsWith('http')
           ? NetworkImage(thumb!)
           : FileImage(File(thumb!)) as ImageProvider;
+
       return Stack(
         alignment: Alignment.center,
         children: [
-          CircleAvatar(
-            radius: 44,
-            backgroundImage: provider,
-          ),
+          CircleAvatar(radius: 44, backgroundImage: provider),
           Container(
             width: 28,
             height: 28,
@@ -579,6 +618,7 @@ class _CircleThumb extends StatelessWidget {
         ],
       );
     }
+
     return CircleAvatar(
       radius: 44,
       backgroundColor: scheme.surfaceContainerHighest,
@@ -587,6 +627,9 @@ class _CircleThumb extends StatelessWidget {
   }
 }
 
+/// ===============================================================
+/// LISTA DESTACADO (tiles verticales)
+/// ===============================================================
 class _FeaturedList extends StatelessWidget {
   const _FeaturedList({
     required this.items,
@@ -604,72 +647,73 @@ class _FeaturedList extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     return Column(
-      children: List.generate(
-        items.take(6).length,
-        (i) {
-          final item = items[i];
-          return Padding(
-            padding: const EdgeInsets.only(
-              left: AppSpacing.md,
-              right: AppSpacing.md,
-              bottom: 10,
-            ),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () => onTap(item, i),
-              onLongPress: () => onLongPress(item, i),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerHigh,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Row(
-                  children: [
-                    _SquareThumb(thumb: item.effectiveThumbnail),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+      children: List.generate(items.take(6).length, (i) {
+        final item = items[i];
+
+        return Padding(
+          padding: const EdgeInsets.only(
+            left: AppSpacing.md,
+            right: AppSpacing.md,
+            bottom: 10,
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(18),
+            onTap: () => onTap(item, i),
+            onLongPress: () => onLongPress(item, i),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  _SquareThumb(thumb: item.effectiveThumbnail),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.displaySubtitle,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            item.displaySubtitle,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: scheme.surface,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.play_arrow_rounded,
-                        color: scheme.primary,
-                      ),
+                  ),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: scheme.surface,
+                      shape: BoxShape.circle,
                     ),
-                  ],
-                ),
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ],
               ),
             ),
-          );
-        },
-      ),
+          ),
+        );
+      }),
     );
   }
 }
 
+/// ===============================================================
+/// THUMB CUADRADO
+/// ===============================================================
 class _SquareThumb extends StatelessWidget {
   const _SquareThumb({required this.thumb});
 
@@ -678,20 +722,18 @@ class _SquareThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
     if (thumb != null && thumb!.isNotEmpty) {
       final provider = thumb!.startsWith('http')
           ? NetworkImage(thumb!)
           : FileImage(File(thumb!)) as ImageProvider;
+
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image(
-          image: provider,
-          width: 56,
-          height: 56,
-          fit: BoxFit.cover,
-        ),
+        child: Image(image: provider, width: 56, height: 56, fit: BoxFit.cover),
       );
     }
+
     return Container(
       width: 56,
       height: 56,

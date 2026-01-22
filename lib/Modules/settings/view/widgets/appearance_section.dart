@@ -108,37 +108,31 @@ class AppearanceSection extends GetView<SettingsController> {
                           children: [
                             PaletteTile(
                               label: 'Rojo',
-                              color: const Color(0xFFE53935),
+                              color: const Color.fromARGB(255, 170, 88, 60),
                               selected: selected == 'red',
                               onTap: () => controller.setPalette('red'),
                             ),
                             PaletteTile(
                               label: 'Verde',
-                              color: const Color(0xFF43A047),
+                              color: const Color.fromARGB(255, 62, 86, 66),
                               selected: selected == 'green',
                               onTap: () => controller.setPalette('green'),
                             ),
                             PaletteTile(
                               label: 'Azul',
-                              color: const Color(0xFF1E88E5),
+                              color: const Color.fromARGB(255, 54, 90, 150),
                               selected: selected == 'blue',
                               onTap: () => controller.setPalette('blue'),
                             ),
                             PaletteTile(
                               label: 'Amarillo',
-                              color: const Color(0xFFFDD835),
+                              color: const Color.fromARGB(255, 196, 154, 92),
                               selected: selected == 'yellow',
                               onTap: () => controller.setPalette('yellow'),
                             ),
                             PaletteTile(
-                              label: 'Morado',
-                              color: const Color(0xFF8E24AA),
-                              selected: selected == 'purple',
-                              onTap: () => controller.setPalette('purple'),
-                            ),
-                            PaletteTile(
                               label: 'Gris',
-                              color: const Color(0xFF616161),
+                              color: const Color(0xFF4F4F4F),
                               selected: selected == 'gray',
                               onTap: () => controller.setPalette('gray'),
                             ),

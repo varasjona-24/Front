@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
+import 'app_palette.dart'; // para mix()
 
 class AppComponentsTheme {
   static AppBarTheme appBarTheme(ColorScheme scheme) {
     final isDark = scheme.brightness == Brightness.dark;
 
+    final barBg = isDark
+        ? mix(scheme.surface, Colors.white, 0.04)
+        : mix(scheme.surface, Colors.black, 0.03);
+
     return AppBarTheme(
-      backgroundColor: isDark
-          ? Colors.black
-          : scheme.surface.withOpacity(0.96), // 🔥 separa barra del fondo
+      backgroundColor: barBg,
+      surfaceTintColor: Colors.transparent,
       foregroundColor: scheme.onSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -21,12 +25,8 @@ class AppComponentsTheme {
   }
 
   static DividerThemeData dividerTheme(ColorScheme scheme) {
-    final isDark = scheme.brightness == Brightness.dark;
-
     return DividerThemeData(
-      color: isDark
-          ? Colors.white.withOpacity(0.10)
-          : Colors.black.withOpacity(0.08),
+      color: scheme.outlineVariant.withOpacity(0.9),
       thickness: 1,
       space: 1,
     );
