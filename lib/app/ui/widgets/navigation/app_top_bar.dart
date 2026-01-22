@@ -25,13 +25,11 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final barBg = Color.alphaBlend(
-      scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
-      scheme.surface,
-    );
+    final barColor = isDark ? Colors.black : Colors.white;
 
     return AppBar(
-      backgroundColor: barBg,
+      backgroundColor: barColor,
+      surfaceTintColor: barColor,
       foregroundColor: scheme.onSurface,
       elevation: 0,
       scrolledUnderElevation: 0,
@@ -40,7 +38,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
         preferredSize: const Size.fromHeight(1),
         child: Container(
           height: 1,
-          color: scheme.primary.withOpacity(isDark ? 0.18 : 0.14),
+          color: scheme.primary,
         ),
       ),
       title: title,

@@ -2,34 +2,34 @@ import 'package:flutter/material.dart';
 import 'app_palette.dart';
 
 const terracotaPalette = AppPalette(
-  primary: Color.fromARGB(255, 223, 65, 12), // Dark Coffee
-  secondary: Color.fromARGB(255, 173, 29, 29), // Khaki Beige
-  accent: Color.fromARGB(255, 214, 127, 92), // Powder Blush
-  neutral: Color.fromARGB(255, 240, 184, 170), // Champagne Mist
+  primary: Color.fromARGB(255, 193, 78, 40), // Dark Coffee (suavizado)
+  secondary: Color.fromARGB(255, 154, 54, 54), // Khaki Beige (suavizado)
+  accent: Color.fromARGB(255, 200, 132, 108), // Powder Blush (suavizado)
+  neutral: Color.fromARGB(255, 228, 190, 180), // Champagne Mist (suavizado)
 );
 const olivePalette = AppPalette(
-  primary: Color.fromARGB(255, 48, 81, 51), // Dark Spruce
-  secondary: Color.fromARGB(255, 53, 122, 11), // Muted Olive
-  accent: Color.fromARGB(255, 161, 203, 83), // Light Olive
-  neutral: Color.fromARGB(255, 173, 227, 204), // Carbon Black
+  primary: Color.fromARGB(255, 50, 80, 58), // Dark Spruce (suavizado)
+  secondary: Color.fromARGB(255, 78, 110, 54), // Muted Olive (suavizado)
+  accent: Color.fromARGB(255, 142, 180, 98), // Light Olive (suavizado)
+  neutral: Color.fromARGB(255, 178, 214, 198), // Carbon Black (suavizado)
 );
 const bluePalette = AppPalette(
-  primary: Color.fromARGB(255, 18, 65, 152), // Deep Blue
-  secondary: Color.fromARGB(255, 80, 183, 227), // Medium Slate Blue
-  accent: Color.fromARGB(255, 75, 114, 231), // Soft Blue
-  neutral: Color(0xFFA3BDFF), // Light Sky
+  primary: Color.fromARGB(255, 35, 85, 160), // Deep Blue (suavizado)
+  secondary: Color.fromARGB(255, 100, 170, 210), // Medium Slate Blue (suavizado)
+  accent: Color.fromARGB(255, 92, 130, 210), // Soft Blue (suavizado)
+  neutral: Color(0xFFB5C6F2), // Light Sky (suavizado)
 );
 const sunsetPalette = AppPalette(
-  primary: Color.fromARGB(255, 243, 183, 43), // Pumpkin Spice
-  secondary: Color.fromARGB(226, 222, 195, 43), // Sandy Brown
-  accent: Color.fromARGB(255, 199, 132, 50), // Sunlit Clay
-  neutral: Color.fromARGB(255, 232, 213, 156), // Powder Blush
+  primary: Color.fromARGB(255, 214, 167, 74), // Pumpkin Spice (suavizado)
+  secondary: Color.fromARGB(255, 200, 180, 90), // Sandy Brown (suavizado)
+  accent: Color.fromARGB(255, 186, 140, 80), // Sunlit Clay (suavizado)
+  neutral: Color.fromARGB(255, 220, 205, 170), // Powder Blush (suavizado)
 );
 const purplePalette = AppPalette(
-  primary: Color(0xFF8575FB), // Medium Slate Blue
-  secondary: Color(0xFFB185FF), // Soft Periwinkle
-  accent: Color(0xFFC799FF), // Mauve
-  neutral: Color(0xFFD4C0EB), // Thistle
+  primary: Color(0xFF8B7FD6), // Medium Slate Blue (suavizado)
+  secondary: Color(0xFFB396E6), // Soft Periwinkle (suavizado)
+  accent: Color(0xFFC4A2E6), // Mauve (suavizado)
+  neutral: Color(0xFFD2C8E6), // Thistle (suavizado)
 );
 const grayPalette = AppPalette(
   primary: Color(0xFF4A4A4A), // Dark Charcoal

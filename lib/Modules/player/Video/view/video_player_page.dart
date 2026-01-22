@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart' as vp;
 
 import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_controller.dart';
 import 'video_queue_page.dart';
+import '../../../../app/ui/widgets/layout/app_gradient_background.dart';
 
 class VideoPlayerPage extends GetView<VideoPlayerController> {
   const VideoPlayerPage({super.key});
@@ -13,9 +14,10 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Obx(() {
+      backgroundColor: Colors.transparent,
+      body: AppGradientBackground(
+        child: SafeArea(
+          child: Obx(() {
           final queue = controller.queue;
           final idx = controller.currentIndex.value;
 
@@ -204,6 +206,7 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
             ],
           );
         }),
+        ),
       ),
     );
   }

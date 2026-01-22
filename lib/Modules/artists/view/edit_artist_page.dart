@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controller/artists_controller.dart';
+import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 
 class EditArtistPage extends StatefulWidget {
   const EditArtistPage({super.key, required this.artist});
@@ -92,8 +93,12 @@ class _EditArtistPageState extends State<EditArtistPage> {
     final thumb = _localThumbPath ?? widget.artist.thumbnail;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Editar artista'),
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
       ),
       bottomNavigationBar: SafeArea(
         child: Padding(
@@ -104,83 +109,85 @@ class _EditArtistPageState extends State<EditArtistPage> {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.surfaceContainer,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  _ArtistAvatar(thumb: thumb),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      widget.artist.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
+      body: AppGradientBackground(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Card(
+              elevation: 0,
+              color: theme.colorScheme.surfaceContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            elevation: 0,
-            color: theme.colorScheme.surfaceContainer,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: _nameCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del artista',
-                      prefixIcon: Icon(Icons.person_rounded),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: _pickLocalThumbnail,
-                          icon: const Icon(Icons.photo_library_rounded),
-                          label: const Text('Elegir imagen'),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    _ArtistAvatar(thumb: thumb),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        widget.artist.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      OutlinedButton(
-                        onPressed: _clearThumbnail,
-                        child: const Text('Limpiar'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _thumbCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Thumbnail URL (opcional)',
-                      prefixIcon: Icon(Icons.image_rounded),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Card(
+              elevation: 0,
+              color: theme.colorScheme.surfaceContainer,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre del artista',
+                        prefixIcon: Icon(Icons.person_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: _pickLocalThumbnail,
+                            icon: const Icon(Icons.photo_library_rounded),
+                            label: const Text('Elegir imagen'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton(
+                          onPressed: _clearThumbnail,
+                          child: const Text('Limpiar'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _thumbCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Thumbnail URL (opcional)',
+                        prefixIcon: Icon(Icons.image_rounded),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

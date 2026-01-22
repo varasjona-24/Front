@@ -6,6 +6,7 @@ import 'queue_page.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/playback_controls.dart';
 import '../widgets/progress_bar.dart';
+import '../../../../app/ui/widgets/layout/app_gradient_background.dart';
 
 class AudioPlayerPage extends GetView<AudioPlayerController> {
   const AudioPlayerPage({super.key});
@@ -15,21 +16,22 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Obx(() {
-          final queue = controller.queue;
-          final idx = controller.currentIndex.value;
-          final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
-              ? queue[idx]
-              : null;
+      backgroundColor: Colors.transparent,
+      body: AppGradientBackground(
+        child: SafeArea(
+          child: Obx(() {
+            final queue = controller.queue;
+            final idx = controller.currentIndex.value;
+            final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
+                ? queue[idx]
+                : null;
 
-          if (item == null) {
-            return const Center(child: Text('No hay nada reproduciéndose'));
-          }
+            if (item == null) {
+              return const Center(child: Text('No hay nada reproduciéndose'));
+            }
 
-          return Column(
-            children: [
+            return Column(
+              children: [
               // ───────────────── Top Bar ─────────────────
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -126,9 +128,10 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
               const PlaybackControls(),
 
               const Spacer(),
-            ],
-          );
-        }),
+              ],
+            );
+          }),
+        ),
       ),
     );
   }

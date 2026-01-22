@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -9,6 +11,8 @@ import '../../../app/ui/widgets/list/media_horizontal_list.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../downloads/view/edit_media_page.dart';
+import 'section_list_page.dart';
+import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 
 class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
@@ -83,12 +87,6 @@ class HomePage extends GetView<HomeController> {
       final scheme = theme.colorScheme;
       final isDark = theme.brightness == Brightness.dark;
 
-      // ✅ Fondo general con tinte primary (para que no quede “plano/blanco” abajo)
-      final bg = Color.alphaBlend(
-        scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
-        scheme.surface,
-      );
-
       // ✅ Fondo de barra (un poco más marcado)
       final barBg = Color.alphaBlend(
         scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
@@ -96,7 +94,7 @@ class HomePage extends GetView<HomeController> {
       );
 
       return Scaffold(
-        backgroundColor: bg,
+        backgroundColor: Colors.transparent,
         extendBody: true, // 🔥 CLAVE: permite pintar debajo del nav
 
         appBar: AppTopBar(
@@ -109,8 +107,9 @@ class HomePage extends GetView<HomeController> {
         ),
 
         // ✅ Body con Stack para controlar nav + safe area inferior
-        body: Stack(
-          children: [
+        body: AppGradientBackground(
+          child: Stack(
+            children: [
             // CONTENIDO
             Positioned.fill(
               child: controller.isLoading.value
@@ -126,10 +125,26 @@ class HomePage extends GetView<HomeController> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _HomePillTabs(),
+                            const SizedBox(height: AppSpacing.lg),
                             if (controller.recentlyPlayed.isNotEmpty)
                               MediaHorizontalList(
-                                title: 'Mis escuchados',
+                                title: 'Reproducciones recientes',
                                 items: controller.recentlyPlayed,
+                                onHeaderTap: () => Get.to(
+                                  () => SectionListPage(
+                                    title: 'Reproducciones recientes',
+                                    items: controller.recentlyPlayed,
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.recentlyPlayed,
+                                        ),
+                                    onItemLongPress: (item, _) =>
+                                        _showItemActions(context, item),
+                                  ),
+                                ),
                                 onItemTap: (item, index) =>
                                     controller.openMedia(
                                       item,
@@ -144,8 +159,22 @@ class HomePage extends GetView<HomeController> {
                             if (controller.latestDownloads.isNotEmpty) ...[
                               const SizedBox(height: AppSpacing.lg),
                               MediaHorizontalList(
-                                title: 'Últimas descargas',
+                                title: 'Últimos agregados',
                                 items: controller.latestDownloads,
+                                onHeaderTap: () => Get.to(
+                                  () => SectionListPage(
+                                    title: 'Últimos agregados',
+                                    items: controller.latestDownloads,
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.latestDownloads,
+                                        ),
+                                    onItemLongPress: (item, _) =>
+                                        _showItemActions(context, item),
+                                  ),
+                                ),
                                 onItemTap: (item, index) =>
                                     controller.openMedia(
                                       item,
@@ -161,8 +190,22 @@ class HomePage extends GetView<HomeController> {
                             if (controller.favorites.isNotEmpty) ...[
                               const SizedBox(height: AppSpacing.lg),
                               MediaHorizontalList(
-                                title: 'Favoritos',
+                                title: 'Mis favoritos',
                                 items: controller.favorites,
+                                onHeaderTap: () => Get.to(
+                                  () => SectionListPage(
+                                    title: 'Mis favoritos',
+                                    items: controller.favorites,
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.favorites,
+                                        ),
+                                    onItemLongPress: (item, _) =>
+                                        _showItemActions(context, item),
+                                  ),
+                                ),
                                 onItemTap: (item, index) =>
                                     controller.openMedia(
                                       item,
@@ -172,6 +215,80 @@ class HomePage extends GetView<HomeController> {
                                 onItemLongPress: (item, _) {
                                   _showItemActions(context, item);
                                 },
+                              ),
+                            ],
+
+                            if (controller.mostPlayed.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              _SectionHeader(
+                                title: 'Más reproducido',
+                                onTap: () => Get.to(
+                                  () => SectionListPage(
+                                    title: 'Más reproducido',
+                                    items: controller.mostPlayed,
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.mostPlayed,
+                                        ),
+                                    onItemLongPress: (item, _) =>
+                                        _showItemActions(context, item),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              _MostPlayedRow(
+                                items: controller.mostPlayed,
+                                onTap: (item, index) => controller.openMedia(
+                                  item,
+                                  index,
+                                  controller.mostPlayed,
+                                ),
+                                onLongPress: (item, _) {
+                                  _showItemActions(context, item);
+                                },
+                              ),
+                            ],
+
+                            if (controller.latestDownloads.isNotEmpty) ...[
+                              const SizedBox(height: AppSpacing.lg),
+                              _SectionHeader(
+                                title: 'Destacado',
+                                onTap: () => Get.to(
+                                  () => SectionListPage(
+                                    title: 'Destacado',
+                                    items: controller.latestDownloads,
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.latestDownloads,
+                                        ),
+                                    onItemLongPress: (item, _) =>
+                                        _showItemActions(context, item),
+                                  ),
+                                ),
+                                trailing: _PillButton(
+                                  label: 'Aleatorio',
+                                  icon: Icons.shuffle_rounded,
+                                  onTap: () => controller.openMedia(
+                                    controller.latestDownloads.first,
+                                    0,
+                                    controller.latestDownloads,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              _FeaturedList(
+                                items: controller.latestDownloads,
+                                onTap: (item, index) => controller.openMedia(
+                                  item,
+                                  index,
+                                  controller.latestDownloads,
+                                ),
+                                onLongPress: (item, _) =>
+                                    _showItemActions(context, item),
                               ),
                             ],
 
@@ -221,10 +338,55 @@ class HomePage extends GetView<HomeController> {
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         ),
       );
     });
+  }
+}
+
+class _HomePillTabs extends StatefulWidget {
+  @override
+  State<_HomePillTabs> createState() => _HomePillTabsState();
+}
+
+class _HomePillTabsState extends State<_HomePillTabs> {
+  int _selected = 0;
+  final _labels = const ['Para ti', 'Canciones', 'Lista de reproducción'];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        scrollDirection: Axis.horizontal,
+        itemCount: _labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final selected = _selected == i;
+          return ChoiceChip(
+            label: Text(_labels[i]),
+            selected: selected,
+            onSelected: (_) => setState(() => _selected = i),
+            labelStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: selected ? scheme.onPrimary : scheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+            selectedColor: scheme.primary,
+            backgroundColor: scheme.surfaceContainerHigh,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            showCheckmark: false,
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -238,5 +400,306 @@ class _NoGlowScrollBehavior extends ScrollBehavior {
     ScrollableDetails details,
   ) {
     return child;
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.trailing, this.onTap});
+
+  final String title;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (trailing != null) trailing!,
+            if (trailing == null)
+              Icon(
+                Icons.chevron_right_rounded,
+                color: scheme.onSurfaceVariant,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PillButton extends StatelessWidget {
+  const _PillButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: scheme.primary.withOpacity(0.2)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: scheme.primary),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MostPlayedRow extends StatelessWidget {
+  const _MostPlayedRow({
+    required this.items,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  final List<MediaItem> items;
+  final void Function(MediaItem item, int index) onTap;
+  final void Function(MediaItem item, int index) onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 190,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        scrollDirection: Axis.horizontal,
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 14),
+        itemBuilder: (context, i) {
+          final item = items[i];
+          final thumb = item.effectiveThumbnail;
+          return GestureDetector(
+            onTap: () => onTap(item, i),
+            onLongPress: () => onLongPress(item, i),
+            child: Container(
+              width: 140,
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _CircleThumb(thumb: thumb),
+                  const SizedBox(height: 10),
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.headphones, size: 14),
+                      const SizedBox(width: 4),
+                      Text('${item.playCount}'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _CircleThumb extends StatelessWidget {
+  const _CircleThumb({required this.thumb});
+
+  final String? thumb;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (thumb != null && thumb!.isNotEmpty) {
+      final provider = thumb!.startsWith('http')
+          ? NetworkImage(thumb!)
+          : FileImage(File(thumb!)) as ImageProvider;
+      return Stack(
+        alignment: Alignment.center,
+        children: [
+          CircleAvatar(
+            radius: 44,
+            backgroundImage: provider,
+          ),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.45),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.play_arrow, color: Colors.white, size: 16),
+          ),
+        ],
+      );
+    }
+    return CircleAvatar(
+      radius: 44,
+      backgroundColor: scheme.surfaceContainerHighest,
+      child: Icon(Icons.music_note, color: scheme.onSurfaceVariant),
+    );
+  }
+}
+
+class _FeaturedList extends StatelessWidget {
+  const _FeaturedList({
+    required this.items,
+    required this.onTap,
+    required this.onLongPress,
+  });
+
+  final List<MediaItem> items;
+  final void Function(MediaItem item, int index) onTap;
+  final void Function(MediaItem item, int index) onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Column(
+      children: List.generate(
+        items.take(6).length,
+        (i) {
+          final item = items[i];
+          return Padding(
+            padding: const EdgeInsets.only(
+              left: AppSpacing.md,
+              right: AppSpacing.md,
+              bottom: 10,
+            ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => onTap(item, i),
+              onLongPress: () => onLongPress(item, i),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    _SquareThumb(thumb: item.effectiveThumbnail),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            item.displaySubtitle,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: scheme.surface,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.play_arrow_rounded,
+                        color: scheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SquareThumb extends StatelessWidget {
+  const _SquareThumb({required this.thumb});
+
+  final String? thumb;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (thumb != null && thumb!.isNotEmpty) {
+      final provider = thumb!.startsWith('http')
+          ? NetworkImage(thumb!)
+          : FileImage(File(thumb!)) as ImageProvider;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image(
+          image: provider,
+          width: 56,
+          height: 56,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(Icons.music_note, color: scheme.onSurfaceVariant),
+    );
   }
 }

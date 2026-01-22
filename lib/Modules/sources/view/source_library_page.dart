@@ -10,6 +10,7 @@ import '../../settings/controller/settings_controller.dart';
 // UI
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
+import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 
 class SourceLibraryPage extends StatefulWidget {
@@ -70,11 +71,6 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
 
     final HomeController home = Get.find<HomeController>();
 
-    final bg = Color.alphaBlend(
-      scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
-      scheme.surface,
-    );
-
     final barBg = Color.alphaBlend(
       scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
       scheme.surface,
@@ -84,7 +80,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
       final mode = home.mode.value;
 
       return Scaffold(
-        backgroundColor: bg,
+        backgroundColor: Colors.transparent,
         extendBody: true,
         appBar: AppTopBar(
           title: Text(widget.title),
@@ -94,126 +90,128 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
               ? AppMediaMode.audio
               : AppMediaMode.video,
         ),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: FutureBuilder<List<MediaItem>>(
-                future: _load(mode),
-                builder: (context, snap) {
-                  if (snap.connectionState != ConnectionState.done) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+        body: AppGradientBackground(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: FutureBuilder<List<MediaItem>>(
+                  future: _load(mode),
+                  builder: (context, snap) {
+                    if (snap.connectionState != ConnectionState.done) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
 
-                  final list = snap.data ?? const <MediaItem>[];
+                    final list = snap.data ?? const <MediaItem>[];
 
-                  // separar audio / video
-                  final audio = list
-                      .where(
-                        (e) => e.variants.any(
-                          (v) => v.kind == MediaVariantKind.audio,
+                    // separar audio / video
+                    final audio = list
+                        .where(
+                          (e) => e.variants.any(
+                            (v) => v.kind == MediaVariantKind.audio,
+                          ),
+                        )
+                        .toList();
+                    final video = list
+                        .where(
+                          (e) => e.variants.any(
+                            (v) => v.kind == MediaVariantKind.video,
+                          ),
+                        )
+                        .toList();
+
+                    if (audio.isEmpty && video.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'No hay contenido aquí todavía.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      )
-                      .toList();
-                  final video = list
-                      .where(
-                        (e) => e.variants.any(
-                          (v) => v.kind == MediaVariantKind.video,
-                        ),
-                      )
-                      .toList();
+                      );
+                    }
 
-                  if (audio.isEmpty && video.isEmpty) {
-                    return Center(
-                      child: Text(
-                        'No hay contenido aquí todavía.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                    return ScrollConfiguration(
+                      behavior: const _NoGlowScrollBehavior(),
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.only(
+                          top: 12,
+                          bottom: kBottomNavigationBarHeight + 18,
+                          left: 12,
+                          right: 12,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (audio.isNotEmpty) ...[
+                              Text(
+                                'Audio',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...audio.map((item) => _itemTile(item, list)),
+                              const SizedBox(height: 18),
+                            ],
+                            if (video.isNotEmpty) ...[
+                              Text(
+                                'Videos',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              ...video.map((item) => _itemTile(item, list)),
+                            ],
+                          ],
                         ),
                       ),
                     );
-                  }
+                  },
+                ),
+              ),
 
-                  return ScrollConfiguration(
-                    behavior: const _NoGlowScrollBehavior(),
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.only(
-                        top: 12,
-                        bottom: kBottomNavigationBarHeight + 18,
-                        left: 12,
-                        right: 12,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (audio.isNotEmpty) ...[
-                            Text(
-                              'Audio',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...audio.map((item) => _itemTile(item, list)),
-                            const SizedBox(height: 18),
-                          ],
-                          if (video.isNotEmpty) ...[
-                            Text(
-                              'Videos',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            ...video.map((item) => _itemTile(item, list)),
-                          ],
-                        ],
+              // NAV
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: barBg,
+                    border: Border(
+                      top: BorderSide(
+                        color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
+                        width: 56,
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-
-            // NAV
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: barBg,
-                  border: Border(
-                    top: BorderSide(
-                      color: scheme.primary.withOpacity(isDark ? 0.22 : 0.18),
-                      width: 56,
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: AppBottomNav(
+                      currentIndex: 4,
+                      onTap: (index) {
+                        switch (index) {
+                          case 1:
+                            home.goToPlaylists();
+                            break;
+                          case 2:
+                            home.goToArtists();
+                            break;
+                          case 3:
+                            home.goToDownloads();
+                            break;
+                          case 4:
+                            home.goToSources();
+                            break;
+                        }
+                      },
                     ),
                   ),
                 ),
-                child: SafeArea(
-                  top: false,
-                  child: AppBottomNav(
-                    currentIndex: 4,
-                    onTap: (index) {
-                      switch (index) {
-                        case 1:
-                          home.goToPlaylists();
-                          break;
-                        case 2:
-                          home.goToArtists();
-                          break;
-                        case 3:
-                          home.goToDownloads();
-                          break;
-                        case 4:
-                          home.goToSources();
-                          break;
-                      }
-                    },
-                  ),
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     });

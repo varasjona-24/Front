@@ -9,6 +9,7 @@ import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import 'widgets/download_settings_panel.dart';
 import 'widgets/downloads_pill.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
@@ -23,11 +24,6 @@ class DownloadsPage extends GetView<DownloadsController> {
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
 
-    final bg = Color.alphaBlend(
-      scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
-      scheme.surface,
-    );
-
     final barBg = Color.alphaBlend(
       scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
       scheme.surface,
@@ -39,7 +35,7 @@ class DownloadsPage extends GetView<DownloadsController> {
       final mode = home.mode.value;
 
       return Scaffold(
-        backgroundColor: bg,
+        backgroundColor: Colors.transparent,
         extendBody: true,
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
@@ -49,8 +45,9 @@ class DownloadsPage extends GetView<DownloadsController> {
         // ============================
         // 📄 LISTA
         // ============================
-        body: Stack(
-          children: [
+        body: AppGradientBackground(
+          child: Stack(
+            children: [
             Positioned.fill(
               child: Obx(() {
                 if (controller.isLoading.value) {
@@ -123,7 +120,8 @@ class DownloadsPage extends GetView<DownloadsController> {
               isDark: isDark,
               home: home,
             ),
-          ],
+            ],
+          ),
         ),
       );
     });

@@ -11,6 +11,7 @@ class MediaCard extends StatefulWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final double width;
+  final bool showPlayBadge;
 
   const MediaCard({
     super.key,
@@ -18,6 +19,7 @@ class MediaCard extends StatefulWidget {
     this.onTap,
     this.onLongPress,
     this.width = 140,
+    this.showPlayBadge = true,
   });
 
   @override
@@ -61,10 +63,10 @@ class _MediaCardState extends State<MediaCard> {
       onTapCancel: _cancelHold,
       onPanStart: (_) => _cancelHold(),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
         onTap: widget.onTap,
-        splashColor: colors.primary.withOpacity(0.1),
-        highlightColor: colors.primary.withOpacity(0.05),
+        splashColor: colors.primary.withOpacity(0.12),
+        highlightColor: colors.primary.withOpacity(0.06),
         child: SizedBox(
           width: widget.width,
           child: Column(
@@ -75,11 +77,60 @@ class _MediaCardState extends State<MediaCard> {
                 aspectRatio: 1,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: colors.surface,
-                    borderRadius: BorderRadius.circular(12),
+                    color: colors.surfaceContainerHigh,
+                    borderRadius: BorderRadius.circular(18),
                   ),
-                  alignment: Alignment.center,
-                  child: _buildThumbnail(context),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildThumbnail(context),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            height: 44,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  colors.shadow.withOpacity(0.55),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (widget.showPlayBadge)
+                          Positioned(
+                            right: 10,
+                            bottom: 10,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: colors.surface.withOpacity(0.9),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: colors.shadow.withOpacity(0.2),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                Icons.play_arrow_rounded,
+                                size: 18,
+                                color: colors.primary,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
 
@@ -90,7 +141,9 @@ class _MediaCardState extends State<MediaCard> {
                 widget.item.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
 
               const SizedBox(height: AppSpacing.xs),
@@ -100,7 +153,9 @@ class _MediaCardState extends State<MediaCard> {
                 widget.item.displaySubtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -115,30 +170,24 @@ class _MediaCardState extends State<MediaCard> {
     // 1) ✅ Preferir thumbnail local si existe
     final local = widget.item.thumbnailLocalPath?.trim();
     if (local != null && local.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          File(local),
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, __, ___) => _fallbackIcon(colors),
-        ),
+      return Image.file(
+        File(local),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _fallbackIcon(colors),
       );
     }
 
     // 2) 🌐 Fallback a thumbnail remoto
     final remote = widget.item.thumbnail?.trim();
     if (remote != null && remote.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Image.network(
-          remote,
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, __, ___) => _fallbackIcon(colors),
-        ),
+      return Image.network(
+        remote,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _fallbackIcon(colors),
       );
     }
 
@@ -152,8 +201,7 @@ class _MediaCardState extends State<MediaCard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: colors.surface,
-        borderRadius: BorderRadius.circular(12),
+        color: colors.surfaceContainerHigh,
       ),
       alignment: Alignment.center,
       child: Icon(

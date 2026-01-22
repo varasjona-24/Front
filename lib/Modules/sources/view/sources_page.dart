@@ -13,6 +13,7 @@ import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 
 class SourcesPage extends GetView<SourcesController> {
@@ -23,11 +24,6 @@ class SourcesPage extends GetView<SourcesController> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
-
-    final bg = Color.alphaBlend(
-      scheme.primary.withOpacity(isDark ? 0.02 : 0.06),
-      scheme.surface,
-    );
 
     final barBg = Color.alphaBlend(
       scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
@@ -41,47 +37,49 @@ class SourcesPage extends GetView<SourcesController> {
       final mode = home.mode.value;
 
       return Scaffold(
-        backgroundColor: bg,
+        backgroundColor: Colors.transparent,
         extendBody: true,
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
           onSearch: home.onSearch,
         ),
-        body: Stack(
-          children: [
-            Positioned.fill(
-              child: ScrollConfiguration(
-                behavior: const _NoGlowScrollBehavior(),
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.only(
-                    top: AppSpacing.md,
-                    bottom: kBottomNavigationBarHeight + 18,
-                    left: AppSpacing.md,
-                    right: AppSpacing.md,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _header(theme: theme, scheme: scheme, home: home),
-                      const SizedBox(height: AppSpacing.lg),
+        body: AppGradientBackground(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ScrollConfiguration(
+                  behavior: const _NoGlowScrollBehavior(),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.only(
+                      top: AppSpacing.md,
+                      bottom: kBottomNavigationBarHeight + 18,
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _header(theme: theme, scheme: scheme, home: home),
+                        const SizedBox(height: AppSpacing.lg),
 
-                      _pillsSection(pills),
-                      const SizedBox(height: AppSpacing.lg),
+                        _pillsSection(pills),
+                        const SizedBox(height: AppSpacing.lg),
 
-                      const SizedBox(height: AppSpacing.lg),
-                    ],
+                        const SizedBox(height: AppSpacing.lg),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            _bottomNav(
-              barBg: barBg,
-              scheme: scheme,
-              isDark: isDark,
-              home: home,
-            ),
-          ],
+              _bottomNav(
+                barBg: barBg,
+                scheme: scheme,
+                isDark: isDark,
+                home: home,
+              ),
+            ],
+          ),
         ),
       );
     });

@@ -11,6 +11,7 @@ class MediaHorizontalList extends StatelessWidget {
   final bool isLoading;
   final void Function(MediaItem item, int index) onItemTap;
   final void Function(MediaItem item, int index)? onItemLongPress;
+  final VoidCallback? onHeaderTap;
 
   const MediaHorizontalList({
     super.key,
@@ -19,6 +20,7 @@ class MediaHorizontalList extends StatelessWidget {
     required this.onItemTap,
     this.onItemLongPress,
     this.isLoading = false,
+    this.onHeaderTap,
   });
 
   @override
@@ -33,7 +35,19 @@ class MediaHorizontalList extends StatelessWidget {
 
     Widget header() => Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          child: Text(title, style: titleStyle),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: onHeaderTap,
+            child: Row(
+              children: [
+                Expanded(child: Text(title, style: titleStyle)),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
         );
 
     if (isLoading) {
@@ -43,13 +57,13 @@ class MediaHorizontalList extends StatelessWidget {
           header(),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
-            height: 200,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              itemCount: 6,
-              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
-              itemBuilder: (_, __) => const MediaCardSkeleton(),
+          height: 210,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            itemCount: 6,
+            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
+            itemBuilder: (_, __) => const MediaCardSkeleton(),
             ),
           ),
         ],
@@ -64,7 +78,7 @@ class MediaHorizontalList extends StatelessWidget {
         header(),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
-          height: 200,
+          height: 210,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             scrollDirection: Axis.horizontal,
@@ -74,6 +88,7 @@ class MediaHorizontalList extends StatelessWidget {
                 final item = items[index];
                 return MediaCard(
                   item: item,
+                  width: 156,
                   onTap: () => onItemTap(item, index),
                   onLongPress: onItemLongPress == null
                       ? null
