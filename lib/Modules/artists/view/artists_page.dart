@@ -57,10 +57,12 @@ class ArtistsPage extends GetView<ArtistsController> {
                             children: [
                               _header(theme),
                               const SizedBox(height: AppSpacing.md),
-                              _searchBar(theme),
-                              const SizedBox(height: AppSpacing.md),
-                              _sortBar(theme),
+                              _categoryChips(theme),
                               const SizedBox(height: AppSpacing.lg),
+                              _recentArtists(theme),
+                              const SizedBox(height: AppSpacing.lg),
+                              _summaryRow(theme, context),
+                              const SizedBox(height: AppSpacing.md),
                               _artistList(),
                             ],
                           ),
@@ -125,52 +127,95 @@ class ArtistsPage extends GetView<ArtistsController> {
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Biblioteca organizada por artista',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
       ],
     );
   }
 
-  Widget _searchBar(ThemeData theme) {
-    return TextField(
-      onChanged: controller.setQuery,
-      decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search),
-        hintText: 'Buscar artista...',
-        filled: true,
-        fillColor: theme.colorScheme.surfaceContainer,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
+  Widget _categoryChips(ThemeData theme) {
+    final scheme = theme.colorScheme;
+    const labels = ['Carpetas', 'Álbumes', 'Artistas', 'Géneros'];
+
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: labels.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final selected = labels[i] == 'Artistas';
+          return ChoiceChip(
+            label: Text(labels[i]),
+            selected: selected,
+            onSelected: (_) {},
+            showCheckmark: false,
+            selectedColor: scheme.surfaceContainerHighest,
+            backgroundColor: scheme.surfaceContainerHigh,
+            labelStyle: theme.textTheme.bodyMedium?.copyWith(
+              color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+          );
+        },
       ),
     );
   }
 
-  Widget _sortBar(ThemeData theme) {
-    return Obx(
-      () => Row(
+  Widget _recentArtists(ThemeData theme) {
+    return Obx(() {
+      final list = controller.filtered.take(8).toList();
+      if (list.isEmpty) return const SizedBox.shrink();
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.sort_rounded),
-          const SizedBox(width: 8),
-          Expanded(
-            child: SegmentedButton<ArtistSort>(
-              segments: const [
-                ButtonSegment(value: ArtistSort.name, label: Text('A-Z')),
-                ButtonSegment(value: ArtistSort.count, label: Text('Cantidad')),
-              ],
-              selected: {controller.sort.value},
-              onSelectionChanged: (value) => controller.setSort(value.first),
+          Text(
+            'Reproducciones recientes',
+            style: theme.textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 124,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: list.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 12),
+              itemBuilder: (context, i) {
+                final artist = list[i];
+                return _ArtistCoverCard(artist: artist);
+              },
             ),
           ),
         ],
-      ),
-    );
+      );
+    });
+  }
+
+  Widget _summaryRow(ThemeData theme, BuildContext context) {
+    return Obx(() {
+      final count = controller.filtered.length;
+      return Row(
+        children: [
+          Text(
+            '$count artistas',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.sort_rounded),
+            onPressed: () => _openSortSheet(context),
+            tooltip: 'Ordenar',
+          ),
+        ],
+      );
+    });
   }
 
   Widget _artistList() {
@@ -206,6 +251,93 @@ class ArtistsPage extends GetView<ArtistsController> {
       );
     });
   }
+
+  Future<void> _openSortSheet(BuildContext context) async {
+    final theme = Theme.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return Obx(() {
+          final sort = controller.sort.value;
+          final asc = controller.sortAscending.value;
+
+          return SafeArea(
+            child: DraggableScrollableSheet(
+              expand: false,
+              minChildSize: 0.4,
+              initialChildSize: 0.72,
+              maxChildSize: 0.9,
+              builder: (context, scrollController) {
+                return ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                  children: [
+                    Text(
+                      'Ordenar por',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _SortOption(
+                      label: 'Nombre del artista',
+                      selected: sort == ArtistSort.name,
+                      onTap: () => controller.setSort(ArtistSort.name),
+                    ),
+                    _SortOption(
+                      label: 'Número de canciones',
+                      selected: sort == ArtistSort.count,
+                      onTap: () => controller.setSort(ArtistSort.count),
+                    ),
+                    _SortOption(
+                      label: 'Aleatorio',
+                      selected: sort == ArtistSort.random,
+                      onTap: () => controller.setSort(ArtistSort.random),
+                    ),
+                    const Divider(height: 28),
+                    _SortOption(
+                      label: 'Tamaño más a menos',
+                      selected: !asc,
+                      onTap: () => controller.setSortAscending(false),
+                    ),
+                    _SortOption(
+                      label: 'Tamaño menos a más',
+                      selected: asc,
+                      onTap: () => controller.setSortAscending(true),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('Cancelar'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () => Navigator.of(ctx).pop(),
+                            child: const Text('Aceptar'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          );
+        });
+      },
+    );
+  }
 }
 
 class _ArtistCard extends StatelessWidget {
@@ -240,6 +372,93 @@ class _ArtistCard extends StatelessWidget {
         ),
         onTap: onOpen,
       ),
+    );
+  }
+}
+
+class _ArtistCoverCard extends StatelessWidget {
+  const _ArtistCoverCard({required this.artist});
+
+  final ArtistGroup artist;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final thumb = artist.thumbnailLocalPath ?? artist.thumbnail;
+
+    final imageProvider = (thumb != null && thumb!.isNotEmpty)
+        ? (thumb!.startsWith('http')
+              ? NetworkImage(thumb!)
+              : FileImage(File(thumb!)) as ImageProvider)
+        : null;
+
+    return SizedBox(
+      width: 96,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 96,
+            height: 96,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(16),
+              image: imageProvider != null
+                  ? DecorationImage(
+                      image: imageProvider,
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: imageProvider == null
+                ? Icon(Icons.person_rounded, color: scheme.onSurfaceVariant)
+                : null,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            artist.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SortOption extends StatelessWidget {
+  const _SortOption({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        label,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: selected ? scheme.primary : scheme.onSurface,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+      trailing: Icon(
+        selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+        color: selected ? scheme.primary : scheme.onSurfaceVariant,
+      ),
+      onTap: onTap,
     );
   }
 }

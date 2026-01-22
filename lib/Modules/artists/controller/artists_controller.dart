@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:get/get.dart';
 
@@ -8,7 +9,7 @@ import '../../../app/models/media_item.dart';
 import '../data/artist_store.dart';
 import '../domain/artist_profile.dart';
 
-enum ArtistSort { name, count }
+enum ArtistSort { name, count, random }
 
 class ArtistGroup {
   final String key;
@@ -37,6 +38,7 @@ class ArtistsController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString query = ''.obs;
   final Rx<ArtistSort> sort = ArtistSort.name.obs;
+  final RxBool sortAscending = true.obs;
 
   @override
   void onInit() {
@@ -47,7 +49,13 @@ class ArtistsController extends GetxController {
   Future<void> load() async {
     isLoading.value = true;
     try {
-      final items = await _repo.getLibrary();
+      final items = (await _repo.getLibrary())
+          .where(
+            (item) => item.variants.any(
+              (v) => v.kind == MediaVariantKind.audio,
+            ),
+          )
+          .toList();
       final profiles = await _artistStore.readAll();
       final profilesByKey = {
         for (final p in profiles) p.key: p,
@@ -110,15 +118,28 @@ class ArtistsController extends GetxController {
     artists.assignAll(_applySort(artists));
   }
 
+  void setSortAscending(bool value) {
+    sortAscending.value = value;
+    artists.assignAll(_applySort(artists));
+  }
+
   List<ArtistGroup> _applySort(List<ArtistGroup> input) {
     final list = List<ArtistGroup>.from(input);
     switch (sort.value) {
       case ArtistSort.count:
-        list.sort((a, b) => b.count.compareTo(a.count));
+        list.sort((a, b) => a.count.compareTo(b.count));
+        break;
+      case ArtistSort.random:
+        list.shuffle(Random());
         break;
       case ArtistSort.name:
       default:
-        list.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+        list.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
+    }
+    if (sort.value != ArtistSort.random && !sortAscending.value) {
+      return list.reversed.toList();
     }
     return list;
   }

@@ -103,23 +103,18 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
 
                     final list = snap.data ?? const <MediaItem>[];
 
-                    // separar audio / video
-                    final audio = list
-                        .where(
-                          (e) => e.variants.any(
-                            (v) => v.kind == MediaVariantKind.audio,
-                          ),
-                        )
-                        .toList();
-                    final video = list
-                        .where(
-                          (e) => e.variants.any(
-                            (v) => v.kind == MediaVariantKind.video,
-                          ),
-                        )
-                        .toList();
+                    final hasAudio = (MediaItem e) => e.variants.any(
+                          (v) => v.kind == MediaVariantKind.audio,
+                        );
+                    final hasVideo = (MediaItem e) => e.variants.any(
+                          (v) => v.kind == MediaVariantKind.video,
+                        );
 
-                    if (audio.isEmpty && video.isEmpty) {
+                    final modeList = mode == HomeMode.audio
+                        ? list.where(hasAudio).toList()
+                        : list.where(hasVideo).toList();
+
+                    if (modeList.isEmpty) {
                       return Center(
                         child: Text(
                           'No hay contenido aquí todavía.',
@@ -142,27 +137,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (audio.isNotEmpty) ...[
-                              Text(
-                                'Audio',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              ...audio.map((item) => _itemTile(item, list)),
-                              const SizedBox(height: 18),
-                            ],
-                            if (video.isNotEmpty) ...[
-                              Text(
-                                'Videos',
-                                style: theme.textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              ...video.map((item) => _itemTile(item, list)),
-                            ],
+                            ...modeList.map((item) => _itemTile(item, modeList)),
                           ],
                         ),
                       ),

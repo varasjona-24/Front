@@ -121,15 +121,38 @@ class SourcesPage extends GetView<SourcesController> {
   }
 
   Widget _pillsSection(List<SourcePillData> pills) {
+    if (pills.isEmpty) return const SizedBox.shrink();
+
+    SourcePillData primary = pills.first;
+    for (final p in pills) {
+      if (p.origin == SourceOrigin.generic) {
+        primary = p;
+        break;
+      }
+    }
+
+    final rest = pills.where((p) => p != primary).toList();
+
     return Column(
-      children: pills
-          .map(
-            (p) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: SourcePillTile(data: p),
-            ),
-          )
-          .toList(),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PrimarySourcePill(data: primary),
+        const SizedBox(height: 16),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: rest.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 1.6,
+          ),
+          itemBuilder: (context, index) {
+            return _SourceGridTile(data: rest[index]);
+          },
+        ),
+      ],
     );
   }
 
@@ -401,6 +424,94 @@ class SourcesPage extends GetView<SourcesController> {
         onTap: openOrigin(SourceOrigin.generic, 'Genérico'),
       ),
     ];
+  }
+}
+
+class _PrimarySourcePill extends StatelessWidget {
+  const _PrimarySourcePill({required this.data});
+
+  final SourcePillData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: SourcePillTile(data: data),
+    );
+  }
+}
+
+class _SourceGridTile extends StatelessWidget {
+  const _SourceGridTile({required this.data});
+
+  final SourcePillData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textColor = data.forceDarkText ? Colors.black : Colors.white;
+    final subColor = data.forceDarkText
+        ? Colors.black87
+        : Colors.white.withOpacity(0.85);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: data.gradient,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+                color: Colors.black.withOpacity(0.18),
+              ),
+            ],
+          ),
+          child: InkWell(
+            onTap: data.onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(data.icon, color: textColor, size: 20),
+                  ),
+                  const Spacer(),
+                  Text(
+                    data.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: textColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    data.subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: subColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -10,6 +10,7 @@ import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/routes/app_routes.dart';
 import 'widgets/download_settings_panel.dart';
 import 'widgets/downloads_pill.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
@@ -54,7 +55,13 @@ class DownloadsPage extends GetView<DownloadsController> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final list = controller.downloads;
+                final list = controller.downloads
+                    .where(
+                      (e) => mode == HomeMode.audio
+                          ? e.hasAudioLocal
+                          : e.hasVideoLocal,
+                    )
+                    .toList();
 
                 return ScrollConfiguration(
                   behavior: const _NoGlowScrollBehavior(),
@@ -99,7 +106,8 @@ class DownloadsPage extends GetView<DownloadsController> {
                                 padding: const EdgeInsets.only(bottom: 10),
                                 child: _DownloadTile(
                                   item: list[i],
-                                  onPlay: controller.play,
+                                  onPlay: (item) =>
+                                      _playItem(mode, list, item),
                                   onHold: (item) =>
                                       _showItemActions(context, item),
                                 ),
@@ -129,6 +137,21 @@ class DownloadsPage extends GetView<DownloadsController> {
 
   void _openEdit(BuildContext context, MediaItem item) {
     Get.to(() => EditMediaMetadataPage(item: item));
+  }
+
+  void _playItem(HomeMode mode, List<MediaItem> queue, MediaItem item) {
+    final idx = queue.indexWhere((e) => e.id == item.id);
+    final route = mode == HomeMode.audio
+        ? AppRoutes.audioPlayer
+        : AppRoutes.videoPlayer;
+
+    Get.toNamed(
+      route,
+      arguments: {
+        'queue': queue,
+        'index': idx < 0 ? 0 : idx,
+      },
+    );
   }
 
   // ============================
