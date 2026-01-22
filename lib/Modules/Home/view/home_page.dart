@@ -151,68 +151,6 @@ class HomePage extends GetView<HomeController> {
                               _HomePillTabs(),
                               const SizedBox(height: AppSpacing.lg),
 
-                              // ---- Recientes ----
-                              if (controller.recentlyPlayed.isNotEmpty)
-                                MediaHorizontalList(
-                                  title: 'Reproducciones recientes',
-                                  items: controller.recentlyPlayed,
-                                  onHeaderTap: () => Get.to(
-                                    () => SectionListPage(
-                                      title: 'Reproducciones recientes',
-                                      items: controller.recentlyPlayed,
-                                      onItemTap: (item, index) =>
-                                          controller.openMedia(
-                                            item,
-                                            index,
-                                            controller.recentlyPlayed,
-                                          ),
-                                      onItemLongPress: (item, _) =>
-                                          _showItemActions(context, item),
-                                    ),
-                                  ),
-                                  onItemTap: (item, index) =>
-                                      controller.openMedia(
-                                        item,
-                                        index,
-                                        controller.recentlyPlayed,
-                                      ),
-                                  onItemLongPress: (item, _) {
-                                    _showItemActions(context, item);
-                                  },
-                                ),
-
-                              // ---- Últimos agregados ----
-                              if (controller.latestDownloads.isNotEmpty) ...[
-                                const SizedBox(height: AppSpacing.lg),
-                                MediaHorizontalList(
-                                  title: 'Últimos agregados',
-                                  items: controller.latestDownloads,
-                                  onHeaderTap: () => Get.to(
-                                    () => SectionListPage(
-                                      title: 'Últimos agregados',
-                                      items: controller.latestDownloads,
-                                      onItemTap: (item, index) =>
-                                          controller.openMedia(
-                                            item,
-                                            index,
-                                            controller.latestDownloads,
-                                          ),
-                                      onItemLongPress: (item, _) =>
-                                          _showItemActions(context, item),
-                                    ),
-                                  ),
-                                  onItemTap: (item, index) =>
-                                      controller.openMedia(
-                                        item,
-                                        index,
-                                        controller.latestDownloads,
-                                      ),
-                                  onItemLongPress: (item, _) {
-                                    _showItemActions(context, item);
-                                  },
-                                ),
-                              ],
-
                               // ---- Favoritos ----
                               if (controller.favorites.isNotEmpty) ...[
                                 const SizedBox(height: AppSpacing.lg),
@@ -237,13 +175,13 @@ class HomePage extends GetView<HomeController> {
                                       controller.openMedia(
                                         item,
                                         index,
-                                        controller.favorites,
-                                      ),
-                                  onItemLongPress: (item, _) {
-                                    _showItemActions(context, item);
-                                  },
-                                ),
-                              ],
+                                      controller.favorites,
+                                    ),
+                                onItemLongPress: (item, _) {
+                                  _showItemActions(context, item);
+                                },
+                              ),
+                            ],
 
                               // ---- Más reproducido ----
                               if (controller.mostPlayed.isNotEmpty) ...[
@@ -279,14 +217,87 @@ class HomePage extends GetView<HomeController> {
                                 ),
                               ],
 
+                              // ---- Recientes ----
+                              if (controller.recentlyPlayed.isNotEmpty)
+                                MediaHorizontalList(
+                                  title: 'Reproducciones recientes',
+                                  items: controller.recentlyPlayed,
+                                  onHeaderTap: () => Get.to(
+                                    () => SectionListPage(
+                                      title: 'Reproducciones recientes',
+                                      items: controller.recentlyPlayed,
+                                      onItemTap: (item, index) =>
+                                          controller.openMedia(
+                                            item,
+                                            index,
+                                            controller.recentlyPlayed,
+                                          ),
+                                      onItemLongPress: (item, _) =>
+                                          _showItemActions(context, item),
+                                    ),
+                                  ),
+                                  onItemTap: (item, index) =>
+                                      controller.openMedia(
+                                        item,
+                                        index,
+                                        controller.recentlyPlayed,
+                                      ),
+                                  onItemLongPress: (item, _) {
+                                    _showItemActions(context, item);
+                                  },
+                                ),
+
                               // ---- Destacado ----
-                              if (controller.latestDownloads.isNotEmpty) ...[
+                              if (controller.featured.isNotEmpty) ...[
                                 const SizedBox(height: AppSpacing.lg),
                                 _SectionHeader(
                                   title: 'Destacado',
                                   onTap: () => Get.to(
                                     () => SectionListPage(
                                       title: 'Destacado',
+                                      items: controller.featured,
+                                      onItemTap: (item, index) =>
+                                          controller.openMedia(
+                                            item,
+                                            index,
+                                            controller.featured,
+                                          ),
+                                      onItemLongPress: (item, _) =>
+                                          _showItemActions(context, item),
+                                    ),
+                                  ),
+                                  trailing: _PillButton(
+                                    label: 'Aleatorio',
+                                    icon: Icons.shuffle_rounded,
+                                    onTap: () => controller.openMedia(
+                                      controller.featured.first,
+                                      0,
+                                      controller.featured,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                _FeaturedList(
+                                  items: controller.featured,
+                                  onTap: (item, index) => controller.openMedia(
+                                    item,
+                                    index,
+                                    controller.featured,
+                                  ),
+                                  onLongPress: (item, _) =>
+                                      _showItemActions(context, item),
+                                ),
+                              ],
+
+                              // ---- Últimas descargas ----
+                              if (controller.latestDownloads.isNotEmpty) ...[
+                                const SizedBox(height: AppSpacing.lg),
+                                MediaHorizontalList(
+                                  title: 'Últimas descargas',
+                                  items: controller.latestDownloads,
+                                  onHeaderTap: () => Get.to(
+                                    () => SectionListPage(
+                                      title: 'Últimas descargas',
                                       items: controller.latestDownloads,
                                       onItemTap: (item, index) =>
                                           controller.openMedia(
@@ -298,26 +309,15 @@ class HomePage extends GetView<HomeController> {
                                           _showItemActions(context, item),
                                     ),
                                   ),
-                                  trailing: _PillButton(
-                                    label: 'Aleatorio',
-                                    icon: Icons.shuffle_rounded,
-                                    onTap: () => controller.openMedia(
-                                      controller.latestDownloads.first,
-                                      0,
-                                      controller.latestDownloads,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                _FeaturedList(
-                                  items: controller.latestDownloads,
-                                  onTap: (item, index) => controller.openMedia(
-                                    item,
-                                    index,
-                                    controller.latestDownloads,
-                                  ),
-                                  onLongPress: (item, _) =>
-                                      _showItemActions(context, item),
+                                  onItemTap: (item, index) =>
+                                      controller.openMedia(
+                                        item,
+                                        index,
+                                        controller.latestDownloads,
+                                      ),
+                                  onItemLongPress: (item, _) {
+                                    _showItemActions(context, item);
+                                  },
                                 ),
                               ],
 

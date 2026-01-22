@@ -22,6 +22,7 @@ class HomeController extends GetxController {
   final RxList<MediaItem> latestDownloads = <MediaItem>[].obs;
   final RxList<MediaItem> favorites = <MediaItem>[].obs;
   final RxList<MediaItem> mostPlayed = <MediaItem>[].obs;
+  final RxList<MediaItem> featured = <MediaItem>[].obs;
 
   final RxList<MediaItem> _allItems = <MediaItem>[].obs;
 
@@ -79,6 +80,59 @@ class HomeController extends GetxController {
         .toList()
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
     mostPlayed.assignAll(most.take(12));
+
+    featured.assignAll(
+      _buildFeatured(
+        favorites: favorites,
+        mostPlayed: mostPlayed,
+        recent: recent,
+        maxItems: 12,
+      ),
+    );
+  }
+
+  List<MediaItem> _buildFeatured({
+    required List<MediaItem> favorites,
+    required List<MediaItem> mostPlayed,
+    required List<MediaItem> recent,
+    int maxItems = 12,
+  }) {
+    final result = <MediaItem>[];
+    final seen = <String>{};
+
+    void addItems(List<MediaItem> items, int limit) {
+      var added = 0;
+      for (final item in items) {
+        if (added >= limit || result.length >= maxItems) return;
+        final key = item.publicId.trim().isNotEmpty
+            ? item.publicId.trim()
+            : item.id.trim();
+        if (seen.contains(key)) continue;
+        result.add(item);
+        seen.add(key);
+        added++;
+      }
+    }
+
+    final favLimit = (maxItems * 0.4).round();
+    final mostLimit = (maxItems * 0.3).round();
+    final recentLimit = maxItems - favLimit - mostLimit;
+
+    addItems(favorites, favLimit);
+    addItems(mostPlayed, mostLimit);
+    addItems(recent, recentLimit);
+
+    if (result.length < maxItems) {
+      addItems(favorites, maxItems - result.length);
+    }
+    if (result.length < maxItems) {
+      addItems(mostPlayed, maxItems - result.length);
+    }
+    if (result.length < maxItems) {
+      addItems(recent, maxItems - result.length);
+    }
+
+    return result;
   }
 
   int _latestVariantCreatedAt(MediaItem item) {

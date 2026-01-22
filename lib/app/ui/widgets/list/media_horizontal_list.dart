@@ -34,21 +34,18 @@ class MediaHorizontalList extends StatelessWidget {
     );
 
     Widget header() => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: onHeaderTap,
-            child: Row(
-              children: [
-                Expanded(child: Text(title, style: titleStyle)),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ],
-            ),
-          ),
-        );
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onHeaderTap,
+        child: Row(
+          children: [
+            Expanded(child: Text(title, style: titleStyle)),
+            Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
 
     if (isLoading) {
       return Column(
@@ -57,13 +54,13 @@ class MediaHorizontalList extends StatelessWidget {
           header(),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
-          height: 210,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            itemCount: 6,
-            separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
-            itemBuilder: (_, __) => const MediaCardSkeleton(),
+            height: 190,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              itemCount: 6,
+              separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
+              itemBuilder: (_, __) => const MediaCardSkeleton(),
             ),
           ),
         ],
@@ -78,23 +75,23 @@ class MediaHorizontalList extends StatelessWidget {
         header(),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
-          height: 210,
+          height: 190,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
             separatorBuilder: (_, __) => const SizedBox(width: AppSpacing.md),
-              itemBuilder: (context, index) {
-                final item = items[index];
-                return MediaCard(
-                  item: item,
-                  width: 156,
-                  onTap: () => onItemTap(item, index),
-                  onLongPress: onItemLongPress == null
-                      ? null
-                      : () => onItemLongPress!(item, index),
-                );
-              },
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return MediaCard(
+                item: item,
+                width: 120,
+                onTap: () => onItemTap(item, index),
+                onLongPress: onItemLongPress == null
+                    ? null
+                    : () => onItemLongPress!(item, index),
+              );
+            },
           ),
         ),
       ],

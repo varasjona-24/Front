@@ -18,7 +18,7 @@ class MediaCard extends StatefulWidget {
     required this.item,
     this.onTap,
     this.onLongPress,
-    this.width = 140,
+    this.width = 132,
     this.showPlayBadge = true,
   });
 
@@ -73,8 +73,8 @@ class _MediaCardState extends State<MediaCard> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 🎨 THUMBNAIL / COVER
-              AspectRatio(
-                aspectRatio: 1,
+              SizedBox(
+                height: 120,
                 child: Container(
                   decoration: BoxDecoration(
                     color: colors.surfaceContainerHigh,
