@@ -13,10 +13,7 @@ import '../controller/playlists_controller.dart';
 import '../domain/playlist.dart';
 
 class PlaylistDetailPage extends GetView<PlaylistsController> {
-  const PlaylistDetailPage._({
-    required this.playlistId,
-    required this.isSmart,
-  });
+  const PlaylistDetailPage._({required this.playlistId, required this.isSmart});
 
   factory PlaylistDetailPage.smart({required String playlistId}) {
     return PlaylistDetailPage._(playlistId: playlistId, isSmart: true);
@@ -36,15 +33,14 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
 
     return Obx(() {
       final smart = isSmart ? controller.getSmartById(playlistId) : null;
-      final playlist =
-          !isSmart ? controller.getPlaylistById(playlistId) : null;
+      final playlist = !isSmart ? controller.getPlaylistById(playlistId) : null;
 
       final title = isSmart ? smart?.title : playlist?.name;
       final items = isSmart
           ? (smart?.items ?? const <MediaItem>[])
           : (playlist != null
-              ? controller.resolvePlaylistItems(playlist)
-              : const <MediaItem>[]);
+                ? controller.resolvePlaylistItems(playlist)
+                : const <MediaItem>[]);
 
       final cover = _resolveCover(playlist, items);
 
@@ -86,14 +82,14 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
                 )
               else
                 ...items.asMap().entries.map(
-                      (entry) => _trackTile(
-                        theme,
-                        entry.value,
-                        entry.key,
-                        items,
-                        isSmart ? null : playlist,
-                      ),
-                    ),
+                  (entry) => _trackTile(
+                    theme,
+                    entry.value,
+                    entry.key,
+                    items,
+                    isSmart ? null : playlist,
+                  ),
+                ),
             ],
           ),
         ),
@@ -119,8 +115,11 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
             color: scheme.surfaceContainer,
             child: cover != null
                 ? Image(image: cover, fit: BoxFit.cover)
-                : Icon(Icons.music_note_rounded,
-                    color: scheme.onSurfaceVariant, size: 36),
+                : Icon(
+                    Icons.music_note_rounded,
+                    color: scheme.onSurfaceVariant,
+                    size: 36,
+                  ),
           ),
         ),
         const SizedBox(width: 14),
@@ -198,13 +197,15 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
           color: scheme.surfaceContainerHighest,
           child: provider != null
               ? Image(image: provider, fit: BoxFit.cover)
-              : Icon(Icons.music_note_rounded,
-                  color: scheme.onSurfaceVariant),
+              : Icon(Icons.music_note_rounded, color: scheme.onSurfaceVariant),
         ),
       ),
       title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(item.displaySubtitle,
-          maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(
+        item.displaySubtitle,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       trailing: playlist == null
           ? null
           : IconButton(
@@ -283,9 +284,8 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
                           const SizedBox(width: 8),
                           Text(
                             'Agregar canciones',
-                            style: Theme.of(ctx2).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: Theme.of(ctx2).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const Spacer(),
                           TextButton(

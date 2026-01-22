@@ -199,24 +199,20 @@ class _MiniBar extends StatelessWidget {
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Anterior',
                     icon: const Icon(Icons.skip_previous_rounded),
                     onPressed: canPrev ? onPrev : null,
                   ),
                   IconButton(
-                    tooltip: isPlaying ? 'Pausar' : 'Reproducir',
                     icon: Icon(
                       isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                     ),
                     onPressed: onToggle,
                   ),
                   IconButton(
-                    tooltip: 'Siguiente',
                     icon: const Icon(Icons.skip_next_rounded),
                     onPressed: canNext ? onNext : null,
                   ),
                   IconButton(
-                    tooltip: 'Cerrar',
                     icon: const Icon(Icons.close_rounded),
                     onPressed: onClose,
                   ),

@@ -174,15 +174,14 @@ class PlaylistsPage extends GetView<PlaylistsController> {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.15,
+        childAspectRatio: 1.0,
       ),
       itemBuilder: (context, index) {
         final data = smart[index];
         return _SmartPlaylistCard(
           data: data,
-          onOpen: () => Get.to(
-            () => PlaylistDetailPage.smart(playlistId: data.id),
-          ),
+          onOpen: () =>
+              Get.to(() => PlaylistDetailPage.smart(playlistId: data.id)),
         );
       },
     );
@@ -227,13 +226,13 @@ class PlaylistsPage extends GetView<PlaylistsController> {
   }
 
   Future<void> _createPlaylist(BuildContext context) async {
-    final ctrl = TextEditingController();
+    String name = '';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Nueva lista'),
         content: TextField(
-          controller: ctrl,
+          onChanged: (value) => name = value,
           decoration: const InputDecoration(hintText: 'Nombre de la lista'),
         ),
         actions: [
@@ -250,9 +249,8 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     );
 
     if (ok == true) {
-      await controller.createPlaylist(ctrl.text);
+      await controller.createPlaylist(name);
     }
-    ctrl.dispose();
   }
 
   Future<void> _openPlaylistActions(
@@ -264,10 +262,10 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     final thumb = playlist.coverLocalPath?.trim().isNotEmpty == true
         ? playlist.coverLocalPath
         : (playlist.coverUrl?.trim().isNotEmpty == true
-            ? playlist.coverUrl
-            : items.isNotEmpty
-                ? items.first.effectiveThumbnail
-                : null);
+              ? playlist.coverUrl
+              : items.isNotEmpty
+              ? items.first.effectiveThumbnail
+              : null);
 
     ImageProvider? provider;
     if (thumb != null && thumb.isNotEmpty) {
@@ -279,87 +277,96 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      isScrollControlled: true,
       backgroundColor: theme.colorScheme.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: provider != null
-                          ? Image(image: provider, fit: BoxFit.cover)
-                          : Icon(Icons.music_note_rounded,
-                              color: theme.colorScheme.onSurfaceVariant),
+          child: DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.62,
+            minChildSize: 0.3,
+            maxChildSize: 0.9,
+            builder: (ctx2, scrollController) {
+              return ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                children: [
+                  ListTile(
+                    leading: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        color: theme.colorScheme.surfaceContainerHighest,
+                        child: provider != null
+                            ? Image(image: provider, fit: BoxFit.cover)
+                            : Icon(
+                                Icons.music_note_rounded,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                      ),
                     ),
+                    title: Text(
+                      playlist.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: Text('${items.length} canciones'),
                   ),
-                  title: Text(
-                    playlist.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ListTile(
+                    leading: const Icon(Icons.play_arrow_rounded),
+                    title: const Text('Reproducir'),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _playPlaylist(items);
+                    },
                   ),
-                  subtitle: Text('${items.length} canciones'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.play_arrow_rounded),
-                  title: const Text('Reproducir'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _playPlaylist(items);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.skip_next_rounded),
-                  title: const Text('Reproducir siguiente'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _playNext(items);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.queue_music_rounded),
-                  title: const Text('Añadir a la cola'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _addToQueue(items);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.edit_rounded),
-                  title: const Text('Renombrar'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _renamePlaylist(context, playlist);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.image_rounded),
-                  title: const Text('Cambiar portada'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _changeCover(context, playlist);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: const Text('Eliminar lista de reproducción'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _confirmDelete(context, playlist);
-                  },
-                ),
-              ],
-            ),
+                  ListTile(
+                    leading: const Icon(Icons.skip_next_rounded),
+                    title: const Text('Reproducir siguiente'),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _playNext(items);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.queue_music_rounded),
+                    title: const Text('Añadir a la cola'),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _addToQueue(items);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.edit_rounded),
+                    title: const Text('Renombrar'),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _renamePlaylist(context, playlist);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.image_rounded),
+                    title: const Text('Cambiar portada'),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _changeCover(context, playlist);
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_outline_rounded),
+                    title: const Text('Eliminar lista de reproducción'),
+                    onTap: () {
+                      Navigator.of(ctx).pop();
+                      _confirmDelete(context, playlist);
+                    },
+                  ),
+                ],
+              );
+            },
           ),
         );
       },
@@ -368,10 +375,7 @@ class PlaylistsPage extends GetView<PlaylistsController> {
 
   void _playPlaylist(List<MediaItem> items) {
     if (items.isEmpty) return;
-    Get.toNamed(
-      AppRoutes.audioPlayer,
-      arguments: {'queue': items, 'index': 0},
-    );
+    Get.toNamed(AppRoutes.audioPlayer, arguments: {'queue': items, 'index': 0});
   }
 
   void _playNext(List<MediaItem> items) {
@@ -397,13 +401,14 @@ class PlaylistsPage extends GetView<PlaylistsController> {
   }
 
   Future<void> _renamePlaylist(BuildContext context, Playlist playlist) async {
-    final ctrl = TextEditingController(text: playlist.name);
+    String name = playlist.name;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Renombrar'),
-        content: TextField(
-          controller: ctrl,
+        content: TextFormField(
+          initialValue: playlist.name,
+          onChanged: (value) => name = value,
           decoration: const InputDecoration(hintText: 'Nuevo nombre'),
         ),
         actions: [
@@ -420,9 +425,8 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     );
 
     if (ok == true) {
-      await controller.renamePlaylist(playlist.id, ctrl.text);
+      await controller.renamePlaylist(playlist.id, name);
     }
-    ctrl.dispose();
   }
 
   Future<void> _changeCover(BuildContext context, Playlist playlist) async {
@@ -435,7 +439,9 @@ class PlaylistsPage extends GetView<PlaylistsController> {
         type: FileType.custom,
         allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
       );
-      final file = (res != null && res.files.isNotEmpty) ? res.files.first : null;
+      final file = (res != null && res.files.isNotEmpty)
+          ? res.files.first
+          : null;
       if (file?.path == null) return;
       localPath = file!.path!;
       urlCtrl.text = '';
@@ -529,7 +535,9 @@ class _SmartPlaylistCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final thumb = data.items.isNotEmpty ? data.items.first.effectiveThumbnail : null;
+    final thumb = data.items.isNotEmpty
+        ? data.items.first.effectiveThumbnail
+        : null;
     ImageProvider? provider;
     if (thumb != null && thumb.isNotEmpty) {
       provider = thumb.startsWith('http')
@@ -582,9 +590,7 @@ class _SmartPlaylistCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 '${data.items.length} canciones',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: subColor,
-                ),
+                style: theme.textTheme.bodySmall?.copyWith(color: subColor),
               ),
               const Spacer(),
               Row(
@@ -634,10 +640,10 @@ class _PlaylistTile extends StatelessWidget {
     final thumb = playlist.coverLocalPath?.trim().isNotEmpty == true
         ? playlist.coverLocalPath
         : (playlist.coverUrl?.trim().isNotEmpty == true
-            ? playlist.coverUrl
-            : items.isNotEmpty
-                ? items.first.effectiveThumbnail
-                : null);
+              ? playlist.coverUrl
+              : items.isNotEmpty
+              ? items.first.effectiveThumbnail
+              : null);
 
     ImageProvider? provider;
     if (thumb != null && thumb!.isNotEmpty) {
@@ -660,8 +666,10 @@ class _PlaylistTile extends StatelessWidget {
             color: scheme.surfaceContainerHighest,
             child: provider != null
                 ? Image(image: provider, fit: BoxFit.cover)
-                : Icon(Icons.music_note_rounded,
-                    color: scheme.onSurfaceVariant),
+                : Icon(
+                    Icons.music_note_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
           ),
         ),
         title: Text(

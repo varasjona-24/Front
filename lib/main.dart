@@ -67,22 +67,21 @@ class MyApp extends StatelessWidget {
         },
 
         builder: (context, child) {
-          return Overlay(
-            initialEntries: [
-              OverlayEntry(
-                builder: (_) => child ?? const SizedBox.shrink(),
-              ),
-              OverlayEntry(
-                builder: (overlayContext) {
-                  final safeBottom = MediaQuery.of(overlayContext).padding.bottom;
-                  final bottomOffset = safeBottom + kBottomNavigationBarHeight + 12;
-                  return Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: bottomOffset,
-                    child: const MiniPlayerBar(),
-                  );
-                },
+          if (child == null) {
+            return const SizedBox.shrink();
+          }
+
+          final safeBottom = MediaQuery.of(context).padding.bottom;
+          final bottomOffset = safeBottom + kBottomNavigationBarHeight + 12;
+
+          return Stack(
+            children: [
+              child,
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: bottomOffset,
+                child: const MiniPlayerBar(),
               ),
             ],
           );
