@@ -131,26 +131,25 @@ class HomePage extends GetView<HomeController> {
               Positioned.fill(
                 child: controller.isLoading.value
                     ? const Center(child: CircularProgressIndicator())
-                    : ScrollConfiguration(
-                        behavior: const _NoGlowScrollBehavior(),
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.only(
-                            top: AppSpacing.md,
+                    : RefreshIndicator(
+                        onRefresh: controller.loadHome,
+                        child: ScrollConfiguration(
+                          behavior: const _NoGlowScrollBehavior(),
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.only(
+                              top: AppSpacing.md,
 
-                            // ✅ espacio real para que nada quede debajo del nav
-                            // - BottomNavigationBarHeight: altura base
-                            // - safeBottom: notch iOS
-                            // - 18: aire extra visual
-                            bottom:
-                                kBottomNavigationBarHeight + safeBottom + 18,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // ---- Tabs superiores ----
-                              _HomePillTabs(),
-                              const SizedBox(height: 18),
-
+                              // ✅ espacio real para que nada quede debajo del nav
+                              // - BottomNavigationBarHeight: altura base
+                              // - safeBottom: notch iOS
+                              // - 18: aire extra visual
+                              bottom:
+                                  kBottomNavigationBarHeight + safeBottom + 18,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                               // ---- Favoritos ----
                               if (controller.favorites.isNotEmpty) ...[
                                 MediaHorizontalList(
@@ -323,7 +322,8 @@ class HomePage extends GetView<HomeController> {
                               ],
 
                               const SizedBox(height: 24),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),

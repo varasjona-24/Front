@@ -57,8 +57,6 @@ class ArtistsPage extends GetView<ArtistsController> {
                             children: [
                               _header(theme),
                               const SizedBox(height: AppSpacing.md),
-                              _categoryChips(theme),
-                              const SizedBox(height: AppSpacing.lg),
                               _recentArtists(theme),
                               const SizedBox(height: AppSpacing.lg),
                               _summaryRow(theme, context),
@@ -128,38 +126,6 @@ class ArtistsPage extends GetView<ArtistsController> {
           ),
         ),
       ],
-    );
-  }
-
-  Widget _categoryChips(ThemeData theme) {
-    final scheme = theme.colorScheme;
-    const labels = ['Carpetas', 'Álbumes', 'Artistas', 'Géneros'];
-
-    return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: labels.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, i) {
-          final selected = labels[i] == 'Artistas';
-          return ChoiceChip(
-            label: Text(labels[i]),
-            selected: selected,
-            onSelected: (_) {},
-            showCheckmark: false,
-            selectedColor: scheme.surfaceContainerHighest,
-            backgroundColor: scheme.surfaceContainerHigh,
-            labelStyle: theme.textTheme.bodyMedium?.copyWith(
-              color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
-              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-          );
-        },
-      ),
     );
   }
 
