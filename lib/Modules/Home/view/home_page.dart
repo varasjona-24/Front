@@ -149,11 +149,10 @@ class HomePage extends GetView<HomeController> {
                             children: [
                               // ---- Tabs superiores ----
                               _HomePillTabs(),
-                              const SizedBox(height: AppSpacing.lg),
+                              const SizedBox(height: 18),
 
                               // ---- Favoritos ----
                               if (controller.favorites.isNotEmpty) ...[
-                                const SizedBox(height: AppSpacing.lg),
                                 MediaHorizontalList(
                                   title: 'Mis favoritos',
                                   items: controller.favorites,
@@ -181,11 +180,11 @@ class HomePage extends GetView<HomeController> {
                                   _showItemActions(context, item);
                                 },
                               ),
+                                const SizedBox(height: 18),
                             ],
 
                               // ---- Más reproducido ----
                               if (controller.mostPlayed.isNotEmpty) ...[
-                                const SizedBox(height: AppSpacing.lg),
                                 _SectionHeader(
                                   title: 'Más reproducido',
                                   onTap: () => Get.to(
@@ -203,7 +202,7 @@ class HomePage extends GetView<HomeController> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: AppSpacing.sm),
+                                const SizedBox(height: 10),
                                 _MostPlayedRow(
                                   items: controller.mostPlayed,
                                   onTap: (item, index) => controller.openMedia(
@@ -215,6 +214,7 @@ class HomePage extends GetView<HomeController> {
                                     _showItemActions(context, item);
                                   },
                                 ),
+                                const SizedBox(height: 18),
                               ],
 
                               // ---- Recientes ----
@@ -246,10 +246,11 @@ class HomePage extends GetView<HomeController> {
                                     _showItemActions(context, item);
                                   },
                                 ),
+                              if (controller.recentlyPlayed.isNotEmpty)
+                                const SizedBox(height: 18),
 
                               // ---- Destacado ----
                               if (controller.featured.isNotEmpty) ...[
-                                const SizedBox(height: AppSpacing.lg),
                                 _SectionHeader(
                                   title: 'Destacado',
                                   onTap: () => Get.to(
@@ -276,7 +277,7 @@ class HomePage extends GetView<HomeController> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: AppSpacing.sm),
+                                const SizedBox(height: 10),
                                 _FeaturedList(
                                   items: controller.featured,
                                   onTap: (item, index) => controller.openMedia(
@@ -287,11 +288,11 @@ class HomePage extends GetView<HomeController> {
                                   onLongPress: (item, _) =>
                                       _showItemActions(context, item),
                                 ),
+                                const SizedBox(height: 18),
                               ],
 
                               // ---- Últimas descargas ----
                               if (controller.latestDownloads.isNotEmpty) ...[
-                                const SizedBox(height: AppSpacing.lg),
                                 MediaHorizontalList(
                                   title: 'Últimas descargas',
                                   items: controller.latestDownloads,
@@ -321,7 +322,7 @@ class HomePage extends GetView<HomeController> {
                                 ),
                               ],
 
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 24),
                             ],
                           ),
                         ),

@@ -18,7 +18,7 @@ class MediaCard extends StatefulWidget {
     required this.item,
     this.onTap,
     this.onLongPress,
-    this.width = 132,
+    this.width = 130,
     this.showPlayBadge = true,
   });
 
@@ -74,7 +74,7 @@ class _MediaCardState extends State<MediaCard> {
             children: [
               // 🎨 THUMBNAIL / COVER
               SizedBox(
-                height: 120,
+                height: 122,
                 child: Container(
                   decoration: BoxDecoration(
                     color: colors.surfaceContainerHigh,
@@ -200,9 +200,7 @@ class _MediaCardState extends State<MediaCard> {
         widget.item.hasVideoLocal || widget.item.localVideoVariant != null;
 
     return Container(
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHigh,
-      ),
+      decoration: BoxDecoration(color: colors.surfaceContainerHigh),
       alignment: Alignment.center,
       child: Icon(
         isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
