@@ -174,7 +174,7 @@ class PlaylistsPage extends GetView<PlaylistsController> {
         crossAxisCount: 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.15,
       ),
       itemBuilder: (context, index) {
         final data = smart[index];
@@ -528,6 +528,7 @@ class _SmartPlaylistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final thumb = data.items.isNotEmpty ? data.items.first.effectiveThumbnail : null;
     ImageProvider? provider;
     if (thumb != null && thumb.isNotEmpty) {
@@ -535,6 +536,12 @@ class _SmartPlaylistCard extends StatelessWidget {
           ? NetworkImage(thumb)
           : FileImage(File(thumb));
     }
+
+    final textColor = isDark ? Colors.white : theme.colorScheme.onSurface;
+    final subColor = isDark
+        ? Colors.white.withOpacity(0.85)
+        : theme.colorScheme.onSurfaceVariant;
+    final iconColor = isDark ? Colors.white : theme.colorScheme.onSurface;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -547,19 +554,28 @@ class _SmartPlaylistCard extends StatelessWidget {
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.black.withOpacity(isDark ? 0.12 : 0.08),
+          ),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+              color: Colors.black.withOpacity(isDark ? 0.35 : 0.2),
+            ),
+          ],
         ),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Spacer(),
               Text(
                 data.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white,
+                  color: textColor,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -567,24 +583,23 @@ class _SmartPlaylistCard extends StatelessWidget {
               Text(
                 '${data.items.length} canciones',
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.white.withOpacity(0.85),
+                  color: subColor,
                 ),
               ),
-              const SizedBox(height: 8),
+              const Spacer(),
               Row(
                 children: [
-                  Icon(data.icon, color: Colors.white.withOpacity(0.9)),
+                  Icon(data.icon, color: iconColor),
                   const Spacer(),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
-                      width: 44,
-                      height: 44,
-                      color: Colors.white.withOpacity(0.15),
+                      width: 40,
+                      height: 40,
+                      color: Colors.white.withOpacity(isDark ? 0.18 : 0.22),
                       child: provider != null
                           ? Image(image: provider, fit: BoxFit.cover)
-                          : const Icon(Icons.play_arrow_rounded,
-                              color: Colors.white),
+                          : Icon(Icons.play_arrow_rounded, color: iconColor),
                     ),
                   ),
                 ],
