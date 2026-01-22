@@ -175,6 +175,17 @@ class AudioPlayerController extends GetxController {
 
   bool get isPlaying => audioService.isPlaying.value;
 
+  void addToQueue(List<MediaItem> items) {
+    if (items.isEmpty) return;
+    queue.addAll(items);
+  }
+
+  void insertNext(List<MediaItem> items) {
+    if (items.isEmpty) return;
+    final insertAt = (currentIndex.value + 1).clamp(0, queue.length);
+    queue.insertAll(insertAt, items);
+  }
+
   // ===========================================================================
   // PLAYBACK
   // ===========================================================================

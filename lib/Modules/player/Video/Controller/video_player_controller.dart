@@ -35,8 +35,13 @@ class VideoPlayerController extends GetxController {
 
     final safeIndex = initialIndex.clamp(0, queue.length - 1).toInt();
     currentIndex.value = safeIndex;
+  }
 
-    _playCurrent();
+  @override
+  void onReady() {
+    super.onReady();
+    // Evita actualizaciones de Rx durante el build inicial.
+    Future.microtask(_playCurrent);
   }
 
   // ===========================================================================

@@ -12,7 +12,7 @@ class AppGradientBackground extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     final topTint = scheme.primary.withOpacity(isDark ? 0.14 : 0.06);
-    final midTint = scheme.primary.withOpacity(isDark ? 0.04 : 0.02);
+    final midTint = scheme.primary.withOpacity(isDark ? 0.24 : 0.16);
     final base = isDark
         ? Color.alphaBlend(
             const Color(0xFF000000).withOpacity(0.60),

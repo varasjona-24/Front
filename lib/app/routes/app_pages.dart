@@ -27,6 +27,10 @@ import 'package:flutter_listenfy/Modules/downloads/view/downloads_page.dart';
 import 'package:flutter_listenfy/Modules/artists/binding/artists_binding.dart';
 import 'package:flutter_listenfy/Modules/artists/view/artists_page.dart';
 
+// Playlists
+import 'package:flutter_listenfy/Modules/playlists/binding/playlists_binding.dart';
+import 'package:flutter_listenfy/Modules/playlists/view/playlists_page.dart';
+
 // Settings
 import 'package:flutter_listenfy/Modules/settings/binding/settings_binding.dart';
 import 'package:flutter_listenfy/Modules/settings/view/settings_view.dart';
@@ -73,6 +77,13 @@ abstract class AppPages {
       name: AppRoutes.downloads,
       page: () => const DownloadsPage(),
       binding: DownloadsBinding(),
+    ),
+
+    // Playlists
+    GetPage(
+      name: AppRoutes.playlists,
+      page: () => const PlaylistsPage(),
+      binding: PlaylistsBinding(),
     ),
 
     // Artists
