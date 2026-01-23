@@ -4,20 +4,37 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/models/media_item.dart';
 import '../../sources/domain/source_origin.dart';
+import '../domain/source_theme.dart';
+import '../domain/source_theme_pill.dart';
+import '../data/source_theme_pill_store.dart';
+import '../domain/source_theme_topic.dart';
+import '../data/source_theme_topic_store.dart';
+import '../domain/source_theme_topic_playlist.dart';
+import '../data/source_theme_topic_playlist_store.dart';
 
 class SourcesController extends GetxController {
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+  final SourceThemePillStore _pillStore = Get.find<SourceThemePillStore>();
+  final SourceThemeTopicStore _topicStore = Get.find<SourceThemeTopicStore>();
+  final SourceThemeTopicPlaylistStore _topicPlaylistStore =
+      Get.find<SourceThemeTopicPlaylistStore>();
 
   /// Archivos escogidos pero todavía NO importados a la librería interna
   final RxList<MediaItem> localFiles = <MediaItem>[].obs;
 
   final RxBool importing = false.obs;
+
+  final RxList<SourceThemePill> pills = <SourceThemePill>[].obs;
+  final RxList<SourceThemeTopic> topics = <SourceThemeTopic>[].obs;
+  final RxList<SourceThemeTopicPlaylist> topicPlaylists =
+      <SourceThemeTopicPlaylist>[].obs;
 
   Future<void> pickLocalFiles() async {
     final res = await FilePicker.platform.pickFiles(
@@ -205,6 +222,301 @@ class SourcesController extends GetxController {
   String _sha1(String input) {
     final bytes = utf8.encode(input);
     return sha1.convert(bytes).toString();
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+    _loadPills();
+    _loadTopics();
+    _loadTopicPlaylists();
+  }
+
+  List<SourceTheme> get themes => [
+        SourceTheme(
+          id: 'offline',
+          title: 'Biblioteca offline',
+          subtitle: 'Todo lo guardado dentro de la app',
+          icon: Icons.offline_pin_rounded,
+          colors: const [Color(0xFF0F5132), Color(0xFF2E8B57)],
+          onlyOffline: true,
+        ),
+        SourceTheme(
+          id: 'movies',
+          title: 'Películas y series',
+          subtitle: 'Descargas y catálogos de video',
+          icon: Icons.local_movies_rounded,
+          colors: const [Color(0xFF2C2F7A), Color(0xFF5D6BE0)],
+          defaultOrigins: [
+            SourceOrigin.youtube,
+            SourceOrigin.vimeo,
+            SourceOrigin.mega,
+            SourceOrigin.vk,
+          ],
+          forceKind: MediaVariantKind.video,
+        ),
+        SourceTheme(
+          id: 'tutorials',
+          title: 'Tutoriales',
+          subtitle: 'Guías, cursos y prácticas',
+          icon: Icons.handyman_rounded,
+          colors: const [Color(0xFF1E4D6B), Color(0xFF3E8BC9)],
+          defaultOrigins: [
+            SourceOrigin.youtube,
+            SourceOrigin.vimeo,
+            SourceOrigin.reddit,
+          ],
+          forceKind: MediaVariantKind.video,
+        ),
+        SourceTheme(
+          id: 'podcasts',
+          title: 'Podcasts y vlogs',
+          subtitle: 'Charlas y contenido hablado',
+          icon: Icons.mic_rounded,
+          colors: const [Color(0xFF5B2C2C), Color(0xFFD36A6A)],
+          defaultOrigins: [
+            SourceOrigin.youtube,
+            SourceOrigin.instagram,
+            SourceOrigin.facebook,
+            SourceOrigin.telegram,
+          ],
+        ),
+        SourceTheme(
+          id: 'social',
+          title: 'Redes sociales',
+          subtitle: 'Contenido social y trending',
+          icon: Icons.people_alt_rounded,
+          colors: const [Color(0xFF3A2F57), Color(0xFF8C6FD9)],
+          defaultOrigins: [
+            SourceOrigin.instagram,
+            SourceOrigin.facebook,
+            SourceOrigin.x,
+            SourceOrigin.reddit,
+            SourceOrigin.threads,
+            SourceOrigin.snapchat,
+            SourceOrigin.telegram,
+            SourceOrigin.pinterest,
+            SourceOrigin.vk,
+            SourceOrigin.amino,
+          ],
+          forceKind: MediaVariantKind.video,
+        ),
+        SourceTheme(
+          id: 'education',
+          title: 'Contenido educativo',
+          subtitle: 'Clases y material formativo',
+          icon: Icons.school_rounded,
+          colors: const [Color(0xFF1F4A3D), Color(0xFF4FB286)],
+          defaultOrigins: [
+            SourceOrigin.youtube,
+            SourceOrigin.vimeo,
+            SourceOrigin.blogger,
+          ],
+          forceKind: MediaVariantKind.video,
+        ),
+        SourceTheme(
+          id: 'files',
+          title: 'Archivos personales',
+          subtitle: 'Imports desde tu dispositivo',
+          icon: Icons.folder_rounded,
+          colors: const [Color(0xFF3F2A1A), Color(0xFFB07A4E)],
+          defaultOrigins: [
+            SourceOrigin.device,
+          ],
+        ),
+      ];
+
+  List<SourceThemePill> pillsForTheme(String themeId) {
+    return pills.where((p) => p.themeId == themeId).toList();
+  }
+
+  List<SourceThemeTopic> topicsForTheme(String themeId) {
+    return topics.where((t) => t.themeId == themeId).toList();
+  }
+
+  List<SourceThemeTopicPlaylist> playlistsForTopic(
+    String topicId, {
+    String? parentId,
+  }) {
+    return topicPlaylists
+        .where((p) => p.topicId == topicId && p.parentId == parentId)
+        .toList();
+  }
+
+  Future<void> addTopic({
+    required String themeId,
+    required String title,
+    String? coverUrl,
+    String? coverLocalPath,
+    int? colorValue,
+  }) async {
+    if (topicsForTheme(themeId).length >= 10) return;
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final id = 'stt_${themeId}_$now';
+    final topic = SourceThemeTopic(
+      id: id,
+      themeId: themeId,
+      title: trimmed,
+      createdAt: now,
+      itemIds: const [],
+      playlistIds: const [],
+      coverUrl: coverUrl?.trim().isEmpty == true ? null : coverUrl,
+      coverLocalPath: coverLocalPath?.trim().isEmpty == true
+          ? null
+          : coverLocalPath,
+      colorValue: colorValue,
+    );
+    await _topicStore.upsert(topic);
+    await _loadTopics();
+  }
+
+  Future<void> deleteTopic(SourceThemeTopic topic) async {
+    await _topicStore.remove(topic.id);
+    await _loadTopics();
+  }
+
+  Future<void> updateTopic(SourceThemeTopic topic) async {
+    await _topicStore.upsert(topic);
+    await _loadTopics();
+  }
+
+  Future<bool> addTopicPlaylist({
+    required String topicId,
+    required String name,
+    required List<MediaItem> items,
+    String? parentId,
+    int depth = 1,
+    String? coverUrl,
+    String? coverLocalPath,
+    int? colorValue,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return false;
+    if (depth > 10) return false;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final id = 'stpl_${topicId}_$now';
+    final itemIds = items.map(_keyForItem).toList();
+    final playlist = SourceThemeTopicPlaylist(
+      id: id,
+      topicId: topicId,
+      name: trimmed,
+      itemIds: itemIds,
+      createdAt: now,
+      parentId: parentId,
+      depth: depth,
+      coverUrl: coverUrl?.trim().isEmpty == true ? null : coverUrl,
+      coverLocalPath: coverLocalPath?.trim().isEmpty == true
+          ? null
+          : coverLocalPath,
+      colorValue: colorValue,
+    );
+    await _topicPlaylistStore.upsert(playlist);
+    await _loadTopicPlaylists();
+    return true;
+  }
+
+  Future<void> deleteTopicPlaylist(SourceThemeTopicPlaylist playlist) async {
+    await _topicPlaylistStore.remove(playlist.id);
+    await _loadTopicPlaylists();
+  }
+
+  Future<void> updateTopicPlaylist(SourceThemeTopicPlaylist playlist) async {
+    await _topicPlaylistStore.upsert(playlist);
+    await _loadTopicPlaylists();
+  }
+
+  Future<void> addItemsToTopic(
+    SourceThemeTopic topic,
+    List<MediaItem> items,
+  ) async {
+    if (items.isEmpty) return;
+    final ids = topic.itemIds.toSet();
+    for (final item in items) {
+      ids.add(_keyForItem(item));
+    }
+    final updated = topic.copyWith(itemIds: ids.toList());
+    await _topicStore.upsert(updated);
+    await _loadTopics();
+  }
+
+  Future<void> removeItemFromTopic(
+    SourceThemeTopic topic,
+    MediaItem item,
+  ) async {
+    final key = _keyForItem(item);
+    final updated =
+        topic.copyWith(itemIds: topic.itemIds.where((e) => e != key).toList());
+    await _topicStore.upsert(updated);
+    await _loadTopics();
+  }
+
+  Future<void> addPlaylistsToTopic(
+    SourceThemeTopic topic,
+    List<String> playlistIds,
+  ) async {
+    if (playlistIds.isEmpty) return;
+    final ids = topic.playlistIds.toSet()..addAll(playlistIds);
+    final updated = topic.copyWith(playlistIds: ids.toList());
+    await _topicStore.upsert(updated);
+    await _loadTopics();
+  }
+
+  Future<void> removePlaylistFromTopic(
+    SourceThemeTopic topic,
+    String playlistId,
+  ) async {
+    final updated = topic.copyWith(
+      playlistIds: topic.playlistIds.where((e) => e != playlistId).toList(),
+    );
+    await _topicStore.upsert(updated);
+    await _loadTopics();
+  }
+
+  Future<void> addPill({
+    required String themeId,
+    required String title,
+    required List<SourceOrigin> origins,
+  }) async {
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final id = 'stp_${themeId}_$now';
+    final pill = SourceThemePill(
+      id: id,
+      themeId: themeId,
+      title: trimmed,
+      origins: origins,
+      createdAt: now,
+    );
+    await _pillStore.upsert(pill);
+    await _loadPills();
+  }
+
+  Future<void> deletePill(SourceThemePill pill) async {
+    await _pillStore.remove(pill.id);
+    await _loadPills();
+  }
+
+  Future<void> _loadPills() async {
+    final list = await _pillStore.readAll();
+    pills.assignAll(list);
+  }
+
+  Future<void> _loadTopics() async {
+    final list = await _topicStore.readAll();
+    topics.assignAll(list);
+  }
+
+  Future<void> _loadTopicPlaylists() async {
+    final list = await _topicPlaylistStore.readAll();
+    topicPlaylists.assignAll(list);
+  }
+
+  String _keyForItem(MediaItem item) {
+    final pid = item.publicId.trim();
+    return pid.isNotEmpty ? pid : item.id.trim();
   }
 }
 

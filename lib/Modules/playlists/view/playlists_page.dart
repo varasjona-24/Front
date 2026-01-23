@@ -545,25 +545,20 @@ class _SmartPlaylistCard extends StatelessWidget {
           : FileImage(File(thumb));
     }
 
-    final textColor = isDark ? Colors.white : theme.colorScheme.onSurface;
-    final subColor = isDark
-        ? Colors.white.withOpacity(0.85)
-        : theme.colorScheme.onSurfaceVariant;
-    final iconColor = isDark ? Colors.white : theme.colorScheme.onSurface;
+    final primary = theme.colorScheme.primary;
+    final textColor = theme.colorScheme.primary;
+    final subColor = theme.colorScheme.primary;
+    final iconColor = theme.colorScheme.primary;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onOpen,
       child: Ink(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: data.colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: primary,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.black.withOpacity(isDark ? 0.12 : 0.08),
+            color: Colors.black.withOpacity(isDark ? 0.18 : 0.12),
           ),
           boxShadow: [
             BoxShadow(
@@ -602,7 +597,7 @@ class _SmartPlaylistCard extends StatelessWidget {
                     child: Container(
                       width: 40,
                       height: 40,
-                      color: Colors.white.withOpacity(isDark ? 0.18 : 0.22),
+                      color: Colors.white.withOpacity(isDark ? 0.22 : 0.18),
                       child: provider != null
                           ? Image(image: provider, fit: BoxFit.cover)
                           : Icon(Icons.play_arrow_rounded, color: iconColor),

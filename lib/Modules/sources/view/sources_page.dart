@@ -3,9 +3,7 @@ import 'package:get/get.dart';
 
 import '../controller/sources_controller.dart';
 
-import '../domain/source_origin.dart';
-import '../domain/source_pill_data.dart';
-import '../ui/source_pill_tile.dart';
+import '../domain/source_theme.dart';
 import 'source_library_page.dart';
 
 // UI widgets
@@ -31,12 +29,8 @@ class SourcesPage extends GetView<SourcesController> {
     );
 
     final HomeController home = Get.find<HomeController>();
-    final pills = _buildPills(controller);
 
-    return Obx(() {
-      final mode = home.mode.value;
-
-      return Scaffold(
+    return Scaffold(
         backgroundColor: Colors.transparent,
         extendBody: true,
         appBar: AppTopBar(
@@ -62,10 +56,10 @@ class SourcesPage extends GetView<SourcesController> {
                         _header(theme: theme, scheme: scheme, home: home),
                         const SizedBox(height: AppSpacing.lg),
 
-                        _pillsSection(pills),
-                        const SizedBox(height: AppSpacing.lg),
-
-                        const SizedBox(height: AppSpacing.lg),
+                        ..._themeSections(
+                          theme: theme,
+                          themes: controller.themes,
+                        ),
                       ],
                     ),
                   ),
@@ -82,7 +76,6 @@ class SourcesPage extends GetView<SourcesController> {
           ),
         ),
       );
-    });
   }
 
   // ===========================================================================
@@ -111,7 +104,7 @@ class SourcesPage extends GetView<SourcesController> {
         ),
         const SizedBox(height: 6),
         Text(
-          'Explora tu contenido organizado por origen.',
+          'Explora tu contenido organizado por temáticas.',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -120,40 +113,19 @@ class SourcesPage extends GetView<SourcesController> {
     );
   }
 
-  Widget _pillsSection(List<SourcePillData> pills) {
-    if (pills.isEmpty) return const SizedBox.shrink();
-
-    SourcePillData primary = pills.first;
-    for (final p in pills) {
-      if (p.origin == SourceOrigin.generic) {
-        primary = p;
-        break;
-      }
-    }
-
-    final rest = pills.where((p) => p != primary).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _PrimarySourcePill(data: primary),
-        const SizedBox(height: 16),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: rest.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.6,
-          ),
-          itemBuilder: (context, index) {
-            return _SourceGridTile(data: rest[index]);
-          },
+  List<Widget> _themeSections({
+    required ThemeData theme,
+    required List<SourceTheme> themes,
+  }) {
+    return [
+      for (final t in themes) ...[
+        _ThemeCard(
+          theme: t,
+          onOpen: () => _openTheme(t),
         ),
+        const SizedBox(height: AppSpacing.lg),
       ],
-    );
+    ];
   }
 
 
@@ -211,248 +183,35 @@ class SourcesPage extends GetView<SourcesController> {
   // ===========================================================================
 
 
-  // ===========================================================================
-  // PILLS
-  // ===========================================================================
-
-  List<SourcePillData> _buildPills(SourcesController controller) {
-    SourcePillData pill({
-      required SourceOrigin origin,
-      required String title,
-      required String subtitle,
-      required IconData icon,
-      required List<Color> colors,
-      required VoidCallback onTap,
-      bool forceDarkText = false,
-    }) {
-      return SourcePillData(
-        origin: origin,
-        title: title,
-        subtitle: subtitle,
-        icon: icon,
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: colors,
-        ),
-        onTap: onTap,
-        forceDarkText: forceDarkText,
-      );
-    }
-
-    VoidCallback openOrigin(SourceOrigin origin, String title) {
-      return () => Get.to(
-        () =>
-            SourceLibraryPage(title: title, origin: origin, onlyOffline: false),
-      );
-    }
-
-    return [
-      pill(
-        origin: SourceOrigin.generic,
-        title: 'Biblioteca offline',
-        subtitle: 'Todo lo guardado dentro de la app',
-        icon: Icons.offline_pin_rounded,
-        colors: const [Color(0xFF00C853), Color(0xFF7CFFB2)],
-        onTap: () => Get.to(
-          () => const SourceLibraryPage(
-            title: 'Biblioteca offline',
-            onlyOffline: true,
-          ),
-        ),
+  void _openTheme(SourceTheme theme) {
+    final origins = theme.defaultOrigins;
+    Get.to(
+      () => SourceLibraryPage(
+        title: theme.title,
+        onlyOffline: theme.onlyOffline,
+        origins: origins.isNotEmpty ? origins : null,
+        forceKind: theme.forceKind,
+        themeId: theme.id,
       ),
-      pill(
-        origin: SourceOrigin.device,
-        title: 'Dispositivo local',
-        subtitle: 'Archivos importados desde el dispositivo',
-        icon: Icons.folder_open_rounded,
-        colors: const [Color(0xFF00C6FF), Color(0xFF0072FF)],
-        onTap: openOrigin(SourceOrigin.device, 'Dispositivo local'),
-      ),
-
-      pill(
-        origin: SourceOrigin.youtube,
-        title: 'YouTube',
-        subtitle: 'youtube.com / youtu.be',
-        icon: Icons.play_circle_fill_rounded,
-        colors: const [Color(0xFFFF0000), Color(0xFFFF6A6A)],
-        onTap: openOrigin(SourceOrigin.youtube, 'YouTube'),
-      ),
-      pill(
-        origin: SourceOrigin.instagram,
-        title: 'Instagram',
-        subtitle: 'instagram.com',
-        icon: Icons.camera_alt_rounded,
-        colors: const [Color(0xFFF58529), Color(0xFFDD2A7B), Color(0xFF8134AF)],
-        onTap: openOrigin(SourceOrigin.instagram, 'Instagram'),
-      ),
-      pill(
-        origin: SourceOrigin.vimeo,
-        title: 'Vimeo',
-        subtitle: 'vimeo.com',
-        icon: Icons.video_library_rounded,
-        colors: const [Color(0xFF1AB7EA), Color(0xFF6ED6F3)],
-        onTap: openOrigin(SourceOrigin.vimeo, 'Vimeo'),
-      ),
-      pill(
-        origin: SourceOrigin.reddit,
-        title: 'Reddit',
-        subtitle: 'reddit.com',
-        icon: Icons.forum_rounded,
-        colors: const [Color(0xFFFF4500), Color(0xFFFF7A45)],
-        onTap: openOrigin(SourceOrigin.reddit, 'Reddit'),
-      ),
-      pill(
-        origin: SourceOrigin.telegram,
-        title: 'Telegram',
-        subtitle: 't.me',
-        icon: Icons.send_rounded,
-        colors: const [Color(0xFF0088CC), Color(0xFF58C7FF)],
-        onTap: openOrigin(SourceOrigin.telegram, 'Telegram'),
-      ),
-      pill(
-        origin: SourceOrigin.x,
-        title: 'X',
-        subtitle: 'x.com / twitter.com',
-        icon: Icons.close_rounded,
-        colors: const [Color(0xFF111111), Color(0xFF505050)],
-        onTap: openOrigin(SourceOrigin.x, 'X'),
-      ),
-      pill(
-        origin: SourceOrigin.facebook,
-        title: 'Facebook',
-        subtitle: 'facebook.com / fb.watch',
-        icon: Icons.facebook_rounded,
-        colors: const [Color(0xFF1877F2), Color(0xFF5AA7FF)],
-        onTap: openOrigin(SourceOrigin.facebook, 'Facebook'),
-      ),
-      pill(
-        origin: SourceOrigin.pinterest,
-        title: 'Pinterest',
-        subtitle: 'pinterest.*',
-        icon: Icons.push_pin_rounded,
-        colors: const [Color(0xFFBD081C), Color(0xFFFF5A6A)],
-        onTap: openOrigin(SourceOrigin.pinterest, 'Pinterest'),
-      ),
-      pill(
-        origin: SourceOrigin.amino,
-        title: 'Amino',
-        subtitle: 'aminoapps.com',
-        icon: Icons.groups_rounded,
-        colors: const [Color(0xFF00C853), Color(0xFF7CFFB2)],
-        onTap: openOrigin(SourceOrigin.amino, 'Amino'),
-      ),
-      pill(
-        origin: SourceOrigin.blogger,
-        title: 'Blogger',
-        subtitle: 'blogspot.* / blogger.com',
-        icon: Icons.article_rounded,
-        colors: const [Color(0xFFFF9800), Color(0xFFFFD180)],
-        onTap: openOrigin(SourceOrigin.blogger, 'Blogger'),
-      ),
-      pill(
-        origin: SourceOrigin.twitch,
-        title: 'Twitch',
-        subtitle: 'twitch.tv',
-        icon: Icons.sports_esports_rounded,
-        colors: const [Color(0xFF6441A5), Color(0xFF9146FF)],
-        onTap: openOrigin(SourceOrigin.twitch, 'Twitch'),
-      ),
-      pill(
-        origin: SourceOrigin.kick,
-        title: 'Kick',
-        subtitle: 'kick.com',
-        icon: Icons.bolt_rounded,
-        colors: const [Color(0xFF00E676), Color(0xFF1DE9B6)],
-        onTap: openOrigin(SourceOrigin.kick, 'Kick'),
-      ),
-      pill(
-        origin: SourceOrigin.snapchat,
-        title: 'Snapchat',
-        subtitle: 'snapchat.com',
-        icon: Icons.chat_bubble_rounded,
-        colors: const [Color(0xFFFFEB3B), Color(0xFFFFF59D)],
-        onTap: openOrigin(SourceOrigin.snapchat, 'Snapchat'),
-        forceDarkText: true,
-      ),
-      pill(
-        origin: SourceOrigin.qq,
-        title: 'QQ',
-        subtitle: 'qq.com',
-        icon: Icons.language_rounded,
-        colors: const [Color(0xFF1976D2), Color(0xFF64B5F6)],
-        onTap: openOrigin(SourceOrigin.qq, 'QQ'),
-      ),
-      pill(
-        origin: SourceOrigin.threads,
-        title: 'Threads',
-        subtitle: 'threads.net',
-        icon: Icons.alternate_email_rounded,
-        colors: const [Color(0xFF000000), Color(0xFF6B6B6B)],
-        onTap: openOrigin(SourceOrigin.threads, 'Threads'),
-      ),
-      pill(
-        origin: SourceOrigin.vk,
-        title: 'VK',
-        subtitle: 'vk.com',
-        icon: Icons.people_alt_rounded,
-        colors: const [Color(0xFF4C75A3), Color(0xFF86A9D6)],
-        onTap: openOrigin(SourceOrigin.vk, 'VK'),
-      ),
-      pill(
-        origin: SourceOrigin.chan4,
-        title: '4chan',
-        subtitle: '4chan.org',
-        icon: Icons.warning_amber_rounded,
-        colors: const [Color(0xFF2E7D32), Color(0xFF81C784)],
-        onTap: openOrigin(SourceOrigin.chan4, '4chan'),
-      ),
-      pill(
-        origin: SourceOrigin.mega,
-        title: 'Mega',
-        subtitle: 'mega.nz',
-        icon: Icons.cloud_rounded,
-        colors: const [Color(0xFFE53935), Color(0xFFFF8A80)],
-        onTap: openOrigin(SourceOrigin.mega, 'Mega'),
-      ),
-      pill(
-        origin: SourceOrigin.generic,
-        title: 'Genérico',
-        subtitle: 'Cualquier URL soportada',
-        icon: Icons.link_rounded,
-        colors: const [Color(0xFF616161), Color(0xFF9E9E9E)],
-        onTap: openOrigin(SourceOrigin.generic, 'Genérico'),
-      ),
-    ];
-  }
-}
-
-class _PrimarySourcePill extends StatelessWidget {
-  const _PrimarySourcePill({required this.data});
-
-  final SourcePillData data;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: SourcePillTile(data: data),
     );
   }
+
 }
 
-class _SourceGridTile extends StatelessWidget {
-  const _SourceGridTile({required this.data});
+class _ThemeCard extends StatelessWidget {
+  const _ThemeCard({
+    required this.theme,
+    required this.onOpen,
+  });
 
-  final SourcePillData data;
+  final SourceTheme theme;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor = data.forceDarkText ? Colors.black : Colors.white;
-    final subColor = data.forceDarkText
-        ? Colors.black87
-        : Colors.white.withOpacity(0.85);
+    final t = Theme.of(context);
+    final textColor = Colors.white;
+    final subColor = Colors.white.withOpacity(0.85);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
@@ -460,7 +219,11 @@ class _SourceGridTile extends StatelessWidget {
         color: Colors.transparent,
         child: Ink(
           decoration: BoxDecoration(
-            gradient: data.gradient,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: theme.colors,
+            ),
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
@@ -471,37 +234,41 @@ class _SourceGridTile extends StatelessWidget {
             ],
           ),
           child: InkWell(
-            onTap: data.onTap,
+            onTap: onOpen,
             child: Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(data.icon, color: textColor, size: 20),
+                  Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.18),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(theme.icon, color: textColor, size: 20),
+                      ),
+                    ],
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 12),
                   Text(
-                    data.title,
-                    maxLines: 1,
+                    theme.title,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    style: t.textTheme.titleMedium?.copyWith(
                       color: textColor,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
-                    data.subtitle,
-                    maxLines: 1,
+                    theme.subtitle,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
+                    style: t.textTheme.bodySmall?.copyWith(
                       color: subColor,
                     ),
                   ),
