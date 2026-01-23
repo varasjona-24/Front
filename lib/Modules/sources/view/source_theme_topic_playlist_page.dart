@@ -10,6 +10,7 @@ import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../home/controller/home_controller.dart';
+import '../../downloads/view/edit_media_page.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
@@ -155,6 +156,8 @@ class _SourceThemeTopicPlaylistPageState
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () => _removeItem(playlist, item),
                 ),
+                onTap: () => _playItem(items, item),
+                onLongPress: () => _showItemActions(playlist, item),
               ),
             ),
           ],
@@ -216,35 +219,22 @@ class _SourceThemeTopicPlaylistPageState
         : widget.theme.defaultOrigins.toSet();
 
     Iterable<MediaItem> items = all;
-    if (allowedOrigins.isNotEmpty) {
-      items = items.where((e) => allowedOrigins.contains(e.origin));
-    }
     if (widget.theme.forceKind != null) {
       final kind = widget.theme.forceKind!;
       items = items.where((e) => e.variants.any((v) => v.kind == kind));
     }
 
+    final filtered = allowedOrigins.isNotEmpty
+        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
+        : items.toList();
+
     final idSet = playlist.itemIds.toSet();
-    return items.where((e) => idSet.contains(_keyForItem(e))).toList();
+    final base = filtered.isNotEmpty ? filtered : items.toList();
+    return base.where((e) => idSet.contains(_keyForItem(e))).toList();
   }
 
   Future<void> _addItems(SourceThemeTopicPlaylist playlist) async {
-    final all = await _repo.getLibrary();
-    final origins = widget.origins;
-    final allowedOrigins = origins != null && origins.isNotEmpty
-        ? origins.toSet()
-        : widget.theme.defaultOrigins.toSet();
-
-    Iterable<MediaItem> items = all;
-    if (allowedOrigins.isNotEmpty) {
-      items = items.where((e) => allowedOrigins.contains(e.origin));
-    }
-    if (widget.theme.forceKind != null) {
-      final kind = widget.theme.forceKind!;
-      items = items.where((e) => e.variants.any((v) => v.kind == kind));
-    }
-
-    final list = items.toList();
+    final list = await _candidateItems();
     final selected = <String>{};
 
     await showModalBottomSheet<void>(
@@ -284,28 +274,42 @@ class _SourceThemeTopicPlaylistPageState
                       ),
                     ),
                     Expanded(
-                      child: ListView.builder(
-                        itemCount: list.length,
-                        itemBuilder: (ctx3, i) {
-                          final item = list[i];
-                          final key = _keyForItem(item);
-                          final checked = selected.contains(key);
-                          return CheckboxListTile(
-                            value: checked,
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == true) {
-                                  selected.add(key);
-                                } else {
-                                  selected.remove(key);
-                                }
-                              });
-                            },
-                            title: Text(item.title),
-                            subtitle: Text(item.displaySubtitle),
-                          );
-                        },
-                      ),
+                      child: list.isEmpty
+                          ? Center(
+                              child: Text(
+                                'No hay items disponibles para esta temática.',
+                                style: Theme.of(ctx2)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: Theme.of(ctx2)
+                                          .colorScheme
+                                          .onSurfaceVariant,
+                                    ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: list.length,
+                              itemBuilder: (ctx3, i) {
+                                final item = list[i];
+                                final key = _keyForItem(item);
+                                final checked = selected.contains(key);
+                                return CheckboxListTile(
+                                  value: checked,
+                                  onChanged: (v) {
+                                    setState(() {
+                                      if (v == true) {
+                                        selected.add(key);
+                                      } else {
+                                        selected.remove(key);
+                                      }
+                                    });
+                                  },
+                                  title: Text(item.title),
+                                  subtitle: Text(item.displaySubtitle),
+                                );
+                              },
+                            ),
                     ),
                     Padding(
                       padding: const EdgeInsets.all(16),
@@ -338,23 +342,6 @@ class _SourceThemeTopicPlaylistPageState
   }
 
   Future<void> _addSubList(SourceThemeTopicPlaylist playlist) async {
-    final all = await _repo.getLibrary();
-    final origins = widget.origins;
-    final allowedOrigins = origins != null && origins.isNotEmpty
-        ? origins.toSet()
-        : widget.theme.defaultOrigins.toSet();
-
-    Iterable<MediaItem> items = all;
-    if (allowedOrigins.isNotEmpty) {
-      items = items.where((e) => allowedOrigins.contains(e.origin));
-    }
-    if (widget.theme.forceKind != null) {
-      final kind = widget.theme.forceKind!;
-      items = items.where((e) => e.variants.any((v) => v.kind == kind));
-    }
-
-    final list = items.toList();
-    final selected = <String>{};
     String name = '';
     String? coverUrl;
     String? coverLocal;
@@ -455,44 +442,16 @@ class _SourceThemeTopicPlaylistPageState
                       ),
                     ),
                     const SizedBox(height: 12),
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: list.length,
-                        itemBuilder: (ctx3, i) {
-                          final item = list[i];
-                          final key = _keyForItem(item);
-                          final checked = selected.contains(key);
-                          return CheckboxListTile(
-                            value: checked,
-                            onChanged: (v) {
-                              setState(() {
-                                if (v == true) {
-                                  selected.add(key);
-                                } else {
-                                  selected.remove(key);
-                                }
-                              });
-                            },
-                            title: Text(item.title),
-                            subtitle: Text(item.displaySubtitle),
-                          );
-                        },
-                      ),
-                    ),
                     Padding(
                       padding: const EdgeInsets.all(16),
                       child: FilledButton(
                         onPressed: () async {
                           final trimmed = name.trim();
                           if (trimmed.isEmpty) return;
-                          final toAdd = list
-                              .where((item) =>
-                                  selected.contains(_keyForItem(item)))
-                              .toList();
                           final ok = await _sources.addTopicPlaylist(
                             topicId: playlist.topicId,
                             name: trimmed,
-                            items: toAdd,
+                            items: const [],
                             parentId: playlist.id,
                             depth: playlist.depth + 1,
                             coverUrl: coverUrl,
@@ -535,6 +494,79 @@ class _SourceThemeTopicPlaylistPageState
   String _keyForItem(MediaItem item) {
     final pid = item.publicId.trim();
     return pid.isNotEmpty ? pid : item.id.trim();
+  }
+
+  void _playItem(List<MediaItem> list, MediaItem item) {
+    final home = Get.find<HomeController>();
+    final idx = list.indexWhere((e) => e.id == item.id);
+    final safeIdx = idx == -1 ? 0 : idx;
+
+    if (item.hasVideoLocal && !item.hasAudioLocal) {
+      home.mode.value = HomeMode.video;
+    } else if (item.hasAudioLocal && !item.hasVideoLocal) {
+      home.mode.value = HomeMode.audio;
+    }
+
+    home.openMedia(item, safeIdx, list);
+  }
+
+  Future<List<MediaItem>> _candidateItems() async {
+    final all = await _repo.getLibrary();
+    final origins = widget.origins;
+    final allowedOrigins = origins != null && origins.isNotEmpty
+        ? origins.toSet()
+        : widget.theme.defaultOrigins.toSet();
+
+    Iterable<MediaItem> items = all;
+    if (widget.theme.forceKind != null) {
+      final kind = widget.theme.forceKind!;
+      items = items.where((e) => e.variants.any((v) => v.kind == kind));
+    }
+
+    final filtered = allowedOrigins.isNotEmpty
+        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
+        : items.toList();
+
+    return filtered.isNotEmpty ? filtered : items.toList();
+  }
+
+  Future<void> _showItemActions(
+    SourceThemeTopicPlaylist playlist,
+    MediaItem item,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.edit_rounded),
+                title: const Text('Editar'),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  await Get.to(() => EditMediaMetadataPage(item: item));
+                  if (mounted) setState(() {});
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.remove_circle_outline),
+                title: const Text('Quitar de la lista'),
+                onTap: () async {
+                  Navigator.of(ctx).pop();
+                  await _removeItem(playlist, item);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _openEditPlaylist(SourceThemeTopicPlaylist playlist) async {

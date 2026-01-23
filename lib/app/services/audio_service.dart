@@ -7,6 +7,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
+import '../../Modules/settings/controller/settings_controller.dart';
 
 enum PlaybackState { stopped, loading, playing, paused }
 
@@ -38,6 +39,11 @@ class AudioService extends GetxService {
 
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
+
+    if (Get.isRegistered<SettingsController>()) {
+      final settings = Get.find<SettingsController>();
+      await setVolume(settings.defaultVolume.value / 100);
+    }
 
     _playerStateSub = _player.playerStateStream.listen((ps) {
       final proc = ps.processingState;
@@ -71,6 +77,7 @@ class AudioService extends GetxService {
 
   final Rx<LoopMode> loopMode = LoopMode.off.obs;
   final RxDouble speed = 1.0.obs;
+  final RxDouble volume = 1.0.obs;
 
   Future<void> setLoopOff() async {
     loopMode.value = LoopMode.off;
@@ -85,6 +92,12 @@ class AudioService extends GetxService {
   Future<void> setSpeed(double s) async {
     speed.value = s;
     await _player.setSpeed(s);
+  }
+
+  Future<void> setVolume(double v) async {
+    final clamped = v.clamp(0.0, 1.0);
+    volume.value = clamped;
+    await _player.setVolume(clamped);
   }
 
   Future<void> seek(Duration position) async {
@@ -159,6 +172,7 @@ class AudioService extends GetxService {
         currentItem.value = item;
         currentVariant.value = variant;
 
+        await _player.setVolume(volume.value);
         await _player.play();
         return;
       } on PlayerException catch (pe) {
@@ -224,6 +238,7 @@ class AudioService extends GetxService {
       currentItem.value = item;
       currentVariant.value = variant;
 
+      await _player.setVolume(volume.value);
       await _player.play();
     } on PlayerException catch (pe) {
       await _player.stop();

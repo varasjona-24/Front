@@ -4,10 +4,12 @@ import 'package:video_player/video_player.dart' as vp;
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/video_service.dart';
 import '../../../../app/data/local/local_library_store.dart';
+import '../../../settings/controller/settings_controller.dart';
 
 class VideoPlayerController extends GetxController {
   final VideoService videoService;
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+  final SettingsController _settings = Get.find<SettingsController>();
   final List<MediaItem> queue;
   final int initialIndex;
 
@@ -35,6 +37,11 @@ class VideoPlayerController extends GetxController {
 
     final safeIndex = initialIndex.clamp(0, queue.length - 1).toInt();
     currentIndex.value = safeIndex;
+
+    ever<int>(videoService.completedTick, (_) async {
+      if (!_settings.autoPlayNext.value) return;
+      await next();
+    });
   }
 
   @override

@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
 import '../../../../app/data/local/local_library_store.dart';
+import '../../../settings/controller/settings_controller.dart';
 
 enum CoverStyle { square, vinyl }
 
@@ -13,6 +15,8 @@ enum RepeatMode { off, once, loop }
 class AudioPlayerController extends GetxController {
   final AudioService audioService;
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+  final SettingsController _settings = Get.find<SettingsController>();
+  final GetStorage _storage = GetStorage();
 
   /// Cola reactiva (para que el UI se actualice bien)
   final RxList<MediaItem> queue = <MediaItem>[].obs;
@@ -42,6 +46,7 @@ class AudioPlayerController extends GetxController {
     super.onInit();
 
     _readArgs();
+    _loadCoverStyle();
 
     _posSub = audioService.positionStream.listen((p) {
       position.value = p;
@@ -66,6 +71,11 @@ class AudioPlayerController extends GetxController {
           repeatMode.value = RepeatMode.off;
           await audioService.setLoopOff();
           await audioService.replay();
+          return;
+        }
+
+        if (!_settings.autoPlayNext.value) {
+          await audioService.stop();
           return;
         }
 
@@ -130,6 +140,16 @@ class AudioPlayerController extends GetxController {
     coverStyle.value = coverStyle.value == CoverStyle.square
         ? CoverStyle.vinyl
         : CoverStyle.square;
+    _storage.write('playerCoverStyle', coverStyle.value.name);
+  }
+
+  void _loadCoverStyle() {
+    final raw = _storage.read('playerCoverStyle') as String?;
+    if (raw == CoverStyle.vinyl.name) {
+      coverStyle.value = CoverStyle.vinyl;
+    } else {
+      coverStyle.value = CoverStyle.square;
+    }
   }
 
   bool get hasQueue => queue.isNotEmpty;

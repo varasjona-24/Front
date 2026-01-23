@@ -14,6 +14,8 @@ import '../../../app/controllers/theme_controller.dart';
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/services/bluetooth_audio_service.dart';
+import '../../../app/services/audio_service.dart';
+import '../../../app/services/video_service.dart';
 
 class SettingsController extends GetxController {
   final GetStorage _storage = GetStorage();
@@ -66,6 +68,8 @@ class SettingsController extends GetxController {
       themeCtrl.setPalette(selectedPalette.value);
       themeCtrl.setBrightness(brightness.value);
     } catch (_) {}
+
+    _applyVolumeToPlayers(defaultVolume.value);
   }
 
   Future<void> _configureAudioSession() async {
@@ -105,6 +109,7 @@ class SettingsController extends GetxController {
   void setDefaultVolume(double volume) {
     defaultVolume.value = volume;
     _storage.write('defaultVolume', volume);
+    _applyVolumeToPlayers(volume);
   }
 
   /// 📱 Cambiar calidad de descarga
@@ -123,6 +128,16 @@ class SettingsController extends GetxController {
   void setAutoPlayNext(bool value) {
     autoPlayNext.value = value;
     _storage.write('autoPlayNext', value);
+  }
+
+  void _applyVolumeToPlayers(double volume) {
+    final v = (volume / 100).clamp(0.0, 1.0);
+    if (Get.isRegistered<AudioService>()) {
+      Get.find<AudioService>().setVolume(v);
+    }
+    if (Get.isRegistered<VideoService>()) {
+      Get.find<VideoService>().setVolume(v);
+    }
   }
 
   Future<void> resetSettings() async {

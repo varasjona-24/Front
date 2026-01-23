@@ -6,6 +6,7 @@ import 'package:video_player/video_player.dart' as vp;
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
+import '../../Modules/settings/controller/settings_controller.dart';
 
 enum VideoPlaybackState { stopped, loading, playing, paused }
 
@@ -16,6 +17,9 @@ class VideoService extends GetxService {
 
   final Rx<Duration> position = Duration.zero.obs;
   final Rx<Duration> duration = Duration.zero.obs;
+  final RxDouble volume = 1.0.obs;
+  final RxInt completedTick = 0.obs;
+  bool _completedOnce = false;
 
   MediaItem? _currentItem;
   MediaVariant? _currentVariant;
@@ -31,6 +35,15 @@ class VideoService extends GetxService {
     return _currentItem?.id == item.id &&
         _currentVariant?.format == v.format &&
         _currentVariant?.kind == v.kind;
+  }
+
+  @override
+  void onInit() {
+    super.onInit();
+    if (Get.isRegistered<SettingsController>()) {
+      final settings = Get.find<SettingsController>();
+      setVolume(settings.defaultVolume.value / 100);
+    }
   }
 
   @override
@@ -62,6 +75,7 @@ class VideoService extends GetxService {
     isLoading.value = true;
     isPlaying.value = false;
     state.value = VideoPlaybackState.loading;
+    _completedOnce = false;
 
     // -----------------------------------------------------------------------
     // ✅ LOCAL
@@ -109,8 +123,9 @@ class VideoService extends GetxService {
 
         _setupPlayerListener();
 
-        duration.value = _player!.value.duration;
-        await _player!.play();
+      duration.value = _player!.value.duration;
+      await _player!.setVolume(volume.value);
+      await _player!.play();
         isPlaying.value = true;
         state.value = VideoPlaybackState.playing;
 
@@ -162,6 +177,7 @@ class VideoService extends GetxService {
       _setupPlayerListener();
 
       duration.value = _player!.value.duration;
+      await _player!.setVolume(volume.value);
       await _player!.play();
       isPlaying.value = true;
       state.value = VideoPlaybackState.playing;
@@ -182,13 +198,23 @@ class VideoService extends GetxService {
     _posTimer?.cancel();
     _posTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
       if (_player == null) return;
-      position.value = _player!.value.position;
-      isPlaying.value = _player!.value.isPlaying;
+      final v = _player!.value;
+      position.value = v.position;
+      isPlaying.value = v.isPlaying;
+      duration.value = v.duration;
 
-      if (_player!.value.isPlaying) {
+      if (v.isPlaying) {
         state.value = VideoPlaybackState.playing;
       } else {
         state.value = VideoPlaybackState.paused;
+      }
+
+      final d = v.duration;
+      final completed = d > Duration.zero &&
+          v.position >= d - const Duration(milliseconds: 200);
+      if (!_completedOnce && completed) {
+        _completedOnce = true;
+        completedTick.value++;
       }
     });
   }
@@ -252,6 +278,12 @@ class VideoService extends GetxService {
     await _player!.seekTo(Duration.zero);
     await _player!.play();
     state.value = VideoPlaybackState.playing;
+  }
+
+  Future<void> setVolume(double v) async {
+    final clamped = v.clamp(0.0, 1.0);
+    volume.value = clamped;
+    await _player?.setVolume(clamped);
   }
 
   Future<void> stop() async {
