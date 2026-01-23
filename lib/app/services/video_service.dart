@@ -18,6 +18,7 @@ class VideoService extends GetxService {
   final Rx<Duration> position = Duration.zero.obs;
   final Rx<Duration> duration = Duration.zero.obs;
   final RxDouble volume = 1.0.obs;
+  final RxDouble speed = 1.0.obs;
   final RxInt completedTick = 0.obs;
   bool _completedOnce = false;
 
@@ -125,6 +126,7 @@ class VideoService extends GetxService {
 
       duration.value = _player!.value.duration;
       await _player!.setVolume(volume.value);
+      await _player!.setPlaybackSpeed(speed.value);
       await _player!.play();
         isPlaying.value = true;
         state.value = VideoPlaybackState.playing;
@@ -178,6 +180,7 @@ class VideoService extends GetxService {
 
       duration.value = _player!.value.duration;
       await _player!.setVolume(volume.value);
+      await _player!.setPlaybackSpeed(speed.value);
       await _player!.play();
       isPlaying.value = true;
       state.value = VideoPlaybackState.playing;
@@ -284,6 +287,12 @@ class VideoService extends GetxService {
     final clamped = v.clamp(0.0, 1.0);
     volume.value = clamped;
     await _player?.setVolume(clamped);
+  }
+
+  Future<void> setSpeed(double v) async {
+    final clamped = v.clamp(0.5, 2.0);
+    speed.value = clamped;
+    await _player?.setPlaybackSpeed(clamped);
   }
 
   Future<void> stop() async {

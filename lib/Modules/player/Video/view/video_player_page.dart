@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 
@@ -6,8 +11,46 @@ import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_co
 import 'video_queue_page.dart';
 import '../../../../app/ui/widgets/layout/app_gradient_background.dart';
 
-class VideoPlayerPage extends GetView<VideoPlayerController> {
+class VideoPlayerPage extends StatefulWidget {
   const VideoPlayerPage({super.key});
+
+  @override
+  State<VideoPlayerPage> createState() => _VideoPlayerPageState();
+}
+
+class _VideoPlayerPageState extends State<VideoPlayerPage> {
+  late final VideoPlayerController controller;
+  bool _showControls = true;
+  bool _isFullscreen = false;
+  Timer? _hideTimer;
+  Timer? _speedTimer;
+  double? _dragValue;
+  String? _speedToast;
+  double _speedDragAccumulator = 0;
+  int _activePointers = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<VideoPlayerController>();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    _scheduleHide();
+  }
+
+  @override
+  void dispose() {
+    _hideTimer?.cancel();
+    _speedTimer?.cancel();
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -18,196 +61,383 @@ class VideoPlayerPage extends GetView<VideoPlayerController> {
       body: AppGradientBackground(
         child: SafeArea(
           child: Obx(() {
-          final queue = controller.queue;
-          final idx = controller.currentIndex.value;
+            final queue = controller.queue;
+            final idx = controller.currentIndex.value;
 
-          final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
-              ? queue[idx]
-              : null;
+            final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
+                ? queue[idx]
+                : null;
 
-          if (item == null) {
-            return const Center(child: Text('No hay vídeo'));
-          }
+            if (item == null) {
+              return const Center(child: Text('No hay vídeo'));
+            }
 
-          return Column(
-            children: [
-              // ───────────────────────────────────────────────────────────────
-              // Top bar
-              // ───────────────────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: Get.back,
-                    ),
-                    Expanded(
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: _buildVideoArea(theme),
+                ),
+                if (_showControls) Positioned.fill(child: _buildControls(theme, item)),
+                if (_speedToast != null)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.65),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       child: Text(
-                        item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleSmall,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Ver cola',
-                      icon: const Icon(Icons.playlist_play),
-                      onPressed: () => Get.to(() => const VideoQueuePage()),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 10),
-
-              // ───────────────────────────────────────────────────────────────
-              // Video area (robust layout)
-              // ───────────────────────────────────────────────────────────────
-              Expanded(
-                child: Obx(() {
-                  // Fuerza rebuild cuando cambia el estado de reproducción
-                  final _ = controller.state.value;
-
-                  final err = controller.error.value;
-                  if (err != null) {
-                    return _ErrorPanel(
-                      message: err,
-                      onPickOther: () => Get.to(() => const VideoQueuePage()),
-                      onRetry: controller.retry,
-                    );
-                  }
-
-                  final vpCtrl = controller.playerController;
-
-                  // Loader si aún no hay controller o no inicializa
-                  if (vpCtrl == null || !vpCtrl.value.isInitialized) {
-                    return Container(
-                      color: theme.colorScheme.surfaceVariant,
-                      child: const Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  // Size del video (si es 0, algo raro pasa)
-                  final size = vpCtrl.value.size;
-                  if (size.width <= 0 || size.height <= 0) {
-                    return Container(
-                      color: theme.colorScheme.surfaceVariant,
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: const Center(
-                        child: Text(
-                          'No se pudo obtener el tamaño del vídeo.',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    );
-                  }
-
-                  // ✅ Layout ultra robusto: evita AspectRatio unbounded constraints
-                  return Container(
-                    color: Colors.black,
-                    child: SizedBox.expand(
-                      child: FittedBox(
-                        fit: BoxFit.contain,
-                        alignment: Alignment.center,
-                        child: SizedBox(
-                          width: size.width,
-                          height: size.height,
-                          child: vp.VideoPlayer(vpCtrl),
+                        _speedToast!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
-                  );
-                }),
-              ),
-
-              // ───────────────────────────────────────────────────────────────
-              // Controls
-              // ───────────────────────────────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Column(
-                  children: [
-                    // Progress + timestamps
-                    Obx(() {
-                      final dur = controller.duration.value;
-                      final pos = controller.position.value;
-
-                      final maxSeconds = dur.inSeconds > 0
-                          ? dur.inSeconds.toDouble()
-                          : 1.0;
-                      final posSeconds = pos.inSeconds.toDouble().clamp(
-                        0.0,
-                        maxSeconds,
-                      );
-
-                      return Row(
-                        children: [
-                          Text(_fmt(pos), style: theme.textTheme.bodySmall),
-                          Expanded(
-                            child: Slider(
-                              value: posSeconds,
-                              min: 0.0,
-                              max: maxSeconds,
-                              // 👇 NO spamear seek en cada pixel, mejor al soltar
-                              onChanged: (_) {},
-                              onChangeEnd: (v) {
-                                controller.seek(Duration(seconds: v.toInt()));
-                              },
-                            ),
-                          ),
-                          Text(_fmt(dur), style: theme.textTheme.bodySmall),
-                        ],
-                      );
-                    }),
-
-                    const SizedBox(height: 6),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.skip_previous),
-                          onPressed: controller.previous,
-                        ),
-                        const SizedBox(width: 12),
-                        Obx(() {
-                          final playing = controller.isPlaying.value;
-                          return ElevatedButton(
-                            onPressed: controller.togglePlay,
-                            style: ElevatedButton.styleFrom(
-                              shape: const CircleBorder(),
-                              padding: EdgeInsets.zero,
-                              backgroundColor: theme.colorScheme.primary
-                                  .withOpacity(0.25),
-                              elevation: 0,
-                            ),
-                            child: Icon(
-                              playing ? Icons.pause : Icons.play_arrow,
-                              size: 30,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          );
-                        }),
-                        const SizedBox(width: 12),
-                        IconButton(
-                          icon: const Icon(Icons.skip_next),
-                          onPressed: controller.next,
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        }),
+                  ),
+              ],
+            );
+          }),
         ),
       ),
+    );
+  }
+
+  Widget _buildVideoArea(ThemeData theme) {
+    return Listener(
+      behavior: HitTestBehavior.opaque,
+      onPointerDown: (_) => _activePointers++,
+      onPointerUp: (_) => _activePointers = (_activePointers - 1).clamp(0, 10),
+      onPointerCancel: (_) => _activePointers = 0,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _toggleControls,
+        onDoubleTap: _pauseOnDoubleTap,
+        onVerticalDragUpdate: (details) {
+          if (_activePointers >= 2) {
+            _onVerticalDragUpdate(details);
+          }
+        },
+        child: Obx(() {
+        final _ = controller.state.value;
+        final err = controller.error.value;
+        if (err != null) {
+          return _ErrorPanel(
+            message: err,
+            onPickOther: () => Get.to(() => const VideoQueuePage()),
+            onRetry: controller.retry,
+          );
+        }
+
+        final vpCtrl = controller.playerController;
+        if (vpCtrl == null || !vpCtrl.value.isInitialized) {
+          return Container(
+            color: theme.colorScheme.surfaceVariant,
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final size = vpCtrl.value.size;
+        if (size.width <= 0 || size.height <= 0) {
+          return Container(
+            color: theme.colorScheme.surfaceVariant,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: const Center(
+              child: Text(
+                'No se pudo obtener el tamaño del vídeo.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
+        }
+
+        return Container(
+          color: Colors.black,
+          child: SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.contain,
+              alignment: Alignment.center,
+              child: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: vp.VideoPlayer(vpCtrl),
+              ),
+            ),
+          ),
+        );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildControls(ThemeData theme, dynamic item) {
+    return Column(
+      children: [
+        if (!_isFullscreen)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: Get.back,
+                ),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Ver cola',
+                  icon: const Icon(Icons.playlist_play),
+                  onPressed: () => Get.to(() => const VideoQueuePage()),
+                ),
+              ],
+            ),
+          ),
+        const Spacer(),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            children: [
+              _buildProgress(theme, item),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous),
+                    onPressed: controller.previous,
+                  ),
+                  const SizedBox(width: 12),
+                  Obx(() {
+                    final playing = controller.isPlaying.value;
+                    return ElevatedButton(
+                      onPressed: controller.togglePlay,
+                      style: ElevatedButton.styleFrom(
+                        shape: const CircleBorder(),
+                        padding: EdgeInsets.zero,
+                        backgroundColor:
+                            theme.colorScheme.primary.withOpacity(0.25),
+                        elevation: 0,
+                      ),
+                      child: Icon(
+                        playing ? Icons.pause : Icons.play_arrow,
+                        size: 30,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 12),
+                  IconButton(
+                    icon: const Icon(Icons.skip_next),
+                    onPressed: controller.next,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  TextButton.icon(
+                    onPressed: _openSpeedPicker,
+                    icon: const Icon(Icons.speed),
+                    label: Obx(() => Text(
+                          '${controller.videoService.speed.value.toStringAsFixed(1)}x',
+                        )),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _isFullscreen
+                          ? Icons.fullscreen_exit_rounded
+                          : Icons.fullscreen_rounded,
+                    ),
+                    onPressed: _toggleFullscreen,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgress(ThemeData theme, dynamic item) {
+    return Obx(() {
+      final dur = controller.duration.value;
+      final pos = controller.position.value;
+      final previewPos = _dragValue != null
+          ? Duration(seconds: _dragValue!.toInt())
+          : pos;
+
+      final maxSeconds =
+          dur.inSeconds > 0 ? dur.inSeconds.toDouble() : 1.0;
+      final posSeconds = (previewPos.inSeconds.toDouble()).clamp(
+        0.0,
+        maxSeconds,
+      );
+
+      return Column(
+        children: [
+          if (_dragValue != null) _buildPreview(item, previewPos),
+          Row(
+            children: [
+              Text(_fmt(previewPos), style: theme.textTheme.bodySmall),
+              Expanded(
+                child: Slider(
+                  value: posSeconds,
+                  min: 0.0,
+                  max: maxSeconds,
+                  onChanged: (v) {
+                    setState(() => _dragValue = v);
+                    _showControlsTemp();
+                  },
+                  onChangeEnd: (v) {
+                    controller.seek(Duration(seconds: v.toInt()));
+                    setState(() => _dragValue = null);
+                  },
+                ),
+              ),
+              Text(_fmt(dur), style: theme.textTheme.bodySmall),
+            ],
+          ),
+        ],
+      );
+    });
+  }
+
+  Widget _buildPreview(dynamic item, Duration position) {
+    final thumb = item.effectiveThumbnail;
+    if (thumb == null || thumb.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(
+          _fmt(position),
+          style: const TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
+    final image = thumb.startsWith('http')
+        ? Image.network(thumb, fit: BoxFit.cover)
+        : Image.file(File(thumb), fit: BoxFit.cover);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(width: 56, height: 36, child: image),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            _fmt(position),
+            style: const TextStyle(color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleControls() {
+    setState(() => _showControls = !_showControls);
+    if (_showControls) _scheduleHide();
+  }
+
+  void _showControlsTemp() {
+    setState(() => _showControls = true);
+    _scheduleHide();
+  }
+
+  void _scheduleHide() {
+    _hideTimer?.cancel();
+    _hideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _showControls = false);
+    });
+  }
+
+  void _pauseOnDoubleTap() {
+    if (controller.isPlaying.value) {
+      controller.togglePlay();
+    }
+    _showControlsTemp();
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    _speedDragAccumulator += -details.delta.dy;
+    if (_speedDragAccumulator.abs() < 24) return;
+    final steps = (_speedDragAccumulator / 24).truncate();
+    _speedDragAccumulator -= steps * 24;
+    _adjustSpeed(steps * 0.1);
+  }
+
+  void _adjustSpeed(double delta) {
+    final current = controller.videoService.speed.value;
+    final next = (current + delta).clamp(0.5, 2.0);
+    controller.videoService.setSpeed(next);
+    _showSpeedToast('${next.toStringAsFixed(1)}x');
+  }
+
+  void _showSpeedToast(String text) {
+    setState(() => _speedToast = text);
+    _speedTimer?.cancel();
+    _speedTimer = Timer(const Duration(milliseconds: 900), () {
+      if (mounted) setState(() => _speedToast = null);
+    });
+  }
+
+  void _toggleFullscreen() {
+    setState(() => _isFullscreen = !_isFullscreen);
+    if (_isFullscreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+  }
+
+  void _openSpeedPicker() {
+    final speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              for (final s in speeds)
+                ListTile(
+                  title: Text('${s.toStringAsFixed(2)}x'),
+                  onTap: () {
+                    controller.videoService.setSpeed(s);
+                    Navigator.of(ctx).pop();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
