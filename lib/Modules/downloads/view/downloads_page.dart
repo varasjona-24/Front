@@ -49,10 +49,12 @@ class DownloadsPage extends GetView<DownloadsController> {
 
         if (shared.isNotEmpty && dialogOpen == false) {
           controller.shareDialogOpen.value = true;
+          final url = shared;
+          controller.sharedUrl.value = '';
           await DownloadsPill.showImportUrlDialog(
             context,
             controller,
-            initialUrl: controller.sharedUrl.value,
+            initialUrl: url,
             clearSharedOnClose: true,
           );
           controller.shareDialogOpen.value = false;

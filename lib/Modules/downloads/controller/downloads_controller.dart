@@ -98,9 +98,8 @@ class DownloadsController extends GetxController {
 
       final list = all.where((item) {
         return item.variants.any((v) {
-          final pth = v.localPath ?? '';
-          return pth.isNotEmpty &&
-              pth.contains('${p.separator}downloads${p.separator}');
+          final pth = (v.localPath ?? '').trim();
+          return pth.isNotEmpty;
         });
       }).toList();
 
