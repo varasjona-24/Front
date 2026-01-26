@@ -22,7 +22,9 @@ class MiniPlayerBar extends StatelessWidget {
 
     return Obx(() {
       final route = nav.currentRoute.value;
-      if (route == AppRoutes.audioPlayer || route == AppRoutes.videoPlayer) {
+      if (route == AppRoutes.entry ||
+          route == AppRoutes.audioPlayer ||
+          route == AppRoutes.videoPlayer) {
         return const SizedBox.shrink();
       }
 
@@ -36,9 +38,10 @@ class MiniPlayerBar extends StatelessWidget {
       final audioItem = audio.currentItem.value;
       final videoItem = video.currentItem.value;
       final audioActive = audioItem != null &&
-          audio.state.value != PlaybackState.stopped;
+          (audio.state.value != PlaybackState.stopped || audio.keepLastItem);
       final videoActive = videoItem != null &&
-          video.state.value != VideoPlaybackState.stopped;
+          (video.state.value != VideoPlaybackState.stopped ||
+              video.keepLastItem);
 
       if (!audioActive && !videoActive) {
         return const SizedBox.shrink();
@@ -92,8 +95,10 @@ class MiniPlayerBar extends StatelessWidget {
         onClose: () async {
           if (isVideo) {
             await video.stop();
+            video.clearLastItem();
           } else {
             await audio.stop();
+            audio.clearLastItem();
           }
         },
         onOpen: () {

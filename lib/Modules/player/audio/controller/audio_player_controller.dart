@@ -38,6 +38,13 @@ class AudioPlayerController extends GetxController {
   StreamSubscription<ProcessingState>? _procSub;
 
   bool _handlingCompleted = false;
+  bool _hydratedFromStorage = false;
+
+  static const _queueKey = 'audio_queue_items';
+  static const _queueIndexKey = 'audio_queue_index';
+  static const _resumePosKey = 'audio_resume_positions';
+  static const _shuffleKey = 'audio_shuffle_on';
+  static const _shuffleHistoryKey = 'audio_shuffle_history';
 
   AudioPlayerController({required this.audioService});
 
@@ -45,7 +52,11 @@ class AudioPlayerController extends GetxController {
   void onInit() {
     super.onInit();
 
-    _readArgs();
+    final hasArgs = _readArgs();
+    if (!hasArgs) {
+      _restoreQueue();
+    }
+    _loadShuffleState();
     _loadCoverStyle();
 
     _posSub = audioService.positionStream.listen((p) {
@@ -92,10 +103,18 @@ class AudioPlayerController extends GetxController {
       }
     });
 
+    ever<List<MediaItem>>(queue, (_) => _persistQueue());
+    ever<int>(currentIndex, (_) => _persistQueue());
+    debounce<Duration>(
+      position,
+      (p) => _persistPosition(p),
+      time: const Duration(seconds: 2),
+    );
+
     _ensurePlayingCurrent();
   }
 
-  void _readArgs() {
+  bool _readArgs() {
     final args = Get.arguments;
 
     if (args is Map) {
@@ -116,12 +135,14 @@ class AudioPlayerController extends GetxController {
         currentIndex.value = idx.clamp(0, queue.length - 1).toInt();
       }
 
-      return;
+      _persistQueue();
+      return true;
     }
 
     // fallback: vacío
     queue.clear();
     currentIndex.value = 0;
+    return false;
   }
 
   @override
@@ -149,6 +170,103 @@ class AudioPlayerController extends GetxController {
       coverStyle.value = CoverStyle.vinyl;
     } else {
       coverStyle.value = CoverStyle.square;
+    }
+  }
+
+  void _restoreQueue() {
+    if (_hydratedFromStorage) return;
+    _hydratedFromStorage = true;
+
+    final raw = _storage.read<List>(_queueKey);
+    if (raw == null || raw.isEmpty) return;
+
+    final items = raw
+        .whereType<Map>()
+        .map((m) => MediaItem.fromJson(Map<String, dynamic>.from(m)))
+        .toList();
+    if (items.isEmpty) return;
+
+    queue.assignAll(items);
+    final idx = _storage.read(_queueIndexKey);
+    if (idx is int && idx >= 0 && idx < queue.length) {
+      currentIndex.value = idx;
+    } else {
+      currentIndex.value = 0;
+    }
+  }
+
+  void _loadShuffleState() {
+    final on = _storage.read(_shuffleKey);
+    if (on is bool) {
+      isShuffling.value = on;
+    }
+
+    final rawHistory = _storage.read<List>(_shuffleHistoryKey);
+    if (rawHistory != null) {
+      _shuffleHistory
+        ..clear()
+        ..addAll(
+          rawHistory
+              .whereType<num>()
+              .map((e) => e.toInt())
+              .where((i) => i >= 0 && i < queue.length),
+        );
+    }
+  }
+
+  void _persistShuffleState() {
+    _storage.write(_shuffleKey, isShuffling.value);
+    _storage.write(_shuffleHistoryKey, List<int>.from(_shuffleHistory));
+  }
+
+  void _persistQueue() {
+    if (queue.isEmpty) return;
+    _storage.write(_queueKey, queue.map((e) => e.toJson()).toList());
+    _storage.write(_queueIndexKey, currentIndex.value);
+  }
+
+  void _persistPosition(Duration p) {
+    final item = currentItemOrNull;
+    if (item == null) return;
+    final key = item.publicId.isNotEmpty ? item.publicId : item.id;
+    if (key.trim().isEmpty) return;
+
+    final map = _storage.read<Map>(_resumePosKey);
+    final next = <String, dynamic>{};
+    if (map != null) {
+      for (final entry in map.entries) {
+        next[entry.key.toString()] = entry.value;
+      }
+    }
+
+    final ms = p.inMilliseconds;
+    if (ms <= 1000) {
+      next.remove(key);
+    } else {
+      next[key] = ms;
+    }
+    _storage.write(_resumePosKey, next);
+  }
+
+  Future<void> _resumeIfAny(MediaItem item) async {
+    final key = item.publicId.isNotEmpty ? item.publicId : item.id;
+    final map = _storage.read<Map>(_resumePosKey);
+    if (map == null) return;
+    final raw = map[key];
+    if (raw is! int) return;
+    if (raw < 1500) return;
+
+    try {
+      final d = await audioService.durationStream
+          .firstWhere((d) => d != null && d > Duration.zero)
+          .timeout(const Duration(seconds: 2));
+      final dur = d ?? Duration.zero;
+      final resume = Duration(milliseconds: raw);
+      if (resume < dur - const Duration(seconds: 2)) {
+        await audioService.seek(resume);
+      }
+    } catch (_) {
+      // ignore resume failures
     }
   }
 
@@ -254,6 +372,7 @@ class AudioPlayerController extends GetxController {
     try {
       print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
       await audioService.play(item, variant);
+      await _resumeIfAny(item);
       await _trackPlay(item);
     } catch (e) {
       print('❌ Error in _playItem: $e');
@@ -350,6 +469,9 @@ class AudioPlayerController extends GetxController {
         if (idx >= newIndex && idx < oldIndex) _shuffleHistory[i] = idx + 1;
       }
     }
+    if (isShuffling.value) {
+      _persistShuffleState();
+    }
   }
 
   Future<void> next() async {
@@ -357,6 +479,7 @@ class AudioPlayerController extends GetxController {
 
     if (isShuffling.value && queue.length > 1) {
       _shuffleHistory.add(currentIndex.value);
+      _persistShuffleState();
 
       int nextIdx;
       final max = queue.length;
@@ -381,6 +504,7 @@ class AudioPlayerController extends GetxController {
     if (isShuffling.value && _shuffleHistory.isNotEmpty) {
       final idx = _shuffleHistory.removeLast();
       currentIndex.value = idx;
+      _persistShuffleState();
       await _playCurrent();
       return;
     }
@@ -401,6 +525,7 @@ class AudioPlayerController extends GetxController {
     } else {
       _shuffleHistory.clear();
     }
+    _persistShuffleState();
   }
 
   Future<void> playAt(int index) async {
@@ -409,6 +534,7 @@ class AudioPlayerController extends GetxController {
     if (isShuffling.value) {
       _shuffleHistory.add(currentIndex.value);
       if (_shuffleHistory.length > 200) _shuffleHistory.removeAt(0);
+      _persistShuffleState();
     }
 
     currentIndex.value = index;

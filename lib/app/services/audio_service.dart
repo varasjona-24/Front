@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../models/media_item.dart';
@@ -13,6 +14,13 @@ enum PlaybackState { stopped, loading, playing, paused }
 
 class AudioService extends GetxService {
   final AudioPlayer _player = AudioPlayer();
+  final GetStorage _storage = GetStorage();
+
+  static const _lastItemKey = 'audio_last_item';
+  static const _lastVariantKey = 'audio_last_variant';
+  bool _keepLastItem = false;
+
+  bool get keepLastItem => _keepLastItem;
 
   final Rx<PlaybackState> state = PlaybackState.stopped.obs;
   final RxBool isPlaying = false.obs;
@@ -45,6 +53,8 @@ class AudioService extends GetxService {
       await setVolume(settings.defaultVolume.value / 100);
     }
 
+    _restoreLastItem();
+
     _playerStateSub = _player.playerStateStream.listen((ps) {
       final proc = ps.processingState;
 
@@ -62,10 +72,15 @@ class AudioService extends GetxService {
         state.value = PlaybackState.paused;
       } else if (proc == ProcessingState.completed ||
           proc == ProcessingState.idle) {
-        state.value = PlaybackState.stopped;
-        isPlaying.value = false;
-        currentItem.value = null;
-        currentVariant.value = null;
+        if (_keepLastItem && currentItem.value != null && !ps.playing) {
+          state.value = PlaybackState.paused;
+          isPlaying.value = false;
+        } else {
+          state.value = PlaybackState.stopped;
+          isPlaying.value = false;
+          currentItem.value = null;
+          currentVariant.value = null;
+        }
       }
     });
   }
@@ -171,6 +186,8 @@ class AudioService extends GetxService {
         _currentVariant = variant;
         currentItem.value = item;
         currentVariant.value = variant;
+        _persistLastItem(item, variant);
+        _keepLastItem = true;
 
         await _player.setVolume(volume.value);
         await _player.play();
@@ -237,6 +254,8 @@ class AudioService extends GetxService {
       _currentVariant = variant;
       currentItem.value = item;
       currentVariant.value = variant;
+      _persistLastItem(item, variant);
+      _keepLastItem = true;
 
       await _player.setVolume(volume.value);
       await _player.play();
@@ -290,6 +309,41 @@ class AudioService extends GetxService {
     _currentVariant = null;
     currentItem.value = null;
     currentVariant.value = null;
+    _keepLastItem = false;
+  }
+
+  void clearLastItem() {
+    _storage.remove(_lastItemKey);
+    _storage.remove(_lastVariantKey);
+    _keepLastItem = false;
+  }
+
+  void _persistLastItem(MediaItem item, MediaVariant variant) {
+    _storage.write(_lastItemKey, item.toJson());
+    _storage.write(_lastVariantKey, variant.toJson());
+  }
+
+  void _restoreLastItem() {
+    final rawItem = _storage.read<Map>(_lastItemKey);
+    if (rawItem == null) return;
+    try {
+      final item = MediaItem.fromJson(Map<String, dynamic>.from(rawItem));
+      final rawVariant = _storage.read<Map>(_lastVariantKey);
+      MediaVariant? variant;
+      if (rawVariant != null) {
+        variant = MediaVariant.fromJson(Map<String, dynamic>.from(rawVariant));
+      }
+
+      _currentItem = item;
+      _currentVariant = variant;
+      currentItem.value = item;
+      currentVariant.value = variant;
+      state.value = PlaybackState.paused;
+      isPlaying.value = false;
+      _keepLastItem = true;
+    } catch (_) {
+      // ignore restore failures
+    }
   }
 
   @override

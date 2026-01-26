@@ -1,4 +1,5 @@
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import '../../../../app/models/media_item.dart';
@@ -10,11 +11,16 @@ class VideoPlayerController extends GetxController {
   final VideoService videoService;
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
   final SettingsController _settings = Get.find<SettingsController>();
+  final GetStorage _storage = GetStorage();
   final List<MediaItem> queue;
   final int initialIndex;
 
   final RxInt currentIndex = 0.obs;
   final Rxn<String> error = Rxn<String>();
+
+  static const _queueKey = 'video_queue_items';
+  static const _queueIndexKey = 'video_queue_index';
+  static const _resumePosKey = 'video_resume_positions';
 
   VideoPlayerController({
     required this.videoService,
@@ -37,6 +43,13 @@ class VideoPlayerController extends GetxController {
 
     final safeIndex = initialIndex.clamp(0, queue.length - 1).toInt();
     currentIndex.value = safeIndex;
+    _persistQueue();
+
+    debounce<Duration>(
+      position,
+      (p) => _persistPosition(p),
+      time: const Duration(seconds: 2),
+    );
 
     ever<int>(videoService.completedTick, (_) async {
       if (!_settings.autoPlayNext.value) return;
@@ -130,6 +143,7 @@ class VideoPlayerController extends GetxController {
     try {
       print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
       await videoService.play(item, variant);
+      await _resumeIfAny(item);
       await _trackPlay(item);
       error.value = null;
     } catch (e) {
@@ -193,6 +207,59 @@ class VideoPlayerController extends GetxController {
   /// Reintentar cargar el mismo vídeo
   Future<void> retry() async {
     await _playCurrent();
+  }
+
+  void _persistQueue() {
+    if (queue.isEmpty) return;
+    _storage.write(_queueKey, queue.map((e) => e.toJson()).toList());
+    _storage.write(_queueIndexKey, currentIndex.value);
+  }
+
+  void _persistPosition(Duration p) {
+    final item = currentItemOrNull;
+    if (item == null) return;
+    final key = item.publicId.isNotEmpty ? item.publicId : item.id;
+    if (key.trim().isNotEmpty) {
+      final map = _storage.read<Map>(_resumePosKey);
+      final next = <String, dynamic>{};
+      if (map != null) {
+        for (final entry in map.entries) {
+          next[entry.key.toString()] = entry.value;
+        }
+      }
+      final ms = p.inMilliseconds;
+      if (ms <= 1000) {
+        next.remove(key);
+      } else {
+        next[key] = ms;
+      }
+      _storage.write(_resumePosKey, next);
+    }
+  }
+
+  Future<void> _resumeIfAny(MediaItem item) async {
+    final key = item.publicId.isNotEmpty ? item.publicId : item.id;
+    final map = _storage.read<Map>(_resumePosKey);
+    if (map == null) return;
+    final raw = map[key];
+    if (raw is! int) return;
+    if (raw < 1500) return;
+
+    try {
+      Duration d = videoService.duration.value;
+      for (var i = 0; i < 10 && d == Duration.zero; i++) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        d = videoService.duration.value;
+      }
+      if (d == Duration.zero) return;
+
+      final resume = Duration(milliseconds: raw);
+      if (resume < d - const Duration(seconds: 2)) {
+        await videoService.seek(resume);
+      }
+    } catch (_) {
+      // ignore resume failures
+    }
   }
 
   @override
