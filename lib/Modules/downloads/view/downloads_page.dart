@@ -36,15 +36,18 @@ class DownloadsPage extends GetView<DownloadsController> {
 
     return Obx(() {
       final mode = home.mode.value;
+      final shared = controller.sharedUrl.value;
+      final dialogOpen = controller.shareDialogOpen.value;
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if ((controller.sharedUrl.value.isEmpty) &&
-            (argUrl != null && argUrl!.isNotEmpty)) {
+            (argUrl != null && argUrl!.isNotEmpty) &&
+            controller.sharedArgConsumed.value == false) {
           controller.sharedUrl.value = argUrl!;
+          controller.sharedArgConsumed.value = true;
         }
 
-        if (controller.sharedUrl.value.isNotEmpty &&
-            controller.shareDialogOpen.value == false) {
+        if (shared.isNotEmpty && dialogOpen == false) {
           controller.shareDialogOpen.value = true;
           await DownloadsPill.showImportUrlDialog(
             context,

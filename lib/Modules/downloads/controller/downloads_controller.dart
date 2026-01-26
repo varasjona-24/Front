@@ -35,6 +35,7 @@ class DownloadsController extends GetxController {
   final RxBool importing = false.obs;
   final RxString sharedUrl = ''.obs;
   final RxBool shareDialogOpen = false.obs;
+  final RxBool sharedArgConsumed = false.obs;
   StreamSubscription<List<SharedMediaFile>>? _shareSub;
 
   @override

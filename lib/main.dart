@@ -12,9 +12,11 @@ import 'app/ui/widgets/player/mini_player_bar.dart';
 
 import 'app/data/network/dio_client.dart';
 import 'app/data/repo/media_repository.dart';
+import 'app/data/local/local_library_store.dart';
 import 'app/services/audio_service.dart';
 import 'app/services/video_service.dart';
 import 'Modules/settings/controller/settings_controller.dart';
+import 'Modules/downloads/controller/downloads_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,8 +43,17 @@ Future<void> main() async {
   // 🌐 Cliente HTTP
   Get.lazyPut<DioClient>(() => DioClient(), fenix: true);
 
+  // 📦 GetStorage (shared)
+  Get.put<GetStorage>(GetStorage(), permanent: true);
+
+  // 💾 Local storage
+  Get.put(LocalLibraryStore(Get.find<GetStorage>()), permanent: true);
+
   // 📦 Repositorio de media
   Get.lazyPut<MediaRepository>(() => MediaRepository(), fenix: true);
+
+  // 📥 Imports/Downloads global (share intent listener)
+  Get.put(DownloadsController(), permanent: true);
 
   runApp(const MyApp());
 }
