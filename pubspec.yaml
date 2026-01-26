@@ -50,6 +50,8 @@ dependencies:
   just_audio: ^0.10.5
   audio_session: ^0.2.2
   video_player: ^2.5.0
+  webview_flutter: ^4.8.0
+  receive_sharing_intent: ^1.4.5
 
 dev_dependencies:
   flutter_test:

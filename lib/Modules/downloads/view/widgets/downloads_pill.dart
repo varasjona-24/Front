@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controller/downloads_controller.dart';
-import '../../../../Modules/settings/controller/settings_controller.dart';
 import '../../../../app/ui/themes/app_spacing.dart';
 import '../../../../app/models/media_item.dart';
+import '../imports_webview_page.dart';
 
 /// Widget tipo "pill" con opciones de descargas
 class DownloadsPill extends GetView<DownloadsController> {
@@ -30,7 +30,7 @@ class DownloadsPill extends GetView<DownloadsController> {
                 Icon(Icons.cloud_download_rounded, color: scheme.primary),
                 const SizedBox(width: 8),
                 Text(
-                  'Descargas',
+                  'Imports',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -39,13 +39,16 @@ class DownloadsPill extends GetView<DownloadsController> {
             ),
             const SizedBox(height: AppSpacing.lg),
 
-            // 🔗 Descargar Online
+            // 🔗 Importar Online
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => _showDownloadOnlineDialog(context),
+                onPressed: () => DownloadsPill.showImportUrlDialog(
+                  context,
+                  controller,
+                ),
                 icon: const Icon(Icons.link_rounded),
-                label: const Text('🌐 Descargar desde URL'),
+                label: const Text('🌐 Importar desde URL'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: scheme.primary,
                   foregroundColor: scheme.onPrimary,
@@ -67,6 +70,20 @@ class DownloadsPill extends GetView<DownloadsController> {
                 ),
               ),
             ),
+            const SizedBox(height: 12),
+
+            // 🌐 WebView limpio
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => Get.to(() => const ImportsWebViewPage()),
+                icon: const Icon(Icons.public_rounded),
+                label: const Text('🧭 Navegador limpio'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -74,121 +91,31 @@ class DownloadsPill extends GetView<DownloadsController> {
   }
 
   /// 🌐 Dialog mejorado de descargas online
-  Future<void> _showDownloadOnlineDialog(BuildContext context) async {
-    final urlCtrl = TextEditingController();
-    final idCtrl = TextEditingController();
-    final settingsCtrl = Get.find<SettingsController>();
-    String format = 'mp3';
-
-    bool isVideoFormat(String f) => f == 'mp4';
-    String kindForFormat(String f) => isVideoFormat(f) ? 'video' : 'audio';
-
+  static Future<void> showImportUrlDialog(
+    BuildContext context,
+    DownloadsController controller, {
+    String? initialUrl,
+    bool clearSharedOnClose = false,
+  }) async {
     try {
-      final ok = await showDialog<bool>(
+      final result = await showDialog<_ImportUrlResult>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) {
-          return StatefulBuilder(
-            builder: (ctx2, setState) {
-              return AlertDialog(
-                title: const Text('🌐 Descargar desde URL'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // 🔗 URL
-                      TextField(
-                        controller: urlCtrl,
-                        keyboardType: TextInputType.url,
-                        textInputAction: TextInputAction.next,
-                        decoration: const InputDecoration(
-                          labelText: 'URL',
-                          hintText: 'https://www.youtube.com/watch?v=...',
-                          prefixIcon: Icon(Icons.link_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // 📁 Formato
-                      DropdownButtonFormField<String>(
-                        value: format,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'mp3',
-                            child: Text('MP3 (audio)'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'm4a',
-                            child: Text('M4A (audio)'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'mp4',
-                            child: Text('MP4 (video)'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) setState(() => format = v);
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Formato',
-                          prefixIcon: Icon(Icons.file_present_rounded),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Tipo: ${kindForFormat(format)}',
-                          style: Theme.of(ctx2).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(ctx2).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const Divider(height: 24),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx2).pop(false),
-                    child: const Text('Cancelar'),
-                  ),
-                  FilledButton(
-                    onPressed: () {
-                      final url = urlCtrl.text.trim();
-                      if (url.isEmpty) {
-                        ScaffoldMessenger.of(ctx2).showSnackBar(
-                          const SnackBar(
-                            content: Text('Por favor ingresa una URL'),
-                          ),
-                        );
-                        return;
-                      }
-                      Navigator.of(ctx2).pop(true);
-                    },
-                    child: const Text('Descargar'),
-                  ),
-                ],
-              );
-            },
-          );
+          return _ImportUrlDialog(initialUrl: initialUrl);
         },
       );
 
-      if (ok == true) {
-        final url = urlCtrl.text.trim();
-        final mid = idCtrl.text.trim();
-
+      if (result != null) {
         await controller.downloadFromUrl(
-          mediaId: mid.isEmpty ? null : mid,
-          url: url,
-          format: format,
-          quality: settingsCtrl.downloadQuality.value,
+          url: result.url,
+          kind: result.kind,
         );
       }
     } finally {
-      urlCtrl.dispose();
-      idCtrl.dispose();
+      if (clearSharedOnClose) {
+        controller.sharedUrl.value = '';
+      }
     }
   }
 
@@ -298,63 +225,113 @@ class DownloadsPill extends GetView<DownloadsController> {
     }
   }
 
-  Widget _buildQualityOption(
-    BuildContext context,
-    String label,
-    String value,
-    SettingsController settingsCtrl,
-  ) {
-    final isSelected = settingsCtrl.downloadQuality.value == value;
-    final scheme = Theme.of(context).colorScheme;
+}
 
-    return GestureDetector(
-      onTap: () => settingsCtrl.setDownloadQuality(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? scheme.primary : scheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: scheme.primary.withOpacity(isSelected ? 1 : 0.3),
-          ),
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: isSelected ? scheme.onPrimary : scheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
+class _ImportUrlResult {
+  final String url;
+  final String kind;
+
+  const _ImportUrlResult({
+    required this.url,
+    required this.kind,
+  });
+}
+
+class _ImportUrlDialog extends StatefulWidget {
+  final String? initialUrl;
+
+  const _ImportUrlDialog({this.initialUrl});
+
+  @override
+  State<_ImportUrlDialog> createState() => _ImportUrlDialogState();
+}
+
+class _ImportUrlDialogState extends State<_ImportUrlDialog> {
+  late final TextEditingController _urlCtrl;
+  String _kind = 'audio';
+
+  @override
+  void initState() {
+    super.initState();
+    _urlCtrl = TextEditingController(text: widget.initialUrl?.trim() ?? '');
   }
 
-  Widget _buildDataUsageOption(
-    BuildContext context,
-    String label,
-    String value,
-    SettingsController settingsCtrl,
-  ) {
-    final isSelected = settingsCtrl.dataUsage.value == value;
-    final scheme = Theme.of(context).colorScheme;
+  @override
+  void dispose() {
+    _urlCtrl.dispose();
+    super.dispose();
+  }
 
-    return GestureDetector(
-      onTap: () => settingsCtrl.setDataUsage(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? scheme.secondary : scheme.surfaceVariant,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: scheme.secondary.withOpacity(isSelected ? 1 : 0.3),
-          ),
-        ),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: isSelected ? scheme.onSecondary : scheme.onSurfaceVariant,
-          ),
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('🌐 Importar desde URL'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 🔗 URL
+            TextField(
+              controller: _urlCtrl,
+              keyboardType: TextInputType.url,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'URL',
+                hintText: 'https://www.youtube.com/watch?v=...',
+                prefixIcon: Icon(Icons.link_rounded),
+              ),
+            ),
+            const SizedBox(height: 18),
+
+            // 📁 Tipo
+            DropdownButtonFormField<String>(
+              value: _kind,
+              items: const [
+                DropdownMenuItem(
+                  value: 'audio',
+                  child: Text('Audio'),
+                ),
+                DropdownMenuItem(
+                  value: 'video',
+                  child: Text('Video'),
+                ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _kind = v);
+              },
+              decoration: const InputDecoration(
+                labelText: 'Tipo',
+                prefixIcon: Icon(Icons.file_present_rounded),
+              ),
+            ),
+            const Divider(height: 24),
+          ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final url = _urlCtrl.text.trim();
+            if (url.isEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Por favor ingresa una URL'),
+                ),
+              );
+              return;
+            }
+            Navigator.of(context).pop(
+              _ImportUrlResult(url: url, kind: _kind),
+            );
+          },
+          child: const Text('Descargar'),
+        ),
+      ],
     );
   }
 }

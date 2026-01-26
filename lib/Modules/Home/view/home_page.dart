@@ -290,14 +290,14 @@ class HomePage extends GetView<HomeController> {
                                 const SizedBox(height: 18),
                               ],
 
-                              // ---- Últimas descargas ----
+                              // ---- Últimos imports ----
                               if (controller.latestDownloads.isNotEmpty) ...[
                                 MediaHorizontalList(
-                                  title: 'Últimas descargas',
+                                  title: 'Últimos imports',
                                   items: controller.latestDownloads,
                                   onHeaderTap: () => Get.to(
                                     () => SectionListPage(
-                                      title: 'Últimas descargas',
+                                      title: 'Últimos imports',
                                       items: controller.latestDownloads,
                                       onItemTap: (item, index) =>
                                           controller.openMedia(

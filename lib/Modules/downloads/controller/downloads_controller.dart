@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,7 @@ import 'package:dio/dio.dart' as dio;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -31,11 +33,57 @@ class DownloadsController extends GetxController {
   // 📁 Archivos locales para importar
   final RxList<MediaItem> localFilesForImport = <MediaItem>[].obs;
   final RxBool importing = false.obs;
+  final RxString sharedUrl = ''.obs;
+  final RxBool shareDialogOpen = false.obs;
+  StreamSubscription<List<SharedMediaFile>>? _shareSub;
 
   @override
   void onInit() {
     super.onInit();
     load();
+    _listenSharedLinks();
+  }
+
+  @override
+  void onClose() {
+    _shareSub?.cancel();
+    super.onClose();
+  }
+
+  Future<void> _listenSharedLinks() async {
+    try {
+      final initial = await ReceiveSharingIntent.instance.getInitialMedia();
+      if (initial.isNotEmpty) {
+        _setSharedUrl(initial.first.path);
+      }
+      _shareSub =
+          ReceiveSharingIntent.instance.getMediaStream().listen((value) {
+        if (value.isNotEmpty) {
+          _setSharedUrl(value.first.path);
+        }
+      });
+    } catch (e) {
+      debugPrint('Share intent error: $e');
+    }
+  }
+
+  void _setSharedUrl(String? value) {
+    final v = (value ?? '').trim();
+    if (v.isEmpty) return;
+    sharedUrl.value = v;
+    _openImportsFromShare(v);
+  }
+
+  void _openImportsFromShare(String url) {
+    if (Get.currentRoute == AppRoutes.downloads) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (Get.currentRoute != AppRoutes.downloads) {
+        Get.toNamed(
+          AppRoutes.downloads,
+          arguments: {'sharedUrl': url},
+        );
+      }
+    });
   }
 
   // ============================
@@ -107,14 +155,14 @@ class DownloadsController extends GetxController {
       await load();
 
       Get.snackbar(
-        'Downloads',
+        'Imports',
         'Eliminado correctamente',
         snackPosition: SnackPosition.BOTTOM,
       );
     } catch (e) {
       debugPrint('Error deleting download: $e');
       Get.snackbar(
-        'Downloads',
+        'Imports',
         'Error al eliminar',
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -190,12 +238,11 @@ class DownloadsController extends GetxController {
   Future<void> downloadFromUrl({
     String? mediaId,
     required String url,
-    required String format,
-    String? quality,
+    required String kind,
   }) async {
     if (url.trim().isEmpty) {
       Get.snackbar(
-        'Download',
+        'Imports',
         'Por favor ingresa una URL válida',
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,
@@ -203,7 +250,7 @@ class DownloadsController extends GetxController {
       return;
     }
 
-    final kind = (format.toLowerCase() == 'mp4') ? 'video' : 'audio';
+    final format = kind == 'video' ? 'mp4' : 'mp3';
 
     try {
       Get.dialog(
@@ -216,7 +263,6 @@ class DownloadsController extends GetxController {
         url: url.trim(),
         kind: kind,
         format: format,
-        quality: quality,
       );
 
       if (Get.isDialogOpen ?? false) Get.back();
@@ -224,15 +270,15 @@ class DownloadsController extends GetxController {
       if (ok) {
         await load();
         Get.snackbar(
-          'Download',
-          'Descarga completada ✅',
+          'Imports',
+          'Importación completada ✅',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.green,
         );
       } else {
         Get.snackbar(
-          'Download',
-          'Falló la descarga. La web puede ser lenta o no compatible.',
+          'Imports',
+          'Falló la importación. La web puede ser lenta o no compatible.',
           snackPosition: SnackPosition.BOTTOM,
           backgroundColor: Colors.orange,
         );
@@ -260,7 +306,7 @@ class DownloadsController extends GetxController {
       }
 
       Get.snackbar(
-        'Download',
+        'Imports',
         msg,
         snackPosition: SnackPosition.BOTTOM,
         backgroundColor: Colors.red,

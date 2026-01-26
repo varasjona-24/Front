@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'playlist_detail_page.dart';
 
 import '../../../app/routes/app_routes.dart';
 import '../../../app/ui/themes/app_spacing.dart';
@@ -11,11 +12,11 @@ import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/models/media_item.dart';
+
 import '../../home/controller/home_controller.dart';
 import '../../player/audio/controller/audio_player_controller.dart';
 import '../controller/playlists_controller.dart';
 import '../domain/playlist.dart';
-import 'playlist_detail_page.dart';
 
 class PlaylistsPage extends GetView<PlaylistsController> {
   const PlaylistsPage({super.key});

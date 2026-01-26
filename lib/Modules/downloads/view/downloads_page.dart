@@ -11,7 +11,6 @@ import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/routes/app_routes.dart';
-import 'widgets/download_settings_panel.dart';
 import 'widgets/downloads_pill.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import 'edit_media_page.dart';
@@ -31,9 +30,31 @@ class DownloadsPage extends GetView<DownloadsController> {
     );
 
     final HomeController home = Get.find<HomeController>();
+    final argUrl = (Get.arguments is Map)
+        ? (Get.arguments as Map)['sharedUrl']?.toString().trim()
+        : null;
 
     return Obx(() {
       final mode = home.mode.value;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if ((controller.sharedUrl.value.isEmpty) &&
+            (argUrl != null && argUrl!.isNotEmpty)) {
+          controller.sharedUrl.value = argUrl!;
+        }
+
+        if (controller.sharedUrl.value.isNotEmpty &&
+            controller.shareDialogOpen.value == false) {
+          controller.shareDialogOpen.value = true;
+          await DownloadsPill.showImportUrlDialog(
+            context,
+            controller,
+            initialUrl: controller.sharedUrl.value,
+            clearSharedOnClose: true,
+          );
+          controller.shareDialogOpen.value = false;
+        }
+      });
 
       return Scaffold(
         backgroundColor: Colors.transparent,
@@ -78,12 +99,8 @@ class DownloadsPage extends GetView<DownloadsController> {
                         _header(theme: theme, context: context),
                         const SizedBox(height: AppSpacing.lg),
 
-                        // 📥 Pill de Descargas (Online + Dispositivo)
+                        // 📥 Pill de Imports (Online + Dispositivo)
                         const DownloadsPill(),
-                        const SizedBox(height: AppSpacing.lg),
-
-                        // ⚙️ Panel de configuración de descargas
-                        const DownloadSettingsPanel(),
                         const SizedBox(height: AppSpacing.lg),
 
                         if (list.isEmpty)
@@ -91,7 +108,7 @@ class DownloadsPage extends GetView<DownloadsController> {
                             child: Padding(
                               padding: const EdgeInsets.all(AppSpacing.lg),
                               child: Text(
-                                'No hay descargas aún.',
+                                'No hay imports aún.',
                                 style: theme.textTheme.bodyMedium?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
@@ -162,14 +179,14 @@ class DownloadsPage extends GetView<DownloadsController> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Descargas',
+          'Imports',
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
           ),
         ),
         const SizedBox(height: 6),
         Text(
-          'Archivos descargados en tu dispositivo',
+          'Archivos importados en tu dispositivo',
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -186,7 +203,7 @@ class DownloadsPage extends GetView<DownloadsController> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Eliminar'),
-        content: const Text('¿Eliminar este archivo descargado?'),
+        content: const Text('¿Eliminar este archivo importado?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),

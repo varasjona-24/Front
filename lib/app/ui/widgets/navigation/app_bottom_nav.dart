@@ -68,7 +68,7 @@ class AppBottomNav extends StatelessWidget {
             BottomNavigationBarItem(
               icon: Icon(Icons.download_outlined),
               activeIcon: Icon(Icons.download),
-              label: 'Downloads',
+              label: 'Imports',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.source_outlined),
