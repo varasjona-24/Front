@@ -13,6 +13,7 @@ import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../downloads/view/edit_media_page.dart';
 import 'section_list_page.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/controllers/navigation_controller.dart';
 
 /// ===============================================================
 /// HOME PAGE (corregida)
@@ -30,8 +31,10 @@ class HomePage extends GetView<HomeController> {
 
   /// Modal de acciones (editar / favoritos / borrar)
   Future<void> _showItemActions(BuildContext context, MediaItem item) async {
+    final nav = Get.find<NavigationController>();
     final theme = Theme.of(context);
 
+    nav.setOverlayOpen(true);
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -84,6 +87,7 @@ class HomePage extends GetView<HomeController> {
         );
       },
     );
+    nav.setOverlayOpen(false);
   }
 
   @override

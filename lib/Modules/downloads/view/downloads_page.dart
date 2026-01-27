@@ -14,6 +14,7 @@ import '../../../app/routes/app_routes.dart';
 import 'widgets/downloads_pill.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import 'edit_media_page.dart';
+import '../../../app/controllers/navigation_controller.dart';
 
 class DownloadsPage extends GetView<DownloadsController> {
   const DownloadsPage({super.key});
@@ -226,8 +227,10 @@ class DownloadsPage extends GetView<DownloadsController> {
   }
 
   Future<void> _showItemActions(BuildContext context, MediaItem item) async {
+    final nav = Get.find<NavigationController>();
     final theme = Theme.of(context);
 
+    nav.setOverlayOpen(true);
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
@@ -280,6 +283,7 @@ class DownloadsPage extends GetView<DownloadsController> {
         );
       },
     );
+    nav.setOverlayOpen(false);
   }
 
   Widget _bottomNav({

@@ -10,6 +10,7 @@ import '../controller/downloads_controller.dart';
 import '../../../app/data/local/local_library_store.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/controllers/navigation_controller.dart';
 
 class EditMediaMetadataPage extends StatefulWidget {
   const EditMediaMetadataPage({super.key, required this.item});
@@ -32,6 +33,11 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<NavigationController>()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.find<NavigationController>().setEditing(true);
+      });
+    }
     _titleCtrl = TextEditingController(text: widget.item.title);
     _artistCtrl = TextEditingController(text: widget.item.subtitle);
     _thumbCtrl = TextEditingController(text: widget.item.thumbnail ?? '');
@@ -47,6 +53,11 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     _artistCtrl.dispose();
     _thumbCtrl.dispose();
     _durationCtrl.dispose();
+    if (Get.isRegistered<NavigationController>()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.find<NavigationController>().setEditing(false);
+      });
+    }
     super.dispose();
   }
 

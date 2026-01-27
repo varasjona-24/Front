@@ -107,6 +107,118 @@ class AudioSection extends GetView<SettingsController> {
                 Divider(color: theme.dividerColor.withOpacity(.12)),
                 const SizedBox(height: 8),
 
+                // Equalizer
+                Obx(() {
+                  if (!controller.eqAvailable.value) {
+                    return InfoTile(
+                      icon: Icons.graphic_eq_rounded,
+                      title: 'Ecualizador',
+                      subtitle: 'Disponible solo en Android.',
+                    );
+                  }
+
+                  if (controller.eqFrequencies.isEmpty ||
+                      controller.eqGains.isEmpty) {
+                    return InfoTile(
+                      icon: Icons.graphic_eq_rounded,
+                      title: 'Ecualizador',
+                      subtitle: 'Cargando parámetros…',
+                      trailing: const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  }
+
+                  final presets = const <String, String>{
+                    'normal': 'Normal',
+                    'bass': 'Bass',
+                    'vocal': 'Vocal',
+                    'rock': 'Rock',
+                    'treble': 'Agudos',
+                    'custom': 'Personalizado',
+                  };
+
+                  return Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          'Ecualizador',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Ajusta las frecuencias de audio.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        value: controller.eqEnabled.value,
+                        onChanged: controller.setEqEnabled,
+                      ),
+                      const SizedBox(height: 8),
+
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: presets.entries.map((entry) {
+                          final isSelected =
+                              controller.eqPreset.value == entry.key;
+                          return ChoiceChip(
+                            label: Text(entry.value),
+                            selected: isSelected,
+                            onSelected: (_) =>
+                                controller.setEqPreset(entry.key),
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      ...List.generate(controller.eqGains.length, (i) {
+                        final freq = controller.eqFrequencies[i];
+                        final value = controller.eqGains[i];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$freq Hz',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 3,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 9,
+                                ),
+                              ),
+                              child: Slider(
+                                value: value,
+                                min: controller.eqMinDb.value,
+                                max: controller.eqMaxDb.value,
+                                divisions: 20,
+                                label: '${value.toStringAsFixed(1)} dB',
+                                onChanged: controller.eqEnabled.value
+                                    ? (v) => controller.setEqGain(i, v)
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                        );
+                      }),
+                    ],
+                  );
+                }),
+
+                const SizedBox(height: 8),
+                Divider(color: theme.dividerColor.withOpacity(.12)),
+                const SizedBox(height: 8),
+
                 // Output / Bluetooth
                 ListTile(
                   contentPadding: EdgeInsets.zero,

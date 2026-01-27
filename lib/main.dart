@@ -55,6 +55,13 @@ Future<void> main() async {
   // 📥 Imports/Downloads global (share intent listener)
   Get.put(DownloadsController(), permanent: true);
 
+  // 🎚️ Reaplicar ecualizador cuando AudioService ya existe (no bloquear arranque)
+  if (Get.isRegistered<SettingsController>()) {
+    Future.microtask(() {
+      Get.find<SettingsController>().refreshEqualizer();
+    });
+  }
+
   runApp(const MyApp());
 }
 

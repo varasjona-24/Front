@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 
 import '../controller/artists_controller.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/controllers/navigation_controller.dart';
 
 class EditArtistPage extends StatefulWidget {
   const EditArtistPage({super.key, required this.artist});
@@ -26,6 +27,11 @@ class _EditArtistPageState extends State<EditArtistPage> {
   @override
   void initState() {
     super.initState();
+    if (Get.isRegistered<NavigationController>()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.find<NavigationController>().setEditing(true);
+      });
+    }
     _nameCtrl = TextEditingController(text: widget.artist.name);
     _thumbCtrl = TextEditingController(text: widget.artist.thumbnail ?? '');
     _localThumbPath = widget.artist.thumbnailLocalPath;
@@ -35,6 +41,11 @@ class _EditArtistPageState extends State<EditArtistPage> {
   void dispose() {
     _nameCtrl.dispose();
     _thumbCtrl.dispose();
+    if (Get.isRegistered<NavigationController>()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.find<NavigationController>().setEditing(false);
+      });
+    }
     super.dispose();
   }
 

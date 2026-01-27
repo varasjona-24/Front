@@ -13,14 +13,28 @@ import '../../Modules/settings/controller/settings_controller.dart';
 enum PlaybackState { stopped, loading, playing, paused }
 
 class AudioService extends GetxService {
-  final AudioPlayer _player = AudioPlayer();
   final GetStorage _storage = GetStorage();
-
+  final AndroidEqualizer? _equalizer;
+  late final AudioPlayer _player;
   static const _lastItemKey = 'audio_last_item';
   static const _lastVariantKey = 'audio_last_variant';
   bool _keepLastItem = false;
 
   bool get keepLastItem => _keepLastItem;
+
+  bool get eqSupported => _equalizer != null;
+
+  AudioService() : _equalizer = Platform.isAndroid ? AndroidEqualizer() : null {
+    if (Platform.isAndroid) {
+      _player = AudioPlayer(
+        audioPipeline: AudioPipeline(
+          androidAudioEffects: [_equalizer!],
+        ),
+      );
+    } else {
+      _player = AudioPlayer();
+    }
+  }
 
   final Rx<PlaybackState> state = PlaybackState.stopped.obs;
   final RxBool isPlaying = false.obs;
@@ -115,6 +129,23 @@ class AudioService extends GetxService {
     await _player.setVolume(clamped);
   }
 
+  Future<AndroidEqualizerParameters?> getEqParameters() async {
+    if (_equalizer == null) return null;
+    return _equalizer!.parameters;
+  }
+
+  Future<void> setEqEnabled(bool enabled) async {
+    if (_equalizer == null) return;
+    await _equalizer!.setEnabled(enabled);
+  }
+
+  Future<void> setEqBandGain(int index, double gain) async {
+    if (_equalizer == null) return;
+    final params = await _equalizer!.parameters;
+    if (index < 0 || index >= params.bands.length) return;
+    await params.bands[index].setGain(gain);
+  }
+
   Future<void> seek(Duration position) async {
     if (!hasSourceLoaded) return;
     await _player.seek(position);
@@ -190,6 +221,7 @@ class AudioService extends GetxService {
         _keepLastItem = true;
 
         await _player.setVolume(volume.value);
+        await _applyEqFromSettings();
         await _player.play();
         return;
       } on PlayerException catch (pe) {
@@ -258,6 +290,7 @@ class AudioService extends GetxService {
       _keepLastItem = true;
 
       await _player.setVolume(volume.value);
+      await _applyEqFromSettings();
       await _player.play();
     } on PlayerException catch (pe) {
       await _player.stop();
@@ -283,6 +316,24 @@ class AudioService extends GetxService {
       rethrow;
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> _applyEqFromSettings() async {
+    if (_equalizer == null) return;
+    if (!Get.isRegistered<SettingsController>()) return;
+    final settings = Get.find<SettingsController>();
+    try {
+      await setEqEnabled(settings.eqEnabled.value);
+      if (settings.eqGains.isEmpty) return;
+      final params = await _equalizer!.parameters;
+      final bands = params.bands.length;
+      final gains = settings.eqGains;
+      for (var i = 0; i < bands && i < gains.length; i++) {
+        await params.bands[i].setGain(gains[i]);
+      }
+    } catch (_) {
+      // ignore eq apply errors
     }
   }
 

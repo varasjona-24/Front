@@ -22,7 +22,11 @@ class MiniPlayerBar extends StatelessWidget {
 
     return Obx(() {
       final route = nav.currentRoute.value;
-      if (route == AppRoutes.entry ||
+      if (nav.isEditing.value ||
+          nav.isOverlayOpen.value ||
+          (Get.isBottomSheetOpen ?? false) ||
+          (Get.isDialogOpen ?? false) ||
+          route == AppRoutes.entry ||
           route == AppRoutes.audioPlayer ||
           route == AppRoutes.videoPlayer) {
         return const SizedBox.shrink();
