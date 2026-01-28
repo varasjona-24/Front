@@ -12,8 +12,8 @@ class PlaybackControls extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Obx(() {
-      final loading = c.audioService.isLoading.value;
       final playing = c.audioService.isPlaying.value;
+      final isLoading = c.audioService.isLoading.value;
 
       return Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -24,13 +24,13 @@ class PlaybackControls extends StatelessWidget {
               Icons.shuffle,
               color: c.isShuffling.value ? theme.colorScheme.primary : null,
             ),
-            onPressed: loading ? null : c.toggleShuffle,
+            onPressed: isLoading ? null : c.toggleShuffle,
             tooltip: 'Shuffle',
           ),
 
           IconButton(
             icon: const Icon(Icons.skip_previous),
-            onPressed: loading ? null : c.previous,
+            onPressed: isLoading ? null : c.previous,
           ),
 
           const SizedBox(width: 12),
@@ -38,7 +38,7 @@ class PlaybackControls extends StatelessWidget {
           SizedBox(
             width: 64,
             height: 64,
-            child: loading
+            child: isLoading
                 ? Center(
                     child: SizedBox(
                       width: 26,
@@ -73,7 +73,7 @@ class PlaybackControls extends StatelessWidget {
 
           IconButton(
             icon: const Icon(Icons.skip_next),
-            onPressed: loading ? null : c.next,
+            onPressed: isLoading ? null : c.next,
           ),
 
           // Speed
@@ -84,7 +84,7 @@ class PlaybackControls extends StatelessWidget {
                 style: theme.textTheme.bodySmall,
               ),
             ),
-            onPressed: loading ? null : c.cyclePlaybackSpeed,
+            onPressed: isLoading ? null : c.cyclePlaybackSpeed,
             tooltip: 'Speed',
           ),
         ],

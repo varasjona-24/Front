@@ -103,6 +103,9 @@ class AudioService extends GetxService {
   Stream<Duration?> get durationStream => _player.durationStream;
   Stream<ProcessingState> get processingStateStream =>
       _player.processingStateStream;
+  Stream<int?> get androidAudioSessionIdStream =>
+      _player.androidAudioSessionIdStream;
+  int? get androidAudioSessionId => _player.androidAudioSessionId;
 
   final Rx<LoopMode> loopMode = LoopMode.off.obs;
   final RxDouble speed = 1.0.obs;
@@ -162,7 +165,7 @@ class AudioService extends GetxService {
     await _player.play();
   }
 
-  Future<void> play(MediaItem item, MediaVariant variant) async {
+  Future<void> play(MediaItem item, MediaVariant variant, {bool autoPlay = true}) async {
     if (!variant.isValid) {
       throw Exception('No existe archivo para reproducir (variant inválido).');
     }
@@ -222,7 +225,13 @@ class AudioService extends GetxService {
 
         await _player.setVolume(volume.value);
         await _applyEqFromSettings();
-        await _player.play();
+        if (autoPlay) {
+          await _player.play();
+        } else {
+          isLoading.value = false;
+          isPlaying.value = false;
+          state.value = PlaybackState.paused;
+        }
         return;
       } on PlayerException catch (pe) {
         await _player.stop();

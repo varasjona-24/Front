@@ -23,4 +23,14 @@ plugins {
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
 }
 
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        maven { url = uri("$rootDir/local-maven") }
+        google()
+        mavenCentral()
+        maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
+    }
+}
+
 include(":app")

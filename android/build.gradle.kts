@@ -3,12 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
+// Repos are defined in settings.gradle.kts (dependencyResolutionManagement)
 
 val newBuildDir: Directory =
     rootProject.layout.buildDirectory

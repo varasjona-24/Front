@@ -62,20 +62,16 @@ class _TurntableNeedleState extends State<TurntableNeedle>
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: -20,
-      right: 40,
-      child: AnimatedBuilder(
-        animation: _rotation,
-        builder: (_, child) {
-          return Transform.rotate(
-            angle: _rotation.value,
-            alignment: Alignment.topCenter,
-            child: child,
-          );
-        },
-        child: _NeedleBody(),
-      ),
+    return AnimatedBuilder(
+      animation: _rotation,
+      builder: (_, child) {
+        return Transform.rotate(
+          angle: _rotation.value,
+          alignment: Alignment.topCenter,
+          child: child,
+        );
+      },
+      child: const _NeedleBody(),
     );
   }
 }

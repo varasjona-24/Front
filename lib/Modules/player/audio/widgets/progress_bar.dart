@@ -27,6 +27,7 @@ class _ProgressBarState extends State<ProgressBar> {
     return Obx(() {
       final pos = controller.position.value;
       final dur = controller.duration.value;
+      final canSeek = !controller.audioService.isLoading.value;
 
       final maxSeconds = dur.inSeconds <= 0 ? 1.0 : dur.inSeconds.toDouble();
 
@@ -75,26 +76,32 @@ class _ProgressBarState extends State<ProgressBar> {
                       max: maxSeconds,
 
                       // ✅ al empezar a arrastrar, congelamos UI al dedo
-                      onChangeStart: (v) {
-                        setState(() {
-                          _isDragging = true;
-                          _dragValueSeconds = v;
-                        });
-                      },
+                      onChangeStart: canSeek
+                          ? (v) {
+                              setState(() {
+                                _isDragging = true;
+                                _dragValueSeconds = v;
+                              });
+                            }
+                          : null,
 
                       // ✅ mientras arrastras, se mueve la bolita (y puedes hacer scrub live)
-                      onChanged: (v) {
-                        setState(() => _dragValueSeconds = v);
+                      onChanged: canSeek
+                          ? (v) {
+                              setState(() => _dragValueSeconds = v);
 
-                        // Si quieres scrub EN VIVO (seeking continuo), descomenta:
-                        // controller.seek(Duration(seconds: v.toInt()));
-                      },
+                              // Si quieres scrub EN VIVO (seeking continuo), descomenta:
+                              // controller.seek(Duration(seconds: v.toInt()));
+                            }
+                          : null,
 
                       // ✅ cuando sueltas, ahí sí hacemos seek definitivo
-                      onChangeEnd: (v) {
-                        setState(() => _isDragging = false);
-                        controller.seek(Duration(seconds: v.toInt()));
-                      },
+                      onChangeEnd: canSeek
+                          ? (v) {
+                              setState(() => _isDragging = false);
+                              controller.seek(Duration(seconds: v.toInt()));
+                            }
+                          : null,
                     ),
                   ),
                 ),

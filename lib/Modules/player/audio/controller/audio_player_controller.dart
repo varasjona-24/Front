@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
+import '../../../../app/services/spatial_audio_service.dart';
 import '../../../../app/data/local/local_library_store.dart';
 import '../../../settings/controller/settings_controller.dart';
 
@@ -14,6 +17,7 @@ enum RepeatMode { off, once, loop }
 
 class AudioPlayerController extends GetxController {
   final AudioService audioService;
+  final SpatialAudioService _spatial = Get.find<SpatialAudioService>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
   final SettingsController _settings = Get.find<SettingsController>();
   final GetStorage _storage = GetStorage();
@@ -58,6 +62,7 @@ class AudioPlayerController extends GetxController {
     }
     _loadShuffleState();
     _loadCoverStyle();
+    _cleanup8dVariants();
 
     _posSub = audioService.positionStream.listen((p) {
       position.value = p;
@@ -114,6 +119,45 @@ class AudioPlayerController extends GetxController {
     _ensurePlayingCurrent();
   }
 
+  Future<void> _cleanup8dVariants() async {
+    try {
+      final items = await _store.readAll();
+      for (final item in items) {
+        final variants = item.variants;
+        if (variants.isEmpty) continue;
+        final toRemove = variants.where(_is8dVariant).toList();
+        if (toRemove.isEmpty) continue;
+
+        for (final v in toRemove) {
+          final path = v.localPath?.trim();
+          if (path != null && path.isNotEmpty) {
+            final f = File(path);
+            if (await f.exists()) {
+              await f.delete();
+            }
+          }
+        }
+
+        final kept = variants.where((v) => !_is8dVariant(v)).toList();
+        final updated = item.copyWith(variants: kept);
+        await _store.upsert(updated);
+
+        final idx = queue.indexWhere((e) => e.id == item.id);
+        if (idx >= 0) {
+          queue[idx] = updated;
+        }
+      }
+    } catch (_) {}
+  }
+
+  bool _is8dVariant(MediaVariant v) {
+    final name = v.fileName?.toLowerCase() ?? '';
+    final path = v.localPath?.toLowerCase() ?? '';
+    return name.contains('_8d') ||
+        path.contains('/converted/') ||
+        path.contains('_8d.');
+  }
+
   bool _readArgs() {
     final args = Get.arguments;
 
@@ -156,6 +200,20 @@ class AudioPlayerController extends GetxController {
   // ===========================================================================
   // STATE / GETTERS
   // ===========================================================================
+  Rx<SpatialAudioMode> get spatialMode => _spatial.mode;
+
+  Future<void> setSpatialMode(SpatialAudioMode mode) async {
+    final ok = await _spatial.setMode(mode);
+    if (!ok) {
+      const msg = 'El efecto envolvente no está disponible en este dispositivo.';
+      Get.snackbar(
+        'Audio',
+        msg,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      await _spatial.setMode(SpatialAudioMode.off);
+    }
+  }
 
   void toggleCoverStyle() {
     coverStyle.value = coverStyle.value == CoverStyle.square
@@ -248,26 +306,53 @@ class AudioPlayerController extends GetxController {
     _storage.write(_resumePosKey, next);
   }
 
-  Future<void> _resumeIfAny(MediaItem item) async {
+  Duration? _getResumePosition(MediaItem item) {
     final key = item.publicId.isNotEmpty ? item.publicId : item.id;
     final map = _storage.read<Map>(_resumePosKey);
-    if (map == null) return;
+    if (map == null) return null;
     final raw = map[key];
-    if (raw is! int) return;
-    if (raw < 1500) return;
+    if (raw is! int) return null;
+    if (raw < 1500) return null;
+    return Duration(milliseconds: raw);
+  }
 
-    try {
-      final d = await audioService.durationStream
-          .firstWhere((d) => d != null && d > Duration.zero)
-          .timeout(const Duration(seconds: 2));
-      final dur = d ?? Duration.zero;
-      final resume = Duration(milliseconds: raw);
-      if (resume < dur - const Duration(seconds: 2)) {
-        await audioService.seek(resume);
-      }
-    } catch (_) {
-      // ignore resume failures
+  Future<bool> _shouldResume(MediaItem item, Duration resume) async {
+    final ctx = Get.context;
+    if (ctx == null) return true;
+    final mins = resume.inMinutes;
+    final secs = (resume.inSeconds % 60).toString().padLeft(2, '0');
+    final timeLabel = '$mins:$secs';
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Reanudar reproducción'),
+        content: Text(
+          '¿Quieres continuar "${item.title}" desde $timeLabel o iniciar desde el comienzo?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Desde inicio'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Continuar'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+    return result ?? true;
+  }
+
+  void _clearResumeForKey(String key) {
+    final map = _storage.read<Map>(_resumePosKey);
+    if (map == null) return;
+    final next = <String, dynamic>{};
+    for (final entry in map.entries) {
+      if (entry.key.toString() == key) continue;
+      next[entry.key.toString()] = entry.value;
     }
+    _storage.write(_resumePosKey, next);
   }
 
   bool get hasQueue => queue.isNotEmpty;
@@ -371,8 +456,30 @@ class AudioPlayerController extends GetxController {
 
     try {
       print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
-      await audioService.play(item, variant);
-      await _resumeIfAny(item);
+      final resume = _getResumePosition(item);
+      final needsPrompt = resume != null;
+      await audioService.play(
+        item,
+        variant,
+        autoPlay: !needsPrompt,
+      );
+      if (resume != null) {
+        final shouldResume = await _shouldResume(item, resume);
+        if (!shouldResume) {
+          final key = item.publicId.isNotEmpty ? item.publicId : item.id;
+          _clearResumeForKey(key);
+          await audioService.seek(Duration.zero);
+        } else {
+          final d = await audioService.durationStream
+              .firstWhere((d) => d != null && d > Duration.zero)
+              .timeout(const Duration(seconds: 2));
+          final dur = d ?? Duration.zero;
+          if (resume < dur - const Duration(seconds: 2)) {
+            await audioService.seek(resume);
+          }
+        }
+        await audioService.resume();
+      }
       await _trackPlay(item);
     } catch (e) {
       print('❌ Error in _playItem: $e');

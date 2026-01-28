@@ -72,6 +72,7 @@ flutter:
   assets:
     - assets/ui/vinyl.png
     - assets/logo/listenfy_logo.svg
+    - assets/hrtf/default.sofa
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

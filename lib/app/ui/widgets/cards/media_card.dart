@@ -55,6 +55,7 @@ class _MediaCardState extends State<MediaCard> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final audioFormat = _audioFormat();
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -70,11 +71,12 @@ class _MediaCardState extends State<MediaCard> {
         child: SizedBox(
           width: widget.width,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 🎨 THUMBNAIL / COVER
               SizedBox(
-                height: 122,
+                height: 110,
                 child: Container(
                   decoration: BoxDecoration(
                     color: colors.surfaceContainerHigh,
@@ -134,7 +136,7 @@ class _MediaCardState extends State<MediaCard> {
                 ),
               ),
 
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpacing.xs),
 
               // 🏷 TITLE
               Text(
@@ -157,11 +159,44 @@ class _MediaCardState extends State<MediaCard> {
                   color: colors.onSurfaceVariant,
                 ),
               ),
+
+              if (audioFormat != null) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: colors.primary.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    audioFormat.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.primary,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
       ),
     );
+  }
+
+  String? _audioFormat() {
+    if (!widget.item.hasAudioLocal &&
+        widget.item.localAudioVariant == null) {
+      return null;
+    }
+    final local = widget.item.localAudioVariant?.format.trim();
+    if (local != null && local.isNotEmpty) return local;
+    final any = widget.item.variants
+        .firstWhere((v) => v.kind == MediaVariantKind.audio)
+        .format
+        .trim();
+    return any.isNotEmpty ? any : null;
   }
 
   Widget _buildThumbnail(BuildContext context) {

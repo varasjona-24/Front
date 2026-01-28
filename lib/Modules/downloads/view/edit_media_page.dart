@@ -148,6 +148,16 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     );
   }
 
+  String? _audioFormat() {
+    final local = widget.item.localAudioVariant?.format.trim();
+    if (local != null && local.isNotEmpty) return local;
+    final any = widget.item.variants
+        .where((v) => v.kind == MediaVariantKind.audio)
+        .map((v) => v.format.trim())
+        .firstWhere((f) => f.isNotEmpty, orElse: () => '');
+    return any.isNotEmpty ? any : null;
+  }
+
   Future<void> _pickLocalThumbnail() async {
     final res = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -243,6 +253,15 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
+                          if (_audioFormat() != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Formato: ${_audioFormat()!.toUpperCase()}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),

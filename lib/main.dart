@@ -14,6 +14,7 @@ import 'app/data/network/dio_client.dart';
 import 'app/data/repo/media_repository.dart';
 import 'app/data/local/local_library_store.dart';
 import 'app/services/audio_service.dart';
+import 'app/services/spatial_audio_service.dart';
 import 'app/services/video_service.dart';
 import 'Modules/settings/controller/settings_controller.dart';
 import 'Modules/downloads/controller/downloads_controller.dart';
@@ -39,6 +40,12 @@ Future<void> main() async {
 
   // 🎬 Video global (CLAVE)
   Get.put<VideoService>(VideoService(), permanent: true);
+
+  // 🎧 Spatial audio (8D)
+  Get.put<SpatialAudioService>(
+    SpatialAudioService(audioService: Get.find<AudioService>()),
+    permanent: true,
+  );
 
   // 🌐 Cliente HTTP
   Get.lazyPut<DioClient>(() => DioClient(), fenix: true);

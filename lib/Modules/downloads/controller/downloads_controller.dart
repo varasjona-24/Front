@@ -463,4 +463,5 @@ class DownloadsController extends GetxController {
     final bytes = utf8.encode(input);
     return sha1.convert(bytes).toString();
   }
+
 }
