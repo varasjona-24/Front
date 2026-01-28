@@ -575,7 +575,7 @@ class _MostPlayedRow extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.headphones, size: 14),
+                      const Icon(Icons.remove_red_eye, size: 14),
                       const SizedBox(width: 4),
                       Text('${item.playCount}'),
                     ],

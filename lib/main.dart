@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:just_audio_background/just_audio_background.dart';
 
 import 'app/controllers/theme_controller.dart';
 import 'app/controllers/navigation_controller.dart';
@@ -21,6 +22,12 @@ import 'Modules/downloads/controller/downloads_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await JustAudioBackground.init(
+    androidNotificationChannelId: 'com.example.flutter_listenfy.audio',
+    androidNotificationChannelName: 'Reproducción',
+    androidNotificationChannelDescription: 'Controles de reproducción',
+    androidNotificationOngoing: true,
+  );
   await GetStorage.init();
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

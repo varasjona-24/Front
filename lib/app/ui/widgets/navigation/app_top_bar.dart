@@ -8,6 +8,7 @@ enum AppMediaMode { audio, video }
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   final Widget title;
   final VoidCallback onSearch;
+  final Widget? leading;
   final VoidCallback? onToggleMode; // ✅ optional
   final AppMediaMode mode;
 
@@ -15,6 +16,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
     super.key,
     required this.title,
     required this.onSearch,
+    this.leading,
     this.onToggleMode, // ✅ no required
     this.mode = AppMediaMode.audio, // ✅ default
   });
@@ -34,6 +36,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       elevation: 0,
       scrolledUnderElevation: 0,
       automaticallyImplyLeading: false,
+      leading: leading,
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(0),
         child: const SizedBox.shrink(),

@@ -90,71 +90,30 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
                 // ───────────────── Audio mode + Repeat ─────────────────
                 Column(
                   children: [
-                    Obx(() {
-                      final mode = controller.spatialMode.value;
-                      final enabled = mode == SpatialAudioMode.virtualizer;
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: enabled
-                                  ? theme.colorScheme.primary.withOpacity(0.16)
-                                  : theme.colorScheme.surfaceVariant
-                                      .withOpacity(0.55),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: enabled
-                                    ? theme.colorScheme.primary.withOpacity(0.5)
-                                    : theme.colorScheme.onSurface
-                                        .withOpacity(0.12),
-                              ),
-                            ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(20),
-                              onTap: () => controller.setSpatialMode(
-                                enabled
-                                    ? SpatialAudioMode.off
-                                    : SpatialAudioMode.virtualizer,
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.surround_sound,
-                                      size: 18,
-                                      color: enabled
-                                          ? theme.colorScheme.primary
-                                          : theme.colorScheme.onSurface
-                                              .withOpacity(0.7),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      'Envolvente',
-                                      style:
-                                          theme.textTheme.labelMedium?.copyWith(
-                                        color: enabled
-                                            ? theme.colorScheme.primary
-                                            : theme.colorScheme.onSurface
-                                                .withOpacity(0.7),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      );
-                    }),
-                    const SizedBox(height: 10),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        Obx(() {
+                          final enabled = controller.spatialMode.value ==
+                              SpatialAudioMode.virtualizer;
+                          return IconButton(
+                            tooltip: 'Envolvente',
+                            icon: Icon(
+                              Icons.surround_sound,
+                              color: enabled
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurface.withOpacity(
+                                      0.55,
+                                    ),
+                            ),
+                            onPressed: () => controller.setSpatialMode(
+                              enabled
+                                  ? SpatialAudioMode.off
+                                  : SpatialAudioMode.virtualizer,
+                            ),
+                          );
+                        }),
+                        const SizedBox(width: 18),
                         Obx(() {
                           final active =
                               controller.repeatMode.value == RepeatMode.once;
@@ -171,7 +130,6 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
                             onPressed: controller.toggleRepeatOnce,
                           );
                         }),
-                        const SizedBox(width: 18),
                         Obx(() {
                           final active =
                               controller.repeatMode.value == RepeatMode.loop;

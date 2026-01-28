@@ -25,6 +25,9 @@ class ChoiceChipRow extends StatelessWidget {
     return Wrap(
       spacing: 10,
       runSpacing: 10,
+      alignment: WrapAlignment.start,
+      runAlignment: WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.start,
       children: options.map((o) {
         final selected = selectedValue == o.value;
 

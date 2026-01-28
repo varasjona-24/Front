@@ -3,6 +3,11 @@
 <plist version="1.0">
 <dict>
 
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>audio</string>
+  </array>
+
   <!-- App Transport Security (PERMITIR HTTP LOCAL) -->
   <key>NSAppTransportSecurity</key>
   <dict>

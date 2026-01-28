@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -35,7 +36,9 @@ class AudioPlayerController extends GetxController {
   final Rx<Duration> duration = Duration.zero.obs;
 
   final RxBool isShuffling = false.obs;
-  final List<int> _shuffleHistory = [];
+  final List<MediaItem> _originalQueueOrder = [];
+  bool _shuffleApplied = false;
+  final Random _rng = Random.secure();
 
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<Duration?>? _durSub;
@@ -48,7 +51,7 @@ class AudioPlayerController extends GetxController {
   static const _queueIndexKey = 'audio_queue_index';
   static const _resumePosKey = 'audio_resume_positions';
   static const _shuffleKey = 'audio_shuffle_on';
-  static const _shuffleHistoryKey = 'audio_shuffle_history';
+  static const _repeatModeKey = 'audio_repeat_mode';
 
   AudioPlayerController({required this.audioService});
 
@@ -62,7 +65,11 @@ class AudioPlayerController extends GetxController {
     }
     _loadShuffleState();
     _loadCoverStyle();
+    _loadRepeatMode();
     _cleanup8dVariants();
+    if (isShuffling.value) {
+      _applyShuffleOrder();
+    }
 
     _posSub = audioService.positionStream.listen((p) {
       position.value = p;
@@ -258,23 +265,10 @@ class AudioPlayerController extends GetxController {
     if (on is bool) {
       isShuffling.value = on;
     }
-
-    final rawHistory = _storage.read<List>(_shuffleHistoryKey);
-    if (rawHistory != null) {
-      _shuffleHistory
-        ..clear()
-        ..addAll(
-          rawHistory
-              .whereType<num>()
-              .map((e) => e.toInt())
-              .where((i) => i >= 0 && i < queue.length),
-        );
-    }
   }
 
   void _persistShuffleState() {
     _storage.write(_shuffleKey, isShuffling.value);
-    _storage.write(_shuffleHistoryKey, List<int>.from(_shuffleHistory));
   }
 
   void _persistQueue() {
@@ -522,6 +516,7 @@ class AudioPlayerController extends GetxController {
         ? RepeatMode.off
         : RepeatMode.once;
     repeatMode.value = next;
+    _storage.write(_repeatModeKey, next.name);
 
     await audioService.setLoopOff();
   }
@@ -531,11 +526,23 @@ class AudioPlayerController extends GetxController {
         ? RepeatMode.off
         : RepeatMode.loop;
     repeatMode.value = next;
+    _storage.write(_repeatModeKey, next.name);
 
     if (next == RepeatMode.loop) {
       await audioService.setLoopOne();
     } else {
       await audioService.setLoopOff();
+    }
+  }
+
+  void _loadRepeatMode() {
+    final raw = _storage.read(_repeatModeKey) as String?;
+    if (raw == RepeatMode.once.name) {
+      repeatMode.value = RepeatMode.once;
+    } else if (raw == RepeatMode.loop.name) {
+      repeatMode.value = RepeatMode.loop;
+    } else {
+      repeatMode.value = RepeatMode.off;
     }
   }
 
@@ -565,17 +572,6 @@ class AudioPlayerController extends GetxController {
       }
     }
 
-    // Ajusta historial shuffle
-    for (var i = 0; i < _shuffleHistory.length; i++) {
-      final idx = _shuffleHistory[i];
-      if (idx == oldIndex) {
-        _shuffleHistory[i] = newIndex;
-      } else if (oldIndex < newIndex) {
-        if (idx > oldIndex && idx <= newIndex) _shuffleHistory[i] = idx - 1;
-      } else {
-        if (idx >= newIndex && idx < oldIndex) _shuffleHistory[i] = idx + 1;
-      }
-    }
     if (isShuffling.value) {
       _persistShuffleState();
     }
@@ -583,21 +579,6 @@ class AudioPlayerController extends GetxController {
 
   Future<void> next() async {
     if (!hasQueue) return;
-
-    if (isShuffling.value && queue.length > 1) {
-      _shuffleHistory.add(currentIndex.value);
-      _persistShuffleState();
-
-      int nextIdx;
-      final max = queue.length;
-      do {
-        nextIdx = DateTime.now().millisecondsSinceEpoch % max;
-      } while (nextIdx == currentIndex.value && max > 1);
-
-      currentIndex.value = nextIdx;
-      await _playCurrent();
-      return;
-    }
 
     if (currentIndex.value < queue.length - 1) {
       currentIndex.value++;
@@ -607,14 +588,6 @@ class AudioPlayerController extends GetxController {
 
   Future<void> previous() async {
     if (!hasQueue) return;
-
-    if (isShuffling.value && _shuffleHistory.isNotEmpty) {
-      final idx = _shuffleHistory.removeLast();
-      currentIndex.value = idx;
-      _persistShuffleState();
-      await _playCurrent();
-      return;
-    }
 
     if (currentIndex.value > 0) {
       currentIndex.value--;
@@ -627,10 +600,9 @@ class AudioPlayerController extends GetxController {
     isShuffling.value = next;
 
     if (next) {
-      _shuffleHistory.clear();
-      _shuffleHistory.add(currentIndex.value);
+      _applyShuffleOrder();
     } else {
-      _shuffleHistory.clear();
+      _restoreOriginalOrder();
     }
     _persistShuffleState();
   }
@@ -638,14 +610,64 @@ class AudioPlayerController extends GetxController {
   Future<void> playAt(int index) async {
     if (index < 0 || index >= queue.length) return;
 
-    if (isShuffling.value) {
-      _shuffleHistory.add(currentIndex.value);
-      if (_shuffleHistory.length > 200) _shuffleHistory.removeAt(0);
-      _persistShuffleState();
-    }
-
     currentIndex.value = index;
     await _playCurrent();
+  }
+
+  void _applyShuffleOrder() {
+    if (queue.length <= 1) return;
+    if (!_shuffleApplied) {
+      _originalQueueOrder
+        ..clear()
+        ..addAll(queue);
+    }
+
+    final current = currentItemOrNull;
+    final rest = queue
+        .where((e) => current == null || e.id != current.id)
+        .toList();
+
+    if (rest.length > 1) {
+      final originalRestOrder = List<MediaItem>.from(rest);
+      var attempts = 0;
+      do {
+        rest.shuffle(_rng);
+        attempts++;
+      } while (attempts < 5 && _sameOrder(rest, originalRestOrder));
+    }
+
+    if (current != null) {
+      queue.assignAll([current, ...rest]);
+      currentIndex.value = 0;
+    } else {
+      queue.assignAll(rest);
+      currentIndex.value = 0;
+    }
+
+    _shuffleApplied = true;
+    _persistQueue();
+  }
+
+  bool _sameOrder(List<MediaItem> a, List<MediaItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
+  }
+
+  void _restoreOriginalOrder() {
+    if (!_shuffleApplied || _originalQueueOrder.isEmpty) return;
+    final current = currentItemOrNull;
+    queue.assignAll(_originalQueueOrder);
+    if (current != null) {
+      final idx = queue.indexWhere((e) => e.id == current.id);
+      currentIndex.value = idx >= 0 ? idx : 0;
+    } else {
+      currentIndex.value = 0;
+    }
+    _shuffleApplied = false;
+    _persistQueue();
   }
 
   Future<void> _playCurrent() async {

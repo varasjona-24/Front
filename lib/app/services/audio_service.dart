@@ -5,10 +5,12 @@ import 'package:audio_session/audio_session.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_background/just_audio_background.dart' as jab;
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
 import '../../Modules/settings/controller/settings_controller.dart';
+import '../../Modules/sources/domain/source_origin.dart';
 
 enum PlaybackState { stopped, loading, playing, paused }
 
@@ -212,7 +214,10 @@ class AudioService extends GetxService {
         print('🎵 Playing local file: $fileUri');
 
         await _player.setAudioSource(
-          AudioSource.uri(fileUri, tag: item.title),
+          AudioSource.uri(
+            fileUri,
+            tag: _buildBackgroundItem(item),
+          ),
           initialPosition: Duration.zero,
         );
 
@@ -287,7 +292,10 @@ class AudioService extends GetxService {
 
     try {
       await _player.setAudioSource(
-        AudioSource.uri(Uri.parse(url), tag: item.title),
+        AudioSource.uri(
+          Uri.parse(url),
+          tag: _buildBackgroundItem(item),
+        ),
         initialPosition: Duration.zero,
       );
 
@@ -326,6 +334,30 @@ class AudioService extends GetxService {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  jab.MediaItem _buildBackgroundItem(MediaItem item) {
+    Uri? artUri;
+    final local = item.thumbnailLocalPath?.trim();
+    if (local != null && local.isNotEmpty) {
+      artUri = Uri.file(local);
+    } else {
+      final remote = item.thumbnail?.trim();
+      if (remote != null && remote.isNotEmpty) {
+        artUri = Uri.tryParse(remote);
+      }
+    }
+
+    final dur = item.effectiveDurationSeconds;
+
+    return jab.MediaItem(
+      id: item.id,
+      title: item.title,
+      artist: item.subtitle.isNotEmpty ? item.subtitle : null,
+      album: item.origin.key,
+      duration: dur == null ? null : Duration(seconds: dur),
+      artUri: artUri,
+    );
   }
 
   Future<void> _applyEqFromSettings() async {

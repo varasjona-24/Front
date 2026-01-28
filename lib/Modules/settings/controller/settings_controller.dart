@@ -354,19 +354,52 @@ class SettingsController extends GetxController {
     return results.values.every((r) => r.isGranted);
   }
 
-  /// 🗑️ Limpiar caché (descargas/medios locales)
+  /// 🗑️ Limpiar caché (mantiene thumbnails)
   Future<void> clearCache() async {
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      final downloadsDir = Directory(p.join(appDir.path, 'downloads'));
-      final mediaDir = Directory(p.join(appDir.path, 'media'));
+      // No borrar archivos de audio/video descargados ni thumbnails.
+      // Sólo limpiamos temporales y estado de configuración (cache lógica).
 
-      if (await downloadsDir.exists()) {
-        await downloadsDir.delete(recursive: true);
+      final tmpDir = await getTemporaryDirectory();
+      if (await tmpDir.exists()) {
+        await for (final entity in tmpDir.list(recursive: true)) {
+          try {
+            await entity.delete(recursive: true);
+          } catch (_) {
+            // Ignorar archivos ya inexistentes o bloqueados
+          }
+        }
       }
-      if (await mediaDir.exists()) {
-        await mediaDir.delete(recursive: true);
+
+      // Limpiar configuración considerada caché
+      const cacheKeys = [
+        // Tema / UI
+        'selectedPalette',
+        'brightness',
+        // Reproducción
+        'defaultVolume',
+        'autoPlayNext',
+        'audio_shuffle_on',
+        'audio_repeat_mode',
+        'audio_queue_items',
+        'audio_queue_index',
+        'audio_resume_positions',
+        'video_queue_items',
+        'video_queue_index',
+        'video_resume_positions',
+        'playerCoverStyle',
+        // Ecualizador
+        'eqEnabled',
+        'eqPreset',
+        'eqGains',
+      ];
+
+      for (final key in cacheKeys) {
+        await _storage.remove(key);
       }
+
+      _loadSettings();
 
       Get.snackbar(
         'Caché',

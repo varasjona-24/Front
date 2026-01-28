@@ -16,6 +16,7 @@ class _ImportsWebViewPageState extends State<ImportsWebViewPage> {
   late final WebViewController _controller;
   final TextEditingController _urlCtrl = TextEditingController();
   bool _loading = false;
+  bool _canGoBack = false;
 
   @override
   void initState() {
@@ -25,7 +26,14 @@ class _ImportsWebViewPageState extends State<ImportsWebViewPage> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) => setState(() => _loading = true),
-          onPageFinished: (_) => setState(() => _loading = false),
+          onPageFinished: (_) async {
+            final canBack = await _controller.canGoBack();
+            if (!mounted) return;
+            setState(() {
+              _loading = false;
+              _canGoBack = canBack;
+            });
+          },
         ),
       )
       ..loadRequest(Uri.parse('about:blank'));
@@ -54,6 +62,17 @@ class _ImportsWebViewPageState extends State<ImportsWebViewPage> {
       appBar: AppTopBar(
         title: const Text('Navegador'),
         onSearch: () {},
+        leading: IconButton(
+          onPressed: _canGoBack
+              ? () async {
+                  await _controller.goBack();
+                  final canBack = await _controller.canGoBack();
+                  if (!mounted) return;
+                  setState(() => _canGoBack = canBack);
+                }
+              : null,
+          icon: const Icon(Icons.arrow_back_rounded),
+        ),
       ),
       body: AppGradientBackground(
         child: Column(

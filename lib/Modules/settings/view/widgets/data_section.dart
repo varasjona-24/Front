@@ -45,6 +45,7 @@ class DataSection extends GetView<SettingsController> {
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Download quality
                 Obx(() {
@@ -114,40 +115,7 @@ class DataSection extends GetView<SettingsController> {
                 const SizedBox(height: 12),
 
                 // Storage used
-                Obx(() {
-                  controller.storageTick.value;
-
-                  return FutureBuilder<String>(
-                    future: controller.getStorageInfo(),
-                    builder: (context, snap) {
-                      final loading =
-                          snap.connectionState != ConnectionState.done;
-                      final value = snap.data;
-
-                      if (loading) {
-                        return const InfoTile(
-                          icon: Icons.storage_rounded,
-                          title: 'Almacenamiento usado',
-                          subtitle: 'Calculando…',
-                          trailing: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        );
-                      }
-
-                      return InfoTile(
-                        icon: Icons.storage_rounded,
-                        title: 'Almacenamiento usado',
-                        subtitle: value ?? '—',
-                        trailing: ValuePill(text: 'Local'),
-                      );
-                    },
-                  );
-                }),
-
-                const SizedBox(height: 12),
+                // Storage used removed
 
                 // Actions
                 SizedBox(
