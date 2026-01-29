@@ -7,6 +7,8 @@ import android.content.Context
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import android.util.Rational
+import android.app.PictureInPictureParams
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.audiofx.BassBoost
@@ -23,6 +25,9 @@ class MainActivity : AudioServiceActivity() {
     private val channel = "listenfy/bluetooth_audio"
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
+    private val pipChannel = "listenfy/pip"
+    private var pipEnabled: Boolean = false
+    private var pipAspect: Double = 1.777777
     private val notifChannelId = "com.example.flutter_listenfy.audio"
     private var spatialSessionId: Int? = null
     private var virtualizer: Virtualizer? = null
@@ -211,6 +216,36 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, pipChannel)
+            .setMethodCallHandler { call, result ->
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                    result.success(false)
+                    return@setMethodCallHandler
+                }
+                when (call.method) {
+                    "setEnabled" -> {
+                        pipEnabled = call.argument<Boolean>("enabled") ?: false
+                        pipAspect = call.argument<Double>("aspect") ?: 1.777777
+                        result.success(true)
+                    }
+                    "enter" -> {
+                        val aspect = call.argument<Double>("aspect") ?: 1.777777
+                        val w = 1000
+                        val h = (w / aspect).toInt().coerceAtLeast(1)
+                        val params = PictureInPictureParams.Builder()
+                            .setAspectRatio(Rational(w, h))
+                            .build()
+                        val ok = enterPictureInPictureMode(params)
+                        result.success(ok)
+                    }
+                    "exit" -> {
+                        // No-op: system exits PiP when activity resumes.
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, openalChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -277,6 +312,18 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
 
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (!pipEnabled) return
+        val w = 1000
+        val h = (w / pipAspect).toInt().coerceAtLeast(1)
+        val params = PictureInPictureParams.Builder()
+            .setAspectRatio(Rational(w, h))
+            .build()
+        enterPictureInPictureMode(params)
     }
 
     private fun releaseSpatial() {

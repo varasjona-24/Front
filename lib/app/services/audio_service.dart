@@ -31,9 +31,7 @@ class AudioService extends GetxService {
   AudioService() : _equalizer = Platform.isAndroid ? AndroidEqualizer() : null {
     if (Platform.isAndroid) {
       _player = AudioPlayer(
-        audioPipeline: AudioPipeline(
-          androidAudioEffects: [_equalizer!],
-        ),
+        audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer!]),
       );
     } else {
       _player = AudioPlayer();
@@ -271,10 +269,7 @@ class AudioService extends GetxService {
           _queueVariants = [variant];
           _syncQueueToHandler();
           await _player.setAudioSource(
-            AudioSource.uri(
-              fileUri,
-              tag: _buildBackgroundItem(item),
-            ),
+            AudioSource.uri(fileUri, tag: _buildBackgroundItem(item)),
             initialPosition: Duration.zero,
           );
         }
@@ -366,10 +361,7 @@ class AudioService extends GetxService {
         _queueVariants = [variant];
         _syncQueueToHandler();
         await _player.setAudioSource(
-          AudioSource.uri(
-            Uri.parse(url),
-            tag: _buildBackgroundItem(item),
-          ),
+          AudioSource.uri(Uri.parse(url), tag: _buildBackgroundItem(item)),
           initialPosition: Duration.zero,
         );
       }
@@ -451,12 +443,7 @@ class AudioService extends GetxService {
               '${ApiConfig.baseUrl}/api/v1/media/file/${item.fileId.trim()}/audio/${v.format.trim()}',
             );
 
-      sources.add(
-        AudioSource.uri(
-          uri,
-          tag: _buildBackgroundItem(item),
-        ),
-      );
+      sources.add(AudioSource.uri(uri, tag: _buildBackgroundItem(item)));
       items.add(item);
       variants.add(v);
 
@@ -487,14 +474,14 @@ class AudioService extends GetxService {
       }
     }
 
-    final dur = item.effectiveDurationSeconds;
+    // Note: omit duration to avoid showing progress bar in notifications.
 
     return aud.MediaItem(
       id: item.id,
       title: item.title,
       artist: item.subtitle.isNotEmpty ? item.subtitle : null,
       album: item.origin.key,
-      duration: dur == null ? null : Duration(seconds: dur),
+      duration: null,
       artUri: artUri,
     );
   }

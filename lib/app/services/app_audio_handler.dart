@@ -5,8 +5,7 @@ import 'package:just_audio/just_audio.dart';
 
 import 'audio_service.dart' as app;
 
-class AppAudioHandler extends BaseAudioHandler
-    with QueueHandler, SeekHandler {
+class AppAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   final app.AudioService _app;
   final AudioPlayer _player;
 
@@ -66,17 +65,13 @@ class AppAudioHandler extends BaseAudioHandler
     playbackState.add(
       playbackState.value.copyWith(
         controls: controls,
-        systemActions: const {
-          MediaAction.seek,
-          MediaAction.seekForward,
-          MediaAction.seekBackward,
-        },
+        systemActions: const {},
         androidCompactActionIndices: compact,
         processingState: _mapProcessingState(_player.processingState),
         playing: playing,
-        updatePosition: _player.position,
-        bufferedPosition: _player.bufferedPosition,
-        speed: _player.speed,
+        updatePosition: Duration.zero,
+        bufferedPosition: Duration.zero,
+        speed: 0.0,
       ),
     );
   }
@@ -107,9 +102,6 @@ class AppAudioHandler extends BaseAudioHandler
     await _player.stop();
     return super.stop();
   }
-
-  @override
-  Future<void> seek(Duration position) => _player.seek(position);
 
   @override
   Future<void> skipToNext() => _player.seekToNext();

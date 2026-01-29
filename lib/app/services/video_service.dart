@@ -115,7 +115,12 @@ class VideoService extends GetxService {
         videoUrl = Uri.file(localPath).toString();
         print('🎬 Playing local video: $videoUrl');
 
-        _player = vp.VideoPlayerController.file(File(localPath));
+        _player = vp.VideoPlayerController.file(
+          File(localPath),
+          videoPlayerOptions: vp.VideoPlayerOptions(
+            allowBackgroundPlayback: true,
+          ),
+        );
 
         await _player!.initialize().timeout(const Duration(seconds: 12));
         final v = _player!.value;
@@ -178,7 +183,12 @@ class VideoService extends GetxService {
     print('🌐 Video URL: $videoUrl');
 
     try {
-      _player = vp.VideoPlayerController.network(videoUrl);
+      _player = vp.VideoPlayerController.network(
+        videoUrl,
+        videoPlayerOptions: vp.VideoPlayerOptions(
+          allowBackgroundPlayback: true,
+        ),
+      );
 
       await _player!.initialize().timeout(const Duration(seconds: 12));
 

@@ -28,28 +28,90 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   String? _speedToast;
   double _speedDragAccumulator = 0;
   int _activePointers = 0;
+  bool _pipRequested = false;
+  final MethodChannel _pipChannel = const MethodChannel('listenfy/pip');
+  late final _LifecycleObserver _lifecycleObserver;
+  Worker? _pipWorker;
 
   @override
   void initState() {
     super.initState();
     controller = Get.find<VideoPlayerController>();
+    _lifecycleObserver = _LifecycleObserver(this);
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     _scheduleHide();
+    _bindPip();
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
     _speedTimer?.cancel();
+    _pipWorker?.dispose();
+    _pipWorker = null;
+    _setPipEnabled(false);
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  void _bindPip() {
+    if (!Platform.isAndroid) return;
+    _pipWorker = ever(controller.isPlaying, (playing) {
+      if (playing == true) {
+        _setPipEnabled(true);
+      } else {
+        _setPipEnabled(false);
+      }
+    });
+  }
+
+  Future<void> _setPipEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    final vpCtrl = controller.playerController;
+    double aspect = 1.777777;
+    if (vpCtrl != null && vpCtrl.value.isInitialized) {
+      final size = vpCtrl.value.size;
+      if (size.width > 0 && size.height > 0) {
+        aspect = size.width / size.height;
+      }
+    }
+    try {
+      await _pipChannel.invokeMethod('setEnabled', {
+        'enabled': enabled,
+        'aspect': aspect,
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _enterPipIfNeeded() async {
+    if (_pipRequested) return;
+    if (!Platform.isAndroid) return;
+    final vpCtrl = controller.playerController;
+    if (vpCtrl == null || !vpCtrl.value.isInitialized) return;
+    if (!controller.isPlaying.value) return;
+    final size = vpCtrl.value.size;
+    if (size.width <= 0 || size.height <= 0) return;
+    final aspect = size.width / size.height;
+    try {
+      _pipRequested = true;
+      await _pipChannel.invokeMethod('enter', {'aspect': aspect});
+      // Ensure playback continues when entering PiP.
+      Future.microtask(() async {
+        if (!controller.isPlaying.value) return;
+        await controller.videoService.resume();
+      });
+    } catch (_) {
+      _pipRequested = false;
+    }
   }
 
   @override
@@ -450,6 +512,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       return '$hh:$m:$s';
     }
     return '$m:$s';
+  }
+}
+
+class _LifecycleObserver with WidgetsBindingObserver {
+  final _VideoPlayerPageState state;
+
+  _LifecycleObserver(this.state);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState appState) {
+    if (appState == AppLifecycleState.paused) {
+      state._enterPipIfNeeded();
+    } else if (appState == AppLifecycleState.resumed) {
+      state._pipRequested = false;
+      state._setPipEnabled(state.controller.isPlaying.value);
+    }
   }
 }
 
