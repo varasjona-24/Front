@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio_background/just_audio_background.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import 'app/controllers/theme_controller.dart';
 import 'app/controllers/navigation_controller.dart';
@@ -26,9 +29,15 @@ Future<void> main() async {
     androidNotificationChannelId: 'com.example.flutter_listenfy.audio',
     androidNotificationChannelName: 'Reproducción',
     androidNotificationChannelDescription: 'Controles de reproducción',
+    notificationColor: const Color(0xFF1A1A1A),
     androidNotificationOngoing: true,
   );
   await GetStorage.init();
+  if (Platform.isAndroid) {
+    Future.microtask(() async {
+      await Permission.notification.request();
+    });
+  }
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);

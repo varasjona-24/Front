@@ -115,6 +115,18 @@ class AudioPlayerController extends GetxController {
       }
     });
 
+    ever<MediaItem?>(audioService.currentItem, (item) {
+      if (item == null) return;
+      final idx = queue.indexWhere((e) {
+        if (e.id == item.id) return true;
+        final pid = item.publicId.trim();
+        return pid.isNotEmpty && e.publicId.trim() == pid;
+      });
+      if (idx >= 0 && idx != currentIndex.value) {
+        currentIndex.value = idx;
+      }
+    });
+
     ever<List<MediaItem>>(queue, (_) => _persistQueue());
     ever<int>(currentIndex, (_) => _persistQueue());
     debounce<Duration>(
@@ -456,6 +468,8 @@ class AudioPlayerController extends GetxController {
         item,
         variant,
         autoPlay: !needsPrompt,
+        queue: queue.toList(),
+        queueIndex: currentIndex.value,
       );
       if (resume != null) {
         final shouldResume = await _shouldResume(item, resume);

@@ -4,6 +4,9 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.audiofx.BassBoost
@@ -20,12 +23,34 @@ class MainActivity : AudioServiceActivity() {
     private val channel = "listenfy/bluetooth_audio"
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
+    private val notifChannelId = "com.example.flutter_listenfy.audio"
     private var spatialSessionId: Int? = null
     private var virtualizer: Virtualizer? = null
     private var bassBoost: BassBoost? = null
     private var reverb: PresetReverb? = null
     private var envReverb: EnvironmentalReverb? = null
     private var loudness: LoudnessEnhancer? = null
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        super.onCreate(savedInstanceState)
+        createNotificationChannel()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val existing = manager.getNotificationChannel(notifChannelId)
+        if (existing != null) return
+
+        val channel = NotificationChannel(
+            notifChannelId,
+            "Reproducción",
+            NotificationManager.IMPORTANCE_DEFAULT
+        )
+        channel.description = "Controles de reproducción"
+        channel.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+        manager.createNotificationChannel(channel)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

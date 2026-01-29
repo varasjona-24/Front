@@ -48,6 +48,10 @@ class AudioService extends GetxService {
   final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
 
   StreamSubscription<PlayerState>? _playerStateSub;
+  StreamSubscription<int?>? _indexSub;
+
+  List<MediaItem> _queueItems = [];
+  List<MediaVariant> _queueVariants = [];
 
   bool get hasSourceLoaded => _player.processingState != ProcessingState.idle;
 
@@ -98,6 +102,22 @@ class AudioService extends GetxService {
           currentVariant.value = null;
         }
       }
+    });
+
+    _indexSub = _player.currentIndexStream.listen((idx) {
+      if (idx == null) return;
+      if (_queueItems.isEmpty || _queueVariants.isEmpty) return;
+      if (idx < 0 || idx >= _queueItems.length) return;
+
+      final item = _queueItems[idx];
+      final variant = _queueVariants[idx];
+
+      _currentItem = item;
+      _currentVariant = variant;
+      currentItem.value = item;
+      currentVariant.value = variant;
+      _persistLastItem(item, variant);
+      _keepLastItem = true;
     });
   }
 
@@ -167,7 +187,13 @@ class AudioService extends GetxService {
     await _player.play();
   }
 
-  Future<void> play(MediaItem item, MediaVariant variant, {bool autoPlay = true}) async {
+  Future<void> play(
+    MediaItem item,
+    MediaVariant variant, {
+    bool autoPlay = true,
+    List<MediaItem>? queue,
+    int? queueIndex,
+  }) async {
     if (!variant.isValid) {
       throw Exception('No existe archivo para reproducir (variant inválido).');
     }
@@ -213,13 +239,27 @@ class AudioService extends GetxService {
         final fileUri = Uri.file(localPath);
         print('🎵 Playing local file: $fileUri');
 
-        await _player.setAudioSource(
-          AudioSource.uri(
-            fileUri,
-            tag: _buildBackgroundItem(item),
-          ),
-          initialPosition: Duration.zero,
-        );
+        if (queue != null && queue.isNotEmpty) {
+          final built = _buildQueueSources(queue, item, variant);
+          _queueItems = built.items;
+          _queueVariants = built.variants;
+
+          await _player.setAudioSource(
+            ConcatenatingAudioSource(children: built.sources),
+            initialIndex: built.startIndex,
+            initialPosition: Duration.zero,
+          );
+        } else {
+          _queueItems = [item];
+          _queueVariants = [variant];
+          await _player.setAudioSource(
+            AudioSource.uri(
+              fileUri,
+              tag: _buildBackgroundItem(item),
+            ),
+            initialPosition: Duration.zero,
+          );
+        }
 
         _currentItem = item;
         _currentVariant = variant;
@@ -291,13 +331,27 @@ class AudioService extends GetxService {
     print('🌐 Audio URL: $url');
 
     try {
-      await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(url),
-          tag: _buildBackgroundItem(item),
-        ),
-        initialPosition: Duration.zero,
-      );
+      if (queue != null && queue.isNotEmpty) {
+        final built = _buildQueueSources(queue, item, variant);
+        _queueItems = built.items;
+        _queueVariants = built.variants;
+
+        await _player.setAudioSource(
+          ConcatenatingAudioSource(children: built.sources),
+          initialIndex: built.startIndex,
+          initialPosition: Duration.zero,
+        );
+      } else {
+        _queueItems = [item];
+        _queueVariants = [variant];
+        await _player.setAudioSource(
+          AudioSource.uri(
+            Uri.parse(url),
+            tag: _buildBackgroundItem(item),
+          ),
+          initialPosition: Duration.zero,
+        );
+      }
 
       _currentItem = item;
       _currentVariant = variant;
@@ -334,6 +388,69 @@ class AudioService extends GetxService {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  MediaVariant? _pickAudioVariant(MediaItem item) {
+    for (final v in item.variants) {
+      if (v.kind == MediaVariantKind.audio &&
+          v.localPath != null &&
+          v.localPath!.trim().isNotEmpty &&
+          v.isValid) {
+        return v;
+      }
+    }
+    for (final v in item.variants) {
+      if (v.kind == MediaVariantKind.audio && v.isValid) return v;
+    }
+    return null;
+  }
+
+  _QueueBuild _buildQueueSources(
+    List<MediaItem> queue,
+    MediaItem currentItem,
+    MediaVariant currentVariant,
+  ) {
+    final sources = <AudioSource>[];
+    final items = <MediaItem>[];
+    final variants = <MediaVariant>[];
+    var startIndex = 0;
+
+    for (final item in queue) {
+      final v = item.id == currentItem.id
+          ? currentVariant
+          : (_pickAudioVariant(item) ?? currentVariant);
+
+      if (!v.isValid) continue;
+
+      final localPath = v.localPath?.trim();
+      final uri = (localPath != null && localPath.isNotEmpty)
+          ? Uri.file(localPath)
+          : Uri.parse(
+              '${ApiConfig.baseUrl}/api/v1/media/file/${item.fileId.trim()}/audio/${v.format.trim()}',
+            );
+
+      sources.add(
+        AudioSource.uri(
+          uri,
+          tag: _buildBackgroundItem(item),
+        ),
+      );
+      items.add(item);
+      variants.add(v);
+
+      if (item.id == currentItem.id ||
+          (currentItem.publicId.trim().isNotEmpty &&
+              item.publicId.trim() == currentItem.publicId.trim())) {
+        startIndex = items.length - 1;
+      }
+    }
+
+    return _QueueBuild(
+      sources: sources,
+      items: items,
+      variants: variants,
+      startIndex: startIndex,
+    );
   }
 
   jab.MediaItem _buildBackgroundItem(MediaItem item) {
@@ -444,4 +561,18 @@ class AudioService extends GetxService {
     _player.dispose();
     super.onClose();
   }
+}
+
+class _QueueBuild {
+  final List<AudioSource> sources;
+  final List<MediaItem> items;
+  final List<MediaVariant> variants;
+  final int startIndex;
+
+  const _QueueBuild({
+    required this.sources,
+    required this.items,
+    required this.variants,
+    required this.startIndex,
+  });
 }

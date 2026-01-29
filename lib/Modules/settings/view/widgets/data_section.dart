@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:app_settings/app_settings.dart';
 
 import '../../controller/settings_controller.dart';
 import '../widgets/section_header.dart';
@@ -128,6 +131,56 @@ class DataSection extends GetView<SettingsController> {
                 ),
 
                 const SizedBox(height: 12),
+
+                if (Platform.isAndroid) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: theme.colorScheme.primary.withOpacity(.25),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline_rounded,
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Para mostrar el reproductor en pantalla de bloqueo, '
+                            'desactiva temporalmente el ahorro de batería y '
+                            'luego vuelve a activarlo.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  InfoTile(
+                    icon: Icons.battery_saver_rounded,
+                    title: 'Ahorro de batería',
+                    subtitle:
+                        'Desactívalo para ver controles en pantalla de bloqueo.',
+                    trailing: TextButton(
+                      onPressed: () => AppSettings.openAppSettings(
+                        type: AppSettingsType.batteryOptimization,
+                      ),
+                      child: const Text('Abrir'),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
 
                 Row(
                   children: [
