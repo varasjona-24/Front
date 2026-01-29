@@ -2,9 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:audio_service/audio_service.dart' as aud;
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
-import 'package:just_audio_background/just_audio_background.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'app/controllers/theme_controller.dart';
@@ -18,6 +18,7 @@ import 'app/data/network/dio_client.dart';
 import 'app/data/repo/media_repository.dart';
 import 'app/data/local/local_library_store.dart';
 import 'app/services/audio_service.dart';
+import 'app/services/app_audio_handler.dart';
 import 'app/services/spatial_audio_service.dart';
 import 'app/services/video_service.dart';
 import 'Modules/settings/controller/settings_controller.dart';
@@ -25,13 +26,6 @@ import 'Modules/downloads/controller/downloads_controller.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await JustAudioBackground.init(
-    androidNotificationChannelId: 'com.example.flutter_listenfy.audio',
-    androidNotificationChannelName: 'Reproducción',
-    androidNotificationChannelDescription: 'Controles de reproducción',
-    notificationColor: const Color(0xFF1A1A1A),
-    androidNotificationOngoing: true,
-  );
   await GetStorage.init();
   if (Platform.isAndroid) {
     Future.microtask(() async {
@@ -52,7 +46,22 @@ Future<void> main() async {
   Get.put(SettingsController(), permanent: true);
 
   // 🎵 Audio global (CLAVE)
-  Get.put<AudioService>(AudioService(), permanent: true);
+  final appAudio = AudioService();
+  Get.put<AudioService>(appAudio, permanent: true);
+  WidgetsBinding.instance.addObserver(_AppLifecycleBridge(appAudio));
+
+  // 🔔 Background controls / lockscreen
+  final handler = await aud.AudioService.init(
+    builder: () => AppAudioHandler(appAudio),
+    config: const aud.AudioServiceConfig(
+      androidNotificationChannelId: 'com.example.flutter_listenfy.audio',
+      androidNotificationChannelName: 'Reproducción',
+      androidNotificationChannelDescription: 'Controles de reproducción',
+      androidNotificationOngoing: true,
+      androidNotificationIcon: 'mipmap/ic_launcher',
+    ),
+  );
+  appAudio.attachHandler(handler);
 
   // 🎬 Video global (CLAVE)
   Get.put<VideoService>(VideoService(), permanent: true);
@@ -138,5 +147,22 @@ class MyApp extends StatelessWidget {
         themeMode: mode,
       );
     });
+  }
+}
+
+class _AppLifecycleBridge with WidgetsBindingObserver {
+  final AudioService audio;
+
+  _AppLifecycleBridge(this.audio);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.detached ||
+        state == AppLifecycleState.paused) {
+      if (!audio.isPlaying.value &&
+          audio.state.value == PlaybackState.stopped) {
+        audio.stopAndDismissNotification();
+      }
+    }
   }
 }

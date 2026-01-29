@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -38,8 +40,9 @@ class _SquareCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumb = item.thumbnail;
+    final thumb = item.effectiveThumbnail;
     final hasThumb = thumb != null && thumb.isNotEmpty;
+    final isLocal = hasThumb && thumb!.startsWith('/');
 
     return Container(
       key: const ValueKey('square'),
@@ -52,17 +55,29 @@ class _SquareCover extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       alignment: Alignment.center,
       child: hasThumb
-          ? Image.network(
-              thumb,
-              width: 260,
-              height: 260,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => Icon(
-                Icons.music_note_rounded,
-                size: 72,
-                color: colors.onSurfaceVariant.withOpacity(0.7),
-              ),
-            )
+          ? (isLocal
+              ? Image.file(
+                  File(thumb),
+                  width: 260,
+                  height: 260,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.music_note_rounded,
+                    size: 72,
+                    color: colors.onSurfaceVariant.withOpacity(0.7),
+                  ),
+                )
+              : Image.network(
+                  thumb,
+                  width: 260,
+                  height: 260,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Icon(
+                    Icons.music_note_rounded,
+                    size: 72,
+                    color: colors.onSurfaceVariant.withOpacity(0.7),
+                  ),
+                ))
           : Icon(
               Icons.music_note_rounded,
               size: 72,
@@ -129,8 +144,9 @@ class _VinylCoverState extends State<_VinylCover>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final thumb = widget.item.thumbnail;
+    final thumb = widget.item.effectiveThumbnail;
     final hasThumb = thumb != null && thumb.isNotEmpty;
+    final isLocal = hasThumb && thumb!.startsWith('/');
 
     const double diskSize = 280;
     const double labelSize = 215;
@@ -162,17 +178,31 @@ class _VinylCoverState extends State<_VinylCover>
               child: RotationTransition(
                 turns: _rotationCtrl,
                 child: hasThumb
-                    ? Image.network(
-                        thumb,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Center(
-                          child: Icon(
-                            Icons.music_note_rounded,
-                            size: 52,
-                            color: theme.colorScheme.onSurface.withOpacity(0.6),
-                          ),
-                        ),
-                      )
+                    ? (isLocal
+                        ? Image.file(
+                            File(thumb),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Icon(
+                                Icons.music_note_rounded,
+                                size: 52,
+                                color:
+                                    theme.colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                          )
+                        : Image.network(
+                            thumb,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Icon(
+                                Icons.music_note_rounded,
+                                size: 52,
+                                color:
+                                    theme.colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                          ))
                     : Center(
                         child: Icon(
                           Icons.music_note_rounded,

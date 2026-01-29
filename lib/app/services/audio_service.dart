@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_session/audio_session.dart';
+import 'package:audio_service/audio_service.dart' as aud;
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:just_audio_background/just_audio_background.dart' as jab;
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
@@ -18,6 +18,7 @@ class AudioService extends GetxService {
   final GetStorage _storage = GetStorage();
   final AndroidEqualizer? _equalizer;
   late final AudioPlayer _player;
+  dynamic _handler;
   static const _lastItemKey = 'audio_last_item';
   static const _lastVariantKey = 'audio_last_variant';
   bool _keepLastItem = false;
@@ -25,6 +26,7 @@ class AudioService extends GetxService {
   bool get keepLastItem => _keepLastItem;
 
   bool get eqSupported => _equalizer != null;
+  AudioPlayer get player => _player;
 
   AudioService() : _equalizer = Platform.isAndroid ? AndroidEqualizer() : null {
     if (Platform.isAndroid) {
@@ -52,6 +54,20 @@ class AudioService extends GetxService {
 
   List<MediaItem> _queueItems = [];
   List<MediaVariant> _queueVariants = [];
+
+  List<MediaItem> get queueItems => List<MediaItem>.from(_queueItems);
+  MediaItem? queueItemAt(int index) {
+    if (index < 0 || index >= _queueItems.length) return null;
+    return _queueItems[index];
+  }
+
+  aud.MediaItem buildBackgroundItem(MediaItem item) =>
+      _buildBackgroundItem(item);
+
+  void attachHandler(dynamic handler) {
+    _handler = handler;
+    _syncQueueToHandler();
+  }
 
   bool get hasSourceLoaded => _player.processingState != ProcessingState.idle;
 
@@ -243,6 +259,7 @@ class AudioService extends GetxService {
           final built = _buildQueueSources(queue, item, variant);
           _queueItems = built.items;
           _queueVariants = built.variants;
+          _syncQueueToHandler();
 
           await _player.setAudioSource(
             ConcatenatingAudioSource(children: built.sources),
@@ -252,6 +269,7 @@ class AudioService extends GetxService {
         } else {
           _queueItems = [item];
           _queueVariants = [variant];
+          _syncQueueToHandler();
           await _player.setAudioSource(
             AudioSource.uri(
               fileUri,
@@ -267,6 +285,7 @@ class AudioService extends GetxService {
         currentVariant.value = variant;
         _persistLastItem(item, variant);
         _keepLastItem = true;
+        _syncQueueToHandler();
 
         await _player.setVolume(volume.value);
         await _applyEqFromSettings();
@@ -335,6 +354,7 @@ class AudioService extends GetxService {
         final built = _buildQueueSources(queue, item, variant);
         _queueItems = built.items;
         _queueVariants = built.variants;
+        _syncQueueToHandler();
 
         await _player.setAudioSource(
           ConcatenatingAudioSource(children: built.sources),
@@ -344,6 +364,7 @@ class AudioService extends GetxService {
       } else {
         _queueItems = [item];
         _queueVariants = [variant];
+        _syncQueueToHandler();
         await _player.setAudioSource(
           AudioSource.uri(
             Uri.parse(url),
@@ -359,6 +380,7 @@ class AudioService extends GetxService {
       currentVariant.value = variant;
       _persistLastItem(item, variant);
       _keepLastItem = true;
+      _syncQueueToHandler();
 
       await _player.setVolume(volume.value);
       await _applyEqFromSettings();
@@ -453,7 +475,7 @@ class AudioService extends GetxService {
     );
   }
 
-  jab.MediaItem _buildBackgroundItem(MediaItem item) {
+  aud.MediaItem _buildBackgroundItem(MediaItem item) {
     Uri? artUri;
     final local = item.thumbnailLocalPath?.trim();
     if (local != null && local.isNotEmpty) {
@@ -467,7 +489,7 @@ class AudioService extends GetxService {
 
     final dur = item.effectiveDurationSeconds;
 
-    return jab.MediaItem(
+    return aud.MediaItem(
       id: item.id,
       title: item.title,
       artist: item.subtitle.isNotEmpty ? item.subtitle : null,
@@ -475,6 +497,17 @@ class AudioService extends GetxService {
       duration: dur == null ? null : Duration(seconds: dur),
       artUri: artUri,
     );
+  }
+
+  void _syncQueueToHandler() {
+    final handler = _handler;
+    if (handler == null) return;
+    if (_queueItems.isNotEmpty) {
+      handler.updateQueue(_queueItems.map(_buildBackgroundItem).toList());
+    }
+    if (_currentItem != null) {
+      handler.updateMediaItem(_buildBackgroundItem(_currentItem!));
+    }
   }
 
   Future<void> _applyEqFromSettings() async {
@@ -521,6 +554,16 @@ class AudioService extends GetxService {
     _keepLastItem = false;
   }
 
+  Future<void> stopAndDismissNotification() async {
+    await stop();
+    final handler = _handler;
+    if (handler != null) {
+      try {
+        await handler.stop();
+      } catch (_) {}
+    }
+  }
+
   void clearLastItem() {
     _storage.remove(_lastItemKey);
     _storage.remove(_lastVariantKey);
@@ -558,6 +601,7 @@ class AudioService extends GetxService {
   @override
   void onClose() {
     _playerStateSub?.cancel();
+    _indexSub?.cancel();
     _player.dispose();
     super.onClose();
   }
