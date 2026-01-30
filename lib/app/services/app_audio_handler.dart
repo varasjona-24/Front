@@ -15,7 +15,7 @@ import 'audio_service.dart' as app;
 class AppAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   final app.AudioService _app;
   final AudioPlayer _player;
-  static const MediaControl _stopControl = MediaControl(
+  static const MediaControl stopControl = MediaControl(
     androidIcon: 'drawable/ic_close',
     label: 'Cerrar',
     action: MediaAction.stop,
@@ -141,7 +141,7 @@ class AppAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
     final hasSkip = _queueLength > 1;
 
     final controls = <MediaControl>[
-      MediaControl.stop, // ❌ X (Stop)
+      stopControl,
       if (hasSkip || _player.hasPrevious) MediaControl.skipToPrevious,
       if (playing) MediaControl.pause else MediaControl.play,
       if (hasSkip || _player.hasNext) MediaControl.skipToNext,

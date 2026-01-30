@@ -28,7 +28,7 @@
   <string>$(DEVELOPMENT_LANGUAGE)</string>
 
   <key>CFBundleDisplayName</key>
-  <string>Flutter Listenfy</string>
+  <string>Listenfy</string>
 
   <key>CFBundleExecutable</key>
   <string>$(EXECUTABLE_NAME)</string>
@@ -40,7 +40,7 @@
   <string>6.0</string>
 
   <key>CFBundleName</key>
-  <string>flutter_listenfy</string>
+  <string>Listenfy</string>
 
   <key>CFBundlePackageType</key>
   <string>APPL</string>
