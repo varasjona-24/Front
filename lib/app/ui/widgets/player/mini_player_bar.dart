@@ -101,7 +101,7 @@ class MiniPlayerBar extends StatelessWidget {
             await video.stop();
             video.clearLastItem();
           } else {
-            await audio.stopAndDismissNotification();
+            await audio.stop();
             audio.clearLastItem();
           }
         },

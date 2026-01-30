@@ -1,3 +1,6 @@
+// ============================================================================
+// IMPORTS
+// ============================================================================
 import 'dart:async';
 import 'dart:io';
 
@@ -10,25 +13,87 @@ import 'package:just_audio/just_audio.dart';
 import '../models/media_item.dart';
 import '../config/api_config.dart';
 import '../../Modules/settings/controller/settings_controller.dart';
-import '../../Modules/sources/domain/source_origin.dart';
 
+// ============================================================================
+// ENUMS
+// ============================================================================
 enum PlaybackState { stopped, loading, playing, paused }
 
+// ============================================================================
+// AUDIO SERVICE (GetxService)
+// ============================================================================
+/// peluches 🧸:
+/// Este servicio es el “cerebro” de reproducción. Maneja:
+/// - AudioPlayer (just_audio)
+/// - EQ Android (si existe)
+/// - cola interna + sincronización con AudioHandler (notificación)
+/// - persistencia del último item reproducido
 class AudioService extends GetxService {
+  // ==========================================================================
+  // STORAGE / KEYS
+  // ==========================================================================
   final GetStorage _storage = GetStorage();
-  final AndroidEqualizer? _equalizer;
-  late final AudioPlayer _player;
-  dynamic _handler;
   static const _lastItemKey = 'audio_last_item';
   static const _lastVariantKey = 'audio_last_variant';
-  bool _keepLastItem = false;
 
+  // ==========================================================================
+  // PLAYER / EQ
+  // ==========================================================================
+  final AndroidEqualizer? _equalizer;
+  late final AudioPlayer _player;
+
+  /// peluches 🧸: handler “externo” (tu AppAudioHandler) que vive en audio_service
+  dynamic _handler;
+
+  // ==========================================================================
+  // FLAGS
+  // ==========================================================================
+  bool _keepLastItem = false;
   bool get keepLastItem => _keepLastItem;
 
   bool get eqSupported => _equalizer != null;
   AudioPlayer get player => _player;
 
+  // ==========================================================================
+  // RX STATE (UI)
+  // ==========================================================================
+  final Rx<PlaybackState> state = PlaybackState.stopped.obs;
+  final RxBool isPlaying = false.obs;
+  final RxBool isLoading = false.obs;
+
+  // ==========================================================================
+  // CURRENT TRACK
+  // ==========================================================================
+  MediaItem? _currentItem;
+  MediaVariant? _currentVariant;
+
+  final Rxn<MediaItem> currentItem = Rxn<MediaItem>();
+  final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
+
+  // ==========================================================================
+  // SUBSCRIPTIONS
+  // ==========================================================================
+  StreamSubscription<PlayerState>? _playerStateSub;
+  StreamSubscription<int?>? _indexSub;
+
+  // ==========================================================================
+  // QUEUE (INTERNAL)
+  // ==========================================================================
+  List<MediaItem> _queueItems = [];
+  List<MediaVariant> _queueVariants = [];
+
+  List<MediaItem> get queueItems => List<MediaItem>.from(_queueItems);
+
+  MediaItem? queueItemAt(int index) {
+    if (index < 0 || index >= _queueItems.length) return null;
+    return _queueItems[index];
+  }
+
+  // ==========================================================================
+  // CONSTRUCTOR
+  // ==========================================================================
   AudioService() : _equalizer = Platform.isAndroid ? AndroidEqualizer() : null {
+    // peluches 🧸: pipeline con efectos solo en Android
     if (Platform.isAndroid) {
       _player = AudioPlayer(
         audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer!]),
@@ -38,35 +103,23 @@ class AudioService extends GetxService {
     }
   }
 
-  final Rx<PlaybackState> state = PlaybackState.stopped.obs;
-  final RxBool isPlaying = false.obs;
-  final RxBool isLoading = false.obs;
-
-  MediaItem? _currentItem;
-  MediaVariant? _currentVariant;
-  final Rxn<MediaItem> currentItem = Rxn<MediaItem>();
-  final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
-
-  StreamSubscription<PlayerState>? _playerStateSub;
-  StreamSubscription<int?>? _indexSub;
-
-  List<MediaItem> _queueItems = [];
-  List<MediaVariant> _queueVariants = [];
-
-  List<MediaItem> get queueItems => List<MediaItem>.from(_queueItems);
-  MediaItem? queueItemAt(int index) {
-    if (index < 0 || index >= _queueItems.length) return null;
-    return _queueItems[index];
-  }
-
+  // ==========================================================================
+  // HANDLER BRIDGE
+  // ==========================================================================
+  /// peluches 🧸: esto expone tu builder de MediaItem para el background
   aud.MediaItem buildBackgroundItem(MediaItem item) =>
       _buildBackgroundItem(item);
 
+  /// peluches 🧸: aquí “enchufas” tu AppAudioHandler para que el servicio
+  /// le pueda mandar queue/mediaItem y refrescar la notificación.
   void attachHandler(dynamic handler) {
     _handler = handler;
     _syncQueueToHandler();
   }
 
+  // ==========================================================================
+  // HELPERS / CHECKS
+  // ==========================================================================
   bool get hasSourceLoaded => _player.processingState != ProcessingState.idle;
 
   bool isSameTrack(MediaItem item, MediaVariant v) {
@@ -75,20 +128,29 @@ class AudioService extends GetxService {
         _currentVariant?.kind == v.kind;
   }
 
+  // ==========================================================================
+  // LIFECYCLE
+  // ==========================================================================
   @override
   Future<void> onInit() async {
     super.onInit();
 
+    // peluches 🧸: sesión de audio (ducking, focus, etc.)
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
 
+    // peluches 🧸: volumen por defecto desde settings (si existe)
     if (Get.isRegistered<SettingsController>()) {
       final settings = Get.find<SettingsController>();
       await setVolume(settings.defaultVolume.value / 100);
     }
 
+    // peluches 🧸: restaurar último item (solo para UI/estado, NO reproduce)
     _restoreLastItem();
 
+    // ------------------------------------------------------------------------
+    // LISTEN: playerStateStream -> actualizar UI state
+    // ------------------------------------------------------------------------
     _playerStateSub = _player.playerStateStream.listen((ps) {
       final proc = ps.processingState;
 
@@ -106,10 +168,12 @@ class AudioService extends GetxService {
         state.value = PlaybackState.paused;
       } else if (proc == ProcessingState.completed ||
           proc == ProcessingState.idle) {
+        // peluches 🧸: si keepLastItem, dejamos el item en UI pausado
         if (_keepLastItem && currentItem.value != null && !ps.playing) {
           state.value = PlaybackState.paused;
           isPlaying.value = false;
         } else {
+          // peluches 🧸: si no, limpiamos todo
           state.value = PlaybackState.stopped;
           isPlaying.value = false;
           currentItem.value = null;
@@ -118,6 +182,9 @@ class AudioService extends GetxService {
       }
     });
 
+    // ------------------------------------------------------------------------
+    // LISTEN: currentIndexStream -> cuando cambia pista en cola
+    // ------------------------------------------------------------------------
     _indexSub = _player.currentIndexStream.listen((idx) {
       if (idx == null) return;
       if (_queueItems.isEmpty || _queueVariants.isEmpty) return;
@@ -128,13 +195,22 @@ class AudioService extends GetxService {
 
       _currentItem = item;
       _currentVariant = variant;
+
       currentItem.value = item;
       currentVariant.value = variant;
+
       _persistLastItem(item, variant);
       _keepLastItem = true;
+
+      // peluches 🧸: importantísimo para notificación:
+      // cuando cambia el track, sincroniza handler
+      _syncQueueToHandler();
     });
   }
 
+  // ==========================================================================
+  // STREAM GETTERS
+  // ==========================================================================
   Stream<Duration> get positionStream => _player.positionStream;
   Stream<Duration?> get durationStream => _player.durationStream;
   Stream<ProcessingState> get processingStateStream =>
@@ -143,6 +219,9 @@ class AudioService extends GetxService {
       _player.androidAudioSessionIdStream;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
 
+  // ==========================================================================
+  // PLAYBACK SETTINGS
+  // ==========================================================================
   final Rx<LoopMode> loopMode = LoopMode.off.obs;
   final RxDouble speed = 1.0.obs;
   final RxDouble volume = 1.0.obs;
@@ -168,6 +247,9 @@ class AudioService extends GetxService {
     await _player.setVolume(clamped);
   }
 
+  // ==========================================================================
+  // EQ (ANDROID)
+  // ==========================================================================
   Future<AndroidEqualizerParameters?> getEqParameters() async {
     if (_equalizer == null) return null;
     return _equalizer!.parameters;
@@ -185,6 +267,9 @@ class AudioService extends GetxService {
     await params.bands[index].setGain(gain);
   }
 
+  // ==========================================================================
+  // BASIC CONTROLS
+  // ==========================================================================
   Future<void> seek(Duration position) async {
     if (!hasSourceLoaded) return;
     await _player.seek(position);
@@ -201,12 +286,19 @@ class AudioService extends GetxService {
     await _player.play();
   }
 
+  // ==========================================================================
+  // PLAY (MAIN)
+  // ==========================================================================
+  /// peluches 🧸:
+  /// - Reproduce item + variant
+  /// - Maneja local vs remoto
+  /// - Maneja cola opcional
   Future<void> play(
     MediaItem item,
     MediaVariant variant, {
     bool autoPlay = true,
     List<MediaItem>? queue,
-    int? queueIndex,
+    int? queueIndex, // (peluches 🧸: por ahora no se usa directamente)
   }) async {
     if (!variant.isValid) {
       throw Exception('No existe archivo para reproducir (variant inválido).');
@@ -253,6 +345,7 @@ class AudioService extends GetxService {
         final fileUri = Uri.file(localPath);
         print('🎵 Playing local file: $fileUri');
 
+        // peluches 🧸: cola
         if (queue != null && queue.isNotEmpty) {
           final built = _buildQueueSources(queue, item, variant);
           _queueItems = built.items;
@@ -265,25 +358,32 @@ class AudioService extends GetxService {
             initialPosition: Duration.zero,
           );
         } else {
+          // peluches 🧸: single
           _queueItems = [item];
           _queueVariants = [variant];
           _syncQueueToHandler();
+
           await _player.setAudioSource(
             AudioSource.uri(fileUri, tag: _buildBackgroundItem(item)),
             initialPosition: Duration.zero,
           );
         }
 
+        // peluches 🧸: set current
         _currentItem = item;
         _currentVariant = variant;
         currentItem.value = item;
         currentVariant.value = variant;
+
         _persistLastItem(item, variant);
         _keepLastItem = true;
+
+        // peluches 🧸: resync handler para notificación/lockscreen
         _syncQueueToHandler();
 
         await _player.setVolume(volume.value);
         await _applyEqFromSettings();
+
         if (autoPlay) {
           await _player.play();
         } else {
@@ -360,6 +460,7 @@ class AudioService extends GetxService {
         _queueItems = [item];
         _queueVariants = [variant];
         _syncQueueToHandler();
+
         await _player.setAudioSource(
           AudioSource.uri(Uri.parse(url), tag: _buildBackgroundItem(item)),
           initialPosition: Duration.zero,
@@ -370,8 +471,10 @@ class AudioService extends GetxService {
       _currentVariant = variant;
       currentItem.value = item;
       currentVariant.value = variant;
+
       _persistLastItem(item, variant);
       _keepLastItem = true;
+
       _syncQueueToHandler();
 
       await _player.setVolume(volume.value);
@@ -404,7 +507,11 @@ class AudioService extends GetxService {
     }
   }
 
+  // ==========================================================================
+  // QUEUE BUILDING
+  // ==========================================================================
   MediaVariant? _pickAudioVariant(MediaItem item) {
+    // peluches 🧸: preferimos local válido
     for (final v in item.variants) {
       if (v.kind == MediaVariantKind.audio &&
           v.localPath != null &&
@@ -413,6 +520,7 @@ class AudioService extends GetxService {
         return v;
       }
     }
+    // peluches 🧸: si no, cualquier audio válido
     for (final v in item.variants) {
       if (v.kind == MediaVariantKind.audio && v.isValid) return v;
     }
@@ -447,6 +555,7 @@ class AudioService extends GetxService {
       items.add(item);
       variants.add(v);
 
+      // peluches 🧸: detecta el índice inicial (por id o publicId)
       if (item.id == currentItem.id ||
           (currentItem.publicId.trim().isNotEmpty &&
               item.publicId.trim() == currentItem.publicId.trim())) {
@@ -462,8 +571,17 @@ class AudioService extends GetxService {
     );
   }
 
+  // ==========================================================================
+  // BACKGROUND MEDIA ITEM (audio_service)
+  // ==========================================================================
+  /// peluches 🧸:
+  /// Esto es CRÍTICO para la notificación:
+  /// - id, title, artist
+  /// - artUri (si hay)
+  /// - duration (si existe) -> sin duration la barra de progreso sufre
   aud.MediaItem _buildBackgroundItem(MediaItem item) {
     Uri? artUri;
+
     final local = item.thumbnailLocalPath?.trim();
     if (local != null && local.isNotEmpty) {
       artUri = Uri.file(local);
@@ -474,21 +592,31 @@ class AudioService extends GetxService {
       }
     }
 
-    // Note: omit duration to avoid showing progress bar in notifications.
+    final durSec = item.effectiveDurationSeconds;
+    final dur = (durSec != null && durSec > 0)
+        ? Duration(seconds: durSec)
+        : null;
 
     return aud.MediaItem(
       id: item.id,
       title: item.title,
-      artist: item.subtitle.isNotEmpty ? item.subtitle : null,
-      album: item.origin.key,
-      duration: null,
+      artist: item.displaySubtitle.isNotEmpty ? item.displaySubtitle : null,
+      duration: dur,
       artUri: artUri,
     );
   }
 
+  // ==========================================================================
+  // HANDLER SYNC (NOTIFICATION)
+  // ==========================================================================
+  /// peluches 🧸:
+  /// Sincroniza:
+  /// - queue del handler
+  /// - mediaItem actual
   void _syncQueueToHandler() {
     final handler = _handler;
     if (handler == null) return;
+
     if (_queueItems.isNotEmpty) {
       handler.updateQueue(_queueItems.map(_buildBackgroundItem).toList());
     }
@@ -497,24 +625,48 @@ class AudioService extends GetxService {
     }
   }
 
+  // ==========================================================================
+  // STOP + DISMISS NOTIFICATION
+  // ==========================================================================
+  Future<void> stopAndDismissNotification() async {
+    await stop();
+    final handler = _handler;
+    if (handler != null) {
+      try {
+        await handler.stop();
+      } catch (_) {
+        // peluches 🧸: ignorar si falla el stop del handler
+      }
+    }
+  }
+
+  // ==========================================================================
+  // APPLY EQ FROM SETTINGS
+  // ==========================================================================
   Future<void> _applyEqFromSettings() async {
     if (_equalizer == null) return;
     if (!Get.isRegistered<SettingsController>()) return;
+
     final settings = Get.find<SettingsController>();
     try {
       await setEqEnabled(settings.eqEnabled.value);
       if (settings.eqGains.isEmpty) return;
+
       final params = await _equalizer!.parameters;
       final bands = params.bands.length;
       final gains = settings.eqGains;
+
       for (var i = 0; i < bands && i < gains.length; i++) {
         await params.bands[i].setGain(gains[i]);
       }
     } catch (_) {
-      // ignore eq apply errors
+      // peluches 🧸: ignorar errores del EQ (no crashear reproducción)
     }
   }
 
+  // ==========================================================================
+  // TOGGLE / PAUSE / STOP
+  // ==========================================================================
   Future<void> toggle() async {
     if (_player.playing) {
       await _player.pause();
@@ -531,26 +683,23 @@ class AudioService extends GetxService {
 
   Future<void> stop() async {
     await _player.stop();
+
     state.value = PlaybackState.stopped;
     isPlaying.value = false;
     isLoading.value = false;
+
     _currentItem = null;
     _currentVariant = null;
+
     currentItem.value = null;
     currentVariant.value = null;
+
     _keepLastItem = false;
   }
 
-  Future<void> stopAndDismissNotification() async {
-    await stop();
-    final handler = _handler;
-    if (handler != null) {
-      try {
-        await handler.stop();
-      } catch (_) {}
-    }
-  }
-
+  // ==========================================================================
+  // LAST ITEM PERSISTENCE
+  // ==========================================================================
   void clearLastItem() {
     _storage.remove(_lastItemKey);
     _storage.remove(_lastVariantKey);
@@ -565,9 +714,11 @@ class AudioService extends GetxService {
   void _restoreLastItem() {
     final rawItem = _storage.read<Map>(_lastItemKey);
     if (rawItem == null) return;
+
     try {
       final item = MediaItem.fromJson(Map<String, dynamic>.from(rawItem));
       final rawVariant = _storage.read<Map>(_lastVariantKey);
+
       MediaVariant? variant;
       if (rawVariant != null) {
         variant = MediaVariant.fromJson(Map<String, dynamic>.from(rawVariant));
@@ -575,16 +726,22 @@ class AudioService extends GetxService {
 
       _currentItem = item;
       _currentVariant = variant;
+
       currentItem.value = item;
       currentVariant.value = variant;
+
       state.value = PlaybackState.paused;
       isPlaying.value = false;
+
       _keepLastItem = true;
     } catch (_) {
-      // ignore restore failures
+      // peluches 🧸: ignorar si la data guardada está corrupta
     }
   }
 
+  // ==========================================================================
+  // CLOSE
+  // ==========================================================================
   @override
   void onClose() {
     _playerStateSub?.cancel();
@@ -594,6 +751,9 @@ class AudioService extends GetxService {
   }
 }
 
+// ============================================================================
+// QUEUE BUILD RESULT MODEL
+// ============================================================================
 class _QueueBuild {
   final List<AudioSource> sources;
   final List<MediaItem> items;

@@ -4,8 +4,6 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.Context
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.os.Build
 import android.util.Rational
 import android.app.PictureInPictureParams
@@ -19,6 +17,7 @@ import android.media.audiofx.Virtualizer
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import kotlin.math.roundToInt
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AudioServiceActivity() {
@@ -28,7 +27,8 @@ class MainActivity : AudioServiceActivity() {
     private val pipChannel = "listenfy/pip"
     private var pipEnabled: Boolean = false
     private var pipAspect: Double = 1.777777
-    private val notifChannelId = "com.example.flutter_listenfy.audio"
+    private var pipWidth: Int? = null
+    private var pipHeight: Int? = null
     private var spatialSessionId: Int? = null
     private var virtualizer: Virtualizer? = null
     private var bassBoost: BassBoost? = null
@@ -36,26 +36,6 @@ class MainActivity : AudioServiceActivity() {
     private var envReverb: EnvironmentalReverb? = null
     private var loudness: LoudnessEnhancer? = null
 
-    override fun onCreate(savedInstanceState: android.os.Bundle?) {
-        super.onCreate(savedInstanceState)
-        createNotificationChannel()
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val existing = manager.getNotificationChannel(notifChannelId)
-        if (existing != null) return
-
-        val channel = NotificationChannel(
-            notifChannelId,
-            "Reproducción",
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
-        channel.description = "Controles de reproducción"
-        channel.lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-        manager.createNotificationChannel(channel)
-    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -226,15 +206,22 @@ class MainActivity : AudioServiceActivity() {
                     "setEnabled" -> {
                         pipEnabled = call.argument<Boolean>("enabled") ?: false
                         pipAspect = call.argument<Double>("aspect") ?: 1.777777
+                        pipWidth = call.argument<Int>("width")
+                        pipHeight = call.argument<Int>("height")
                         result.success(true)
                     }
                     "enter" -> {
+                        val width = call.argument<Int>("width")
+                        val height = call.argument<Int>("height")
                         val aspect = call.argument<Double>("aspect") ?: 1.777777
-                        val w = 1000
-                        val h = (w / aspect).toInt().coerceAtLeast(1)
-                        val params = PictureInPictureParams.Builder()
-                            .setAspectRatio(Rational(w, h))
-                            .build()
+                        val ratio = buildPipRational(width, height, aspect)
+                        val builder = PictureInPictureParams.Builder()
+                            .setAspectRatio(ratio)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            builder.setExpandedAspectRatio(ratio)
+                            builder.setSeamlessResizeEnabled(true)
+                        }
+                        val params = builder.build()
                         val ok = enterPictureInPictureMode(params)
                         result.success(ok)
                     }
@@ -318,12 +305,30 @@ class MainActivity : AudioServiceActivity() {
         super.onUserLeaveHint()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         if (!pipEnabled) return
-        val w = 1000
-        val h = (w / pipAspect).toInt().coerceAtLeast(1)
-        val params = PictureInPictureParams.Builder()
-            .setAspectRatio(Rational(w, h))
-            .build()
+        val ratio = buildPipRational(pipWidth, pipHeight, pipAspect)
+        val builder = PictureInPictureParams.Builder()
+            .setAspectRatio(ratio)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            builder.setExpandedAspectRatio(ratio)
+            builder.setSeamlessResizeEnabled(true)
+        }
+        val params = builder.build()
         enterPictureInPictureMode(params)
+    }
+
+    private fun buildPipRational(width: Int?, height: Int?, aspect: Double): Rational {
+        val ratio = when {
+            width != null && height != null && width > 0 && height > 0 ->
+                width.toDouble() / height.toDouble()
+            else -> aspect
+        }
+
+        val minRatio = 1.0 / 2.39
+        val maxRatio = 2.39
+        val clamped = ratio.coerceIn(minRatio, maxRatio)
+        val w = 1000
+        val h = (w / clamped).roundToInt().coerceAtLeast(1)
+        return Rational(w, h)
     }
 
     private fun releaseSpatial() {

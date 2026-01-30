@@ -48,7 +48,6 @@ Future<void> main() async {
   // 🎵 Audio global (CLAVE)
   final appAudio = AudioService();
   Get.put<AudioService>(appAudio, permanent: true);
-  WidgetsBinding.instance.addObserver(_AppLifecycleBridge(appAudio));
 
   // 🔔 Background controls / lockscreen
   final handler = await aud.AudioService.init(
@@ -147,22 +146,5 @@ class MyApp extends StatelessWidget {
         themeMode: mode,
       );
     });
-  }
-}
-
-class _AppLifecycleBridge with WidgetsBindingObserver {
-  final AudioService audio;
-
-  _AppLifecycleBridge(this.audio);
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.detached ||
-        state == AppLifecycleState.paused) {
-      if (!audio.isPlaying.value &&
-          audio.state.value == PlaybackState.stopped) {
-        audio.stopAndDismissNotification();
-      }
-    }
   }
 }
