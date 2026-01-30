@@ -43,10 +43,8 @@ class DownloadsPill extends GetView<DownloadsController> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => DownloadsPill.showImportUrlDialog(
-                  context,
-                  controller,
-                ),
+                onPressed: () =>
+                    DownloadsPill.showImportUrlDialog(context, controller),
                 icon: const Icon(Icons.link_rounded),
                 label: const Text('🌐 Importar desde URL'),
                 style: ElevatedButton.styleFrom(
@@ -107,10 +105,7 @@ class DownloadsPill extends GetView<DownloadsController> {
       );
 
       if (result != null) {
-        await controller.downloadFromUrl(
-          url: result.url,
-          kind: result.kind,
-        );
+        await controller.downloadFromUrl(url: result.url, kind: result.kind);
       }
     } finally {
       if (clearSharedOnClose) {
@@ -224,17 +219,13 @@ class DownloadsPill extends GetView<DownloadsController> {
       );
     }
   }
-
 }
 
 class _ImportUrlResult {
   final String url;
   final String kind;
 
-  const _ImportUrlResult({
-    required this.url,
-    required this.kind,
-  });
+  const _ImportUrlResult({required this.url, required this.kind});
 }
 
 class _ImportUrlDialog extends StatefulWidget {
@@ -287,14 +278,8 @@ class _ImportUrlDialogState extends State<_ImportUrlDialog> {
             DropdownButtonFormField<String>(
               value: _kind,
               items: const [
-                DropdownMenuItem(
-                  value: 'audio',
-                  child: Text('Audio'),
-                ),
-                DropdownMenuItem(
-                  value: 'video',
-                  child: Text('Video'),
-                ),
+                DropdownMenuItem(value: 'audio', child: Text('Audio')),
+                DropdownMenuItem(value: 'video', child: Text('Video')),
               ],
               onChanged: (v) {
                 if (v == null) return;
@@ -319,15 +304,11 @@ class _ImportUrlDialogState extends State<_ImportUrlDialog> {
             final url = _urlCtrl.text.trim();
             if (url.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Por favor ingresa una URL'),
-                ),
+                const SnackBar(content: Text('Por favor ingresa una URL')),
               );
               return;
             }
-            Navigator.of(context).pop(
-              _ImportUrlResult(url: url, kind: _kind),
-            );
+            Navigator.of(context).pop(_ImportUrlResult(url: url, kind: _kind));
           },
           child: const Text('Descargar'),
         ),

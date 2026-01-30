@@ -1,21 +1,58 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<queries>
+  <intent>
+    <action android:name="android.intent.action.VIEW" />
+    <data android:scheme="http" />
+  </intent>
+  <intent>
+    <action android:name="android.intent.action.VIEW" />
+    <data android:scheme="https" />
+  </intent>
+
+  <!-- Lo tuyo de PROCESS_TEXT -->
+  <intent>
+    <action android:name="android.intent.action.PROCESS_TEXT"/>
+    <data android:mimeType="text/plain"/>
+  </intent>
+</queries>
+
+    <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Bluetooth -->
+    <!-- Legacy (Android <= 11). En Android 12+ se usan CONNECT/SCAN -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <!-- Android 12+ -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <!-- Opcional para ciertas funciones -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+
+    <!-- Location (solo si BLUETOOTH_SCAN lo requiere según tu caso) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Audio -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Notifications (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Foreground service (AudioService) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+
+    <!-- Wake lock (AudioService lo puede necesitar) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:label="Listenfy"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true" >
+        android:usesCleartextTraffic="true">
+
+        <!-- AudioService -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:exported="false"
@@ -24,6 +61,7 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
         <receiver
             android:name="com.ryanheise.audioservice.MediaButtonReceiver"
             android:exported="false">
@@ -31,6 +69,7 @@
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -39,26 +78,27 @@
             android:theme="@style/LaunchTheme"
             android:supportsPictureInPicture="true"
             android:resizeableActivity="true"
+            android:enableOnBackInvokedCallback="true"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize">
-            <!-- Specifies an Android theme to apply to this Activity as soon as
-                 the Android process has started. This theme is visible to the user
-                 while the Flutter UI initializes. After that, this theme continues
-                 to determine the Window background behind the Flutter UI. -->
+
             <meta-data
-              android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- Si tienes imports por compartir texto -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

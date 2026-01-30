@@ -53,6 +53,7 @@ dependencies:
   video_player: ^2.5.0
   webview_flutter: ^4.8.0
   receive_sharing_intent: ^1.4.5
+  flutter_custom_tabs: ^2.4.0
 
 dev_dependencies:
   flutter_test:

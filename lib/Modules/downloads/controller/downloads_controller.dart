@@ -57,8 +57,9 @@ class DownloadsController extends GetxController {
       if (initial.isNotEmpty) {
         _setSharedUrl(initial.first.path);
       }
-      _shareSub =
-          ReceiveSharingIntent.instance.getMediaStream().listen((value) {
+      _shareSub = ReceiveSharingIntent.instance.getMediaStream().listen((
+        value,
+      ) {
         if (value.isNotEmpty) {
           _setSharedUrl(value.first.path);
         }
@@ -79,10 +80,7 @@ class DownloadsController extends GetxController {
     if (Get.currentRoute == AppRoutes.downloads) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (Get.currentRoute != AppRoutes.downloads) {
-        Get.toNamed(
-          AppRoutes.downloads,
-          arguments: {'sharedUrl': url},
-        );
+        Get.toNamed(AppRoutes.downloads, arguments: {'sharedUrl': url});
       }
     });
   }
@@ -442,6 +440,7 @@ class DownloadsController extends GetxController {
   // ============================
   // 🔧 HELPERS
   // ============================
+
   Future<String> _buildStableId(String filePath) async {
     try {
       final f = File(filePath);
@@ -463,5 +462,4 @@ class DownloadsController extends GetxController {
     final bytes = utf8.encode(input);
     return sha1.convert(bytes).toString();
   }
-
 }
