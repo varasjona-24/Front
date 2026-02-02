@@ -74,9 +74,26 @@ class DownloadsPill extends GetView<DownloadsController> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () => Get.to(() => const ImportsWebViewPage()),
+                onPressed: () async {
+                  final size = MediaQuery.of(context).size;
+                  await showDialog<void>(
+                    context: context,
+                    barrierDismissible: true,
+                    builder: (ctx) {
+                      return Dialog(
+                        insetPadding: const EdgeInsets.all(16),
+                        backgroundColor: Colors.transparent,
+                        child: SizedBox(
+                          width: size.width * 0.9,
+                          height: size.height * 0.65,
+                          child: const ImportsWebViewPage(),
+                        ),
+                      );
+                    },
+                  );
+                },
                 icon: const Icon(Icons.public_rounded),
-                label: const Text('🧭 Navegador limpio'),
+                label: const Text('🧭 Buscador web'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
