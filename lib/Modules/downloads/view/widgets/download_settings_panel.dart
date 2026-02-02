@@ -54,7 +54,9 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _getQualityDescription(settingsCtrl.downloadQuality.value),
+                    controller.getQualityDescription(
+                      settingsCtrl.downloadQuality.value,
+                    ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -77,7 +79,9 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _getDataUsageDescription(settingsCtrl.dataUsage.value),
+                    controller.getDataUsageDescription(
+                      settingsCtrl.dataUsage.value,
+                    ),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
@@ -217,27 +221,4 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
     );
   }
 
-  String _getQualityDescription(String quality) {
-    switch (quality) {
-      case 'low':
-        return 'Baja: 128 kbps (audio) / 360p (video) - Menor consumo de datos';
-      case 'medium':
-        return 'Media: 192 kbps (audio) / 720p (video) - Balance calidad/datos';
-      case 'high':
-        return 'Alta: 320 kbps (audio) / 1080p (video) - Máxima calidad';
-      default:
-        return 'Alta: 320 kbps (audio) / 1080p (video) - Máxima calidad';
-    }
-  }
-
-  String _getDataUsageDescription(String usage) {
-    switch (usage) {
-      case 'wifi_only':
-        return 'Solo descargas en redes Wi-Fi';
-      case 'all':
-        return 'Descargas en Wi-Fi y conexiones móviles';
-      default:
-        return 'Descargas en Wi-Fi y conexiones móviles';
-    }
-  }
 }

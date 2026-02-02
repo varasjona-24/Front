@@ -6,17 +6,20 @@ import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart' as dio;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:get/get.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
-import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../../../app/controllers/navigation_controller.dart';
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
+import '../../home/controller/home_controller.dart';
 import '../../sources/domain/source_origin.dart';
+import '../view/edit_media_page.dart';
 
 class DownloadsController extends GetxController {
   // ============================
@@ -40,6 +43,9 @@ class DownloadsController extends GetxController {
   final RxBool sharedArgConsumed = false.obs;
   StreamSubscription<List<SharedMediaFile>>? _shareSub;
 
+  // ============================
+  // 🔁 LIFECYCLE
+  // ============================
   @override
   void onInit() {
     super.onInit();
@@ -53,6 +59,9 @@ class DownloadsController extends GetxController {
     super.onClose();
   }
 
+  // ============================
+  // 🔗 SHARE INTENT
+  // ============================
   Future<void> _listenSharedLinks() async {
     try {
       final initial = await ReceiveSharingIntent.instance.getInitialMedia();
@@ -87,6 +96,9 @@ class DownloadsController extends GetxController {
     });
   }
 
+  // ============================
+  // 🌐 CUSTOM TAB
+  // ============================
   String normalizeImportUrl(String raw) {
     final t = raw.trim();
     if (t.isEmpty) return 'https://m.youtube.com';
@@ -199,6 +211,114 @@ class DownloadsController extends GetxController {
   }
 
   // ============================
+  // 🧭 NAVEGACION UI
+  // ============================
+  void openEditPage(MediaItem item) {
+    Get.to(() => EditMediaMetadataPage(item: item));
+  }
+
+  void playItem(HomeMode mode, List<MediaItem> queue, MediaItem item) {
+    final idx = queue.indexWhere((e) => e.id == item.id);
+    final route = mode == HomeMode.audio
+        ? AppRoutes.audioPlayer
+        : AppRoutes.videoPlayer;
+
+    Get.toNamed(
+      route,
+      arguments: {
+        'queue': queue,
+        'index': idx < 0 ? 0 : idx,
+      },
+    );
+  }
+
+  Future<void> confirmDelete(BuildContext context, MediaItem item) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Eliminar'),
+        content: const Text('¿Eliminar este archivo importado?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok == true) {
+      await delete(item);
+    }
+  }
+
+  Future<void> showItemActions(BuildContext context, MediaItem item) async {
+    final theme = Theme.of(context);
+    final nav = Get.isRegistered<NavigationController>()
+        ? Get.find<NavigationController>()
+        : null;
+
+    nav?.setOverlayOpen(true);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.edit_rounded),
+                  title: const Text('Editar cancion'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    openEditPage(item);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    item.isFavorite
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
+                  ),
+                  title: Text(
+                    item.isFavorite
+                        ? 'Quitar de favoritos'
+                        : 'Agregar a favoritos',
+                  ),
+                  onTap: () async {
+                    Navigator.of(ctx).pop();
+                    await toggleFavorite(item);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: const Text('Borrar del dispositivo'),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    confirmDelete(context, item);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    nav?.setOverlayOpen(false);
+  }
+
+  // ============================
   // 🗑️ ELIMINAR
   // ============================
   Future<void> delete(MediaItem item) async {
@@ -293,6 +413,33 @@ class DownloadsController extends GetxController {
         'No se pudo actualizar',
         snackPosition: SnackPosition.BOTTOM,
       );
+    }
+  }
+
+  // ============================
+  // 🧾 DESCRIPCIONES UI
+  // ============================
+  String getQualityDescription(String quality) {
+    switch (quality) {
+      case 'low':
+        return 'Baja: 128 kbps (audio) / 360p (video) - Menor consumo de datos';
+      case 'medium':
+        return 'Media: 192 kbps (audio) / 720p (video) - Balance calidad/datos';
+      case 'high':
+        return 'Alta: 320 kbps (audio) / 1080p (video) - Máxima calidad';
+      default:
+        return 'Alta: 320 kbps (audio) / 1080p (video) - Máxima calidad';
+    }
+  }
+
+  String getDataUsageDescription(String usage) {
+    switch (usage) {
+      case 'wifi_only':
+        return 'Solo descargas en redes Wi-Fi';
+      case 'all':
+        return 'Descargas en Wi-Fi y conexiones móviles';
+      default:
+        return 'Descargas en Wi-Fi y conexiones móviles';
     }
   }
 

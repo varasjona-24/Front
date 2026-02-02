@@ -10,11 +10,8 @@ import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
-import '../../../app/routes/app_routes.dart';
 import 'widgets/downloads_pill.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
-import 'edit_media_page.dart';
-import '../../../app/controllers/navigation_controller.dart';
 
 class DownloadsPage extends GetView<DownloadsController> {
   const DownloadsPage({super.key});
@@ -133,9 +130,9 @@ class DownloadsPage extends GetView<DownloadsController> {
                                 child: _DownloadTile(
                                   item: list[i],
                                   onPlay: (item) =>
-                                      _playItem(mode, list, item),
+                                      controller.playItem(mode, list, item),
                                   onHold: (item) =>
-                                      _showItemActions(context, item),
+                                      controller.showItemActions(context, item),
                                 ),
                               ),
                             ),
@@ -161,25 +158,6 @@ class DownloadsPage extends GetView<DownloadsController> {
     });
   }
 
-  void _openEdit(BuildContext context, MediaItem item) {
-    Get.to(() => EditMediaMetadataPage(item: item));
-  }
-
-  void _playItem(HomeMode mode, List<MediaItem> queue, MediaItem item) {
-    final idx = queue.indexWhere((e) => e.id == item.id);
-    final route = mode == HomeMode.audio
-        ? AppRoutes.audioPlayer
-        : AppRoutes.videoPlayer;
-
-    Get.toNamed(
-      route,
-      arguments: {
-        'queue': queue,
-        'index': idx < 0 ? 0 : idx,
-      },
-    );
-  }
-
   // ============================
   // UI SECTIONS
   // ============================
@@ -202,91 +180,6 @@ class DownloadsPage extends GetView<DownloadsController> {
         ),
       ],
     );
-  }
-
-  // ============================
-  // 🧩 CONFIRM: ELIMINAR
-  // ============================
-  Future<void> _confirmDelete(BuildContext context, MediaItem item) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Eliminar'),
-        content: const Text('¿Eliminar este archivo importado?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton.tonal(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Eliminar'),
-          ),
-        ],
-      ),
-    );
-
-    if (ok == true) controller.delete(item);
-  }
-
-  Future<void> _showItemActions(BuildContext context, MediaItem item) async {
-    final nav = Get.find<NavigationController>();
-    final theme = Theme.of(context);
-
-    nav.setOverlayOpen(true);
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.edit_rounded),
-                  title: const Text('Editar cancion'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _openEdit(context, item);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(
-                    item.isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                  ),
-                  title: Text(
-                    item.isFavorite
-                        ? 'Quitar de favoritos'
-                        : 'Agregar a favoritos',
-                  ),
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    await controller.toggleFavorite(item);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: const Text('Borrar del dispositivo'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _confirmDelete(context, item);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    nav.setOverlayOpen(false);
   }
 
   Widget _bottomNav({
