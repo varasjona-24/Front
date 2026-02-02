@@ -10,6 +10,9 @@ import '../imports_webview_page.dart';
 class DownloadsPill extends GetView<DownloadsController> {
   const DownloadsPill({super.key});
 
+  // ============================
+  // 🎨 UI
+  // ============================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -105,6 +108,9 @@ class DownloadsPill extends GetView<DownloadsController> {
     );
   }
 
+  // ============================
+  // 🌐 IMPORTS URL (DIALOG)
+  // ============================
   /// 🌐 Dialog mejorado de descargas online
   static Future<void> showImportUrlDialog(
     BuildContext context,
@@ -131,6 +137,9 @@ class DownloadsPill extends GetView<DownloadsController> {
     }
   }
 
+  // ============================
+  // 📁 IMPORTS LOCAL
+  // ============================
   /// 📁 Descargar desde dispositivo local
   Future<void> _pickLocalFiles(BuildContext context) async {
     await controller.pickLocalFilesForImport();

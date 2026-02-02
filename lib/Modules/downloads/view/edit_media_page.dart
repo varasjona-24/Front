@@ -22,6 +22,9 @@ class EditMediaMetadataPage extends StatefulWidget {
 }
 
 class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
+  // ============================
+  // 🧭 ESTADO
+  // ============================
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
 
   late final TextEditingController _titleCtrl;
@@ -30,6 +33,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
   late final TextEditingController _durationCtrl;
   String? _localThumbPath;
 
+  // ============================
+  // 🔁 LIFECYCLE
+  // ============================
   @override
   void initState() {
     super.initState();
@@ -61,6 +67,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     super.dispose();
   }
 
+  // ============================
+  // 💾 ACCIONES
+  // ============================
   Future<void> _save() async {
     final title = _titleCtrl.text.trim();
     if (title.isEmpty) {
@@ -112,6 +121,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     }
   }
 
+  // ============================
+  // 🧩 HELPERS
+  // ============================
   Widget _buildThumbnail(BuildContext context) {
     final theme = Theme.of(context);
     final thumb = _localThumbPath?.trim().isNotEmpty == true
@@ -181,6 +193,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     });
   }
 
+  // ============================
+  // 🎨 UI
+  // ============================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

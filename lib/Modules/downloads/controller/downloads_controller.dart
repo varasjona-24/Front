@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
+import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -29,6 +30,7 @@ class DownloadsController extends GetxController {
   // ============================
   final RxList<MediaItem> downloads = <MediaItem>[].obs;
   final RxBool isLoading = false.obs;
+  final RxBool customTabOpening = false.obs;
 
   // 📁 Archivos locales para importar
   final RxList<MediaItem> localFilesForImport = <MediaItem>[].obs;
@@ -83,6 +85,70 @@ class DownloadsController extends GetxController {
         Get.toNamed(AppRoutes.downloads, arguments: {'sharedUrl': url});
       }
     });
+  }
+
+  String normalizeImportUrl(String raw) {
+    final t = raw.trim();
+    if (t.isEmpty) return 'https://m.youtube.com';
+    if (t.startsWith('http://') || t.startsWith('https://')) return t;
+    return 'https://$t';
+  }
+
+  Future<void> openCustomTab(BuildContext context, String rawUrl) async {
+    if (customTabOpening.value) return;
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final url = normalizeImportUrl(rawUrl);
+    final uri = Uri.tryParse(url);
+    if (uri == null) {
+      Get.snackbar('URL inválida', 'No pude interpretar: $url');
+      return;
+    }
+
+    customTabOpening.value = true;
+    try {
+      await launchUrl(
+        uri,
+        prefersDeepLink: false,
+        customTabsOptions: CustomTabsOptions(
+          browser: const CustomTabsBrowserConfiguration(
+            prefersDefaultBrowser: true,
+            fallbackCustomTabs: <String>[
+              'com.brave.browser',
+              'com.microsoft.emmx',
+              'com.sec.android.app.sbrowser',
+              'com.opera.browser',
+            ],
+          ),
+          colorSchemes: CustomTabsColorSchemes.defaults(
+            toolbarColor: cs.surface,
+          ),
+          showTitle: true,
+          urlBarHidingEnabled: true,
+          shareState: CustomTabsShareState.on,
+          instantAppsEnabled: false,
+          closeButton: CustomTabsCloseButton(
+            icon: CustomTabsCloseButtonIcons.back,
+          ),
+          animations: CustomTabsSystemAnimations.slideIn(),
+        ),
+        safariVCOptions: SafariViewControllerOptions(
+          preferredBarTintColor: cs.surface,
+          preferredControlTintColor: cs.onSurface,
+          barCollapsingEnabled: true,
+          dismissButtonStyle: SafariViewControllerDismissButtonStyle.close,
+        ),
+      );
+    } catch (e) {
+      debugPrint('CustomTab launch error: $e');
+      Get.snackbar(
+        'No se pudo abrir',
+        'No hay navegador compatible (Custom Tabs) disponible o está deshabilitado.',
+      );
+    } finally {
+      customTabOpening.value = false;
+    }
   }
 
   // ============================

@@ -19,6 +19,9 @@ import '../../../app/controllers/navigation_controller.dart';
 class DownloadsPage extends GetView<DownloadsController> {
   const DownloadsPage({super.key});
 
+  // ============================
+  // 🎨 UI
+  // ============================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);

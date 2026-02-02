@@ -9,6 +9,9 @@ import '../../../../app/ui/themes/app_spacing.dart';
 class DownloadSettingsPanel extends GetView<DownloadsController> {
   const DownloadSettingsPanel({super.key});
 
+  // ============================
+  // 🎨 UI
+  // ============================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -113,6 +116,9 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
     );
   }
 
+  // ============================
+  // 🧩 HELPERS UI
+  // ============================
   Widget _buildQualityChip({
     required BuildContext context,
     required String label,
@@ -173,6 +179,9 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
     );
   }
 
+  // ============================
+  // 🧩 HELPERS UI
+  // ============================
   Widget _buildDataUsageChip({
     required BuildContext context,
     required String label,
