@@ -11,6 +11,7 @@ import '../../../app/models/media_item.dart';
 import '../../home/controller/home_controller.dart';
 import '../controller/playlists_controller.dart';
 import '../domain/playlist.dart';
+import '../../../app/utils/format_bytes.dart';
 
 class PlaylistDetailPage extends GetView<PlaylistsController> {
   const PlaylistDetailPage._({required this.playlistId, required this.isSmart});
@@ -43,6 +44,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
                 : const <MediaItem>[]);
 
       final cover = _resolveCover(playlist, items);
+      final totalBytes = _totalBytes(items);
 
       return Scaffold(
         backgroundColor: Colors.transparent,
@@ -58,7 +60,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
               AppSpacing.lg,
             ),
             children: [
-              _header(theme, title, cover, items.length),
+              _header(theme, title, cover, items.length, totalBytes),
               const SizedBox(height: 14),
               _actionRow(items),
               const SizedBox(height: 16),
@@ -101,6 +103,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
     String? title,
     ImageProvider? cover,
     int count,
+    int totalBytes,
   ) {
     final scheme = theme.colorScheme;
     return Row(
@@ -136,7 +139,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
               ),
               const SizedBox(height: 6),
               Text(
-                '$count canciones',
+                _buildMetaLine(count, totalBytes),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
@@ -146,6 +149,22 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
         ),
       ],
     );
+  }
+
+  String _buildMetaLine(int count, int totalBytes) {
+    final sizeLabel = totalBytes > 0 ? formatBytes(totalBytes) : '';
+    if (sizeLabel.isEmpty) return '$count canciones';
+    return '$count canciones · $sizeLabel';
+  }
+
+  int _totalBytes(List<MediaItem> items) {
+    var total = 0;
+    for (final item in items) {
+      final v = item.localAudioVariant ?? item.localVideoVariant;
+      final size = v?.size ?? 0;
+      if (size > 0) total += size;
+    }
+    return total;
   }
 
   Widget _actionRow(List<MediaItem> items) {

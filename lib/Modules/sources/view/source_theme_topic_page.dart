@@ -18,6 +18,7 @@ import '../domain/source_theme_topic_playlist.dart';
 import '../ui/source_color_picker_field.dart';
 import '../ui/source_playlist_card.dart';
 import 'source_theme_topic_playlist_page.dart';
+import '../../../app/utils/format_bytes.dart';
 
 // ============================
 // 🧭 PAGE: TOPIC
@@ -44,6 +45,7 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
   // ============================
   final SourcesController _sources = Get.find<SourcesController>();
   final MediaActionsController _actions = Get.find<MediaActionsController>();
+  String? _topicSizeLabel;
 
   SourceThemeTopic? get _topic {
     for (final t in _sources.topics) {
@@ -138,7 +140,7 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
               ),
               const SizedBox(height: 6),
               Text(
-                '${topic.itemIds.length} items · $listCount listas',
+                _buildTopicMetaLine(topic, listCount),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
                 ),
@@ -148,6 +150,12 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
         ),
       ],
     );
+  }
+
+  String _buildTopicMetaLine(SourceThemeTopic topic, int listCount) {
+    final base = '${topic.itemIds.length} items · $listCount listas';
+    if (_topicSizeLabel == null || _topicSizeLabel!.isEmpty) return base;
+    return '$base · ${_topicSizeLabel!}';
   }
 
   Widget _actionRow(SourceThemeTopic topic) {
@@ -180,6 +188,12 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
       future: _loadItems(topic),
       builder: (context, snap) {
         final items = snap.data ?? const <MediaItem>[];
+        final nextSize = _formatSizeLabel(items);
+        if (nextSize != _topicSizeLabel) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _topicSizeLabel = nextSize);
+          });
+        }
         if (items.isEmpty) {
           return Text(
             'No hay items todavía.',
@@ -219,6 +233,17 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
         );
       },
     );
+  }
+
+  String? _formatSizeLabel(List<MediaItem> items) {
+    var total = 0;
+    for (final item in items) {
+      final v = item.localAudioVariant ?? item.localVideoVariant;
+      final size = v?.size ?? 0;
+      if (size > 0) total += size;
+    }
+    if (total <= 0) return null;
+    return formatBytes(total);
   }
 
   Widget _playlistsSection(

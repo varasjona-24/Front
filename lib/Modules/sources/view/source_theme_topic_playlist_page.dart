@@ -16,6 +16,7 @@ import '../domain/source_theme.dart';
 import '../domain/source_theme_topic_playlist.dart';
 import '../ui/source_color_picker_field.dart';
 import '../ui/source_playlist_card.dart';
+import '../../../app/utils/format_bytes.dart';
 
 // ============================
 // 🧭 PAGE: PLAYLIST
@@ -44,6 +45,7 @@ class _SourceThemeTopicPlaylistPageState
   // ============================
   final SourcesController _sources = Get.find<SourcesController>();
   final MediaActionsController _actions = Get.find<MediaActionsController>();
+  String? _playlistSizeLabel;
 
   SourceThemeTopicPlaylist? get _playlist {
     for (final p in _sources.topicPlaylists) {
@@ -89,7 +91,7 @@ class _SourceThemeTopicPlaylistPageState
             ),
             children: [
               Text(
-                '${playlist.itemIds.length} items · ${children.length} listas',
+                _buildMetaLine(playlist.itemIds.length, children.length),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -134,6 +136,12 @@ class _SourceThemeTopicPlaylistPageState
       future: _loadItems(playlist),
       builder: (context, snap) {
         final items = snap.data ?? const <MediaItem>[];
+        final nextSize = _formatSizeLabel(items);
+        if (nextSize != _playlistSizeLabel) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _playlistSizeLabel = nextSize);
+          });
+        }
         if (items.isEmpty) {
           return Text(
             'No hay items todavía.',
@@ -173,6 +181,23 @@ class _SourceThemeTopicPlaylistPageState
         );
       },
     );
+  }
+
+  String _buildMetaLine(int itemCount, int listCount) {
+    final base = '$itemCount items · $listCount listas';
+    if (_playlistSizeLabel == null || _playlistSizeLabel!.isEmpty) return base;
+    return '$base · ${_playlistSizeLabel!}';
+  }
+
+  String? _formatSizeLabel(List<MediaItem> items) {
+    var total = 0;
+    for (final item in items) {
+      final v = item.localAudioVariant ?? item.localVideoVariant;
+      final size = v?.size ?? 0;
+      if (size > 0) total += size;
+    }
+    if (total <= 0) return null;
+    return formatBytes(total);
   }
 
   Widget _subListsSection(

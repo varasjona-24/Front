@@ -11,6 +11,7 @@ import '../../../app/data/local/local_library_store.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/controllers/navigation_controller.dart';
+import '../../../app/utils/format_bytes.dart';
 
 class EditMediaMetadataPage extends StatefulWidget {
   const EditMediaMetadataPage({super.key, required this.item});
@@ -170,6 +171,17 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     return any.isNotEmpty ? any : null;
   }
 
+  int? _resolveSizeBytes() {
+    final local = widget.item.localAudioVariant ?? widget.item.localVideoVariant;
+    if (local?.size != null && local!.size! > 0) return local.size;
+
+    for (final v in widget.item.variants) {
+      if (v.size != null && v.size! > 0) return v.size;
+    }
+
+    return null;
+  }
+
   Future<void> _pickLocalThumbnail() async {
     final res = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -273,6 +285,15 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
                             const SizedBox(height: 4),
                             Text(
                               'Formato: ${_audioFormat()!.toUpperCase()}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                          if (_resolveSizeBytes() != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              'Peso: ${formatBytes(_resolveSizeBytes()!)}',
                               style: theme.textTheme.labelSmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
