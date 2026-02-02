@@ -470,48 +470,56 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
           title: Text('Nueva temática (${themeMeta.title})'),
           content: StatefulBuilder(
             builder: (ctx2, setState) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    onChanged: (v) => name = v,
-                    decoration: const InputDecoration(
-                      hintText: 'Nombre',
+              return SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      onChanged: (v) => name = v,
+                      decoration: const InputDecoration(
+                        hintText: 'Nombre',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    onChanged: (v) => coverUrl = v,
-                    decoration: const InputDecoration(
-                      hintText: 'URL de imagen (opcional)',
+                    const SizedBox(height: 10),
+                    TextField(
+                      onChanged: (v) => coverUrl = v,
+                      decoration: const InputDecoration(
+                        hintText: 'URL de imagen (opcional)',
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  _ColorPickerField(
-                    color: colorValue != null ? Color(colorValue!) : draftColor,
-                    onChanged: (c) => setState(() {
-                      draftColor = c;
-                      colorValue = c.value;
-                    }),
-                  ),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final res = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-                      );
-                      final file = (res != null && res.files.isNotEmpty)
-                          ? res.files.first
-                          : null;
-                      if (file?.path != null) {
-                        coverLocal = file!.path!;
-                      }
-                    },
-                    icon: const Icon(Icons.folder_open_rounded),
-                    label: const Text('Elegir imagen'),
-                  ),
-                ],
+                    const SizedBox(height: 10),
+                    _ColorPickerField(
+                      color:
+                          colorValue != null ? Color(colorValue!) : draftColor,
+                      onChanged: (c) => setState(() {
+                        draftColor = c;
+                        colorValue = c.value;
+                      }),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final res = await FilePicker.platform.pickFiles(
+                          type: FileType.custom,
+                          allowedExtensions: const [
+                            'jpg',
+                            'jpeg',
+                            'png',
+                            'webp',
+                          ],
+                        );
+                        final file = (res != null && res.files.isNotEmpty)
+                            ? res.files.first
+                            : null;
+                        if (file?.path != null) {
+                          coverLocal = file!.path!;
+                        }
+                      },
+                      icon: const Icon(Icons.folder_open_rounded),
+                      label: const Text('Elegir imagen'),
+                    ),
+                  ],
+                ),
               );
             },
           ),

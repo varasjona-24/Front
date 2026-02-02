@@ -1,7 +1,5 @@
 import 'dart:io';
 
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -18,7 +16,7 @@ import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../home/controller/home_controller.dart';
-import '../../downloads/view/edit_media_page.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 
 class SourceThemeTopicPage extends StatefulWidget {
   const SourceThemeTopicPage({
@@ -39,6 +37,7 @@ class SourceThemeTopicPage extends StatefulWidget {
 class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
   final SourcesController _sources = Get.find<SourcesController>();
   final MediaRepository _repo = Get.find<MediaRepository>();
+  final MediaActionsController _actions = Get.find<MediaActionsController>();
 
   SourceThemeTopic? get _topic {
     for (final t in _sources.topics) {
@@ -574,7 +573,7 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
                 title: const Text('Editar'),
                 onTap: () async {
                   Navigator.of(ctx).pop();
-                  await Get.to(() => EditMediaMetadataPage(item: item));
+                  await _actions.openEditPage(item);
                   if (mounted) setState(() {});
                 },
               ),

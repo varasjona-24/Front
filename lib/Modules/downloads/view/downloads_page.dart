@@ -12,6 +12,8 @@ import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import 'widgets/downloads_pill.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
+import '../../../app/routes/app_routes.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 
 class DownloadsPage extends GetView<DownloadsController> {
   const DownloadsPage({super.key});
@@ -24,6 +26,7 @@ class DownloadsPage extends GetView<DownloadsController> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final actions = Get.find<MediaActionsController>();
 
     final barBg = Color.alphaBlend(
       scheme.primary.withOpacity(isDark ? 0.24 : 0.28),
@@ -129,10 +132,12 @@ class DownloadsPage extends GetView<DownloadsController> {
                                 padding: const EdgeInsets.only(bottom: 10),
                                 child: _DownloadTile(
                                   item: list[i],
-                                  onPlay: (item) =>
-                                      controller.playItem(mode, list, item),
-                                  onHold: (item) =>
-                                      controller.showItemActions(context, item),
+                                  onPlay: (item) => _playItem(mode, list, item),
+                                  onHold: (item) => actions.showItemActions(
+                                        context,
+                                        item,
+                                        onChanged: controller.load,
+                                      ),
                                 ),
                               ),
                             ),
@@ -156,6 +161,21 @@ class DownloadsPage extends GetView<DownloadsController> {
         ),
       );
     });
+  }
+
+  void _playItem(HomeMode mode, List<MediaItem> queue, MediaItem item) {
+    final idx = queue.indexWhere((e) => e.id == item.id);
+    final route = mode == HomeMode.audio
+        ? AppRoutes.audioPlayer
+        : AppRoutes.videoPlayer;
+
+    Get.toNamed(
+      route,
+      arguments: {
+        'queue': queue,
+        'index': idx < 0 ? 0 : idx,
+      },
+    );
   }
 
   // ============================

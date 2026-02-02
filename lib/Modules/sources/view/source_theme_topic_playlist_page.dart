@@ -6,11 +6,11 @@ import 'package:get/get.dart';
 
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../home/controller/home_controller.dart';
-import '../../downloads/view/edit_media_page.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
@@ -37,6 +37,7 @@ class _SourceThemeTopicPlaylistPageState
     extends State<SourceThemeTopicPlaylistPage> {
   final SourcesController _sources = Get.find<SourcesController>();
   final MediaRepository _repo = Get.find<MediaRepository>();
+  final MediaActionsController _actions = Get.find<MediaActionsController>();
 
   SourceThemeTopicPlaylist? get _playlist {
     for (final p in _sources.topicPlaylists) {
@@ -550,7 +551,7 @@ class _SourceThemeTopicPlaylistPageState
                 title: const Text('Editar'),
                 onTap: () async {
                   Navigator.of(ctx).pop();
-                  await Get.to(() => EditMediaMetadataPage(item: item));
+                  await _actions.openEditPage(item);
                   if (mounted) setState(() {});
                 },
               ),

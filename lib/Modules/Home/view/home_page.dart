@@ -10,10 +10,9 @@ import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/list/media_horizontal_list.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
-import '../../downloads/view/edit_media_page.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 import 'section_list_page.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
-import '../../../app/controllers/navigation_controller.dart';
 
 /// ===============================================================
 /// HOME PAGE (corregida)
@@ -24,72 +23,6 @@ import '../../../app/controllers/navigation_controller.dart';
 class HomePage extends GetView<HomeController> {
   const HomePage({super.key});
 
-  /// Abre la pantalla de edición de metadata
-  void _openEdit(BuildContext context, MediaItem item) {
-    Get.to(() => EditMediaMetadataPage(item: item));
-  }
-
-  /// Modal de acciones (editar / favoritos / borrar)
-  Future<void> _showItemActions(BuildContext context, MediaItem item) async {
-    final nav = Get.find<NavigationController>();
-    final theme = Theme.of(context);
-
-    nav.setOverlayOpen(true);
-    await showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      backgroundColor: theme.colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.edit_rounded),
-                  title: const Text('Editar cancion'),
-                  onTap: () {
-                    Navigator.of(ctx).pop();
-                    _openEdit(context, item);
-                  },
-                ),
-                ListTile(
-                  leading: Icon(
-                    item.isFavorite
-                        ? Icons.favorite_rounded
-                        : Icons.favorite_border_rounded,
-                  ),
-                  title: Text(
-                    item.isFavorite
-                        ? 'Quitar de favoritos'
-                        : 'Agregar a favoritos',
-                  ),
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    await controller.toggleFavorite(item);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.delete_outline_rounded),
-                  title: const Text('Borrar del dispositivo'),
-                  onTap: () async {
-                    Navigator.of(ctx).pop();
-                    await controller.deleteLocalItem(item);
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-    nav.setOverlayOpen(false);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Obx(() {
@@ -97,6 +30,7 @@ class HomePage extends GetView<HomeController> {
       // 1) Estado del controlador
       // ===========================================================
       final mode = controller.mode.value;
+      final actions = Get.find<MediaActionsController>();
 
       // ===========================================================
       // 2) Theme + safe area (para padding inferior correcto)
@@ -170,7 +104,11 @@ class HomePage extends GetView<HomeController> {
                                             controller.favorites,
                                           ),
                                       onItemLongPress: (item, _) =>
-                                          _showItemActions(context, item),
+                                          actions.showItemActions(
+                                            context,
+                                            item,
+                                            onChanged: controller.loadHome,
+                                          ),
                                     ),
                                   ),
                                   onItemTap: (item, index) =>
@@ -180,7 +118,11 @@ class HomePage extends GetView<HomeController> {
                                       controller.favorites,
                                     ),
                                 onItemLongPress: (item, _) {
-                                  _showItemActions(context, item);
+                                  actions.showItemActions(
+                                    context,
+                                    item,
+                                    onChanged: controller.loadHome,
+                                  );
                                 },
                               ),
                                 const SizedBox(height: 18),
@@ -201,7 +143,11 @@ class HomePage extends GetView<HomeController> {
                                             controller.mostPlayed,
                                           ),
                                       onItemLongPress: (item, _) =>
-                                          _showItemActions(context, item),
+                                          actions.showItemActions(
+                                            context,
+                                            item,
+                                            onChanged: controller.loadHome,
+                                          ),
                                     ),
                                   ),
                                 ),
@@ -214,7 +160,11 @@ class HomePage extends GetView<HomeController> {
                                     controller.mostPlayed,
                                   ),
                                   onLongPress: (item, _) {
-                                    _showItemActions(context, item);
+                                    actions.showItemActions(
+                                      context,
+                                      item,
+                                      onChanged: controller.loadHome,
+                                    );
                                   },
                                 ),
                                 const SizedBox(height: 18),
@@ -236,7 +186,11 @@ class HomePage extends GetView<HomeController> {
                                             controller.recentlyPlayed,
                                           ),
                                       onItemLongPress: (item, _) =>
-                                          _showItemActions(context, item),
+                                          actions.showItemActions(
+                                            context,
+                                            item,
+                                            onChanged: controller.loadHome,
+                                          ),
                                     ),
                                   ),
                                   onItemTap: (item, index) =>
@@ -246,7 +200,11 @@ class HomePage extends GetView<HomeController> {
                                         controller.recentlyPlayed,
                                       ),
                                   onItemLongPress: (item, _) {
-                                    _showItemActions(context, item);
+                                    actions.showItemActions(
+                                      context,
+                                      item,
+                                      onChanged: controller.loadHome,
+                                    );
                                   },
                                 ),
                               if (controller.recentlyPlayed.isNotEmpty)
@@ -267,7 +225,11 @@ class HomePage extends GetView<HomeController> {
                                             controller.featured,
                                           ),
                                       onItemLongPress: (item, _) =>
-                                          _showItemActions(context, item),
+                                          actions.showItemActions(
+                                            context,
+                                            item,
+                                            onChanged: controller.loadHome,
+                                          ),
                                     ),
                                   ),
                                   trailing: _PillButton(
@@ -289,7 +251,11 @@ class HomePage extends GetView<HomeController> {
                                     controller.featured,
                                   ),
                                   onLongPress: (item, _) =>
-                                      _showItemActions(context, item),
+                                      actions.showItemActions(
+                                        context,
+                                        item,
+                                        onChanged: controller.loadHome,
+                                      ),
                                 ),
                                 const SizedBox(height: 18),
                               ],
@@ -310,7 +276,11 @@ class HomePage extends GetView<HomeController> {
                                             controller.latestDownloads,
                                           ),
                                       onItemLongPress: (item, _) =>
-                                          _showItemActions(context, item),
+                                          actions.showItemActions(
+                                            context,
+                                            item,
+                                            onChanged: controller.loadHome,
+                                          ),
                                     ),
                                   ),
                                   onItemTap: (item, index) =>
@@ -320,7 +290,11 @@ class HomePage extends GetView<HomeController> {
                                         controller.latestDownloads,
                                       ),
                                   onItemLongPress: (item, _) {
-                                    _showItemActions(context, item);
+                                    actions.showItemActions(
+                                      context,
+                                      item,
+                                      onChanged: controller.loadHome,
+                                    );
                                   },
                                 ),
                               ],

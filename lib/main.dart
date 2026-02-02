@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'app/controllers/theme_controller.dart';
 import 'app/controllers/navigation_controller.dart';
+import 'app/controllers/media_actions_controller.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/ui/themes/app_theme_factory.dart';
@@ -79,6 +80,9 @@ Future<void> main() async {
 
   // 💾 Local storage
   Get.put(LocalLibraryStore(Get.find<GetStorage>()), permanent: true);
+
+  // 🧩 Controller global de acciones de media
+  Get.put(MediaActionsController(), permanent: true);
 
   // 📦 Repositorio de media
   Get.lazyPut<MediaRepository>(() => MediaRepository(), fenix: true);
