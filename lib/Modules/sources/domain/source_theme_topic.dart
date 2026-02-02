@@ -1,3 +1,6 @@
+// ============================
+// 🧩 MODELO: TOPIC
+// ============================
 class SourceThemeTopic {
   const SourceThemeTopic({
     required this.id,
@@ -11,6 +14,9 @@ class SourceThemeTopic {
     this.colorValue,
   });
 
+  // ============================
+  // 📌 PROPIEDADES
+  // ============================
   final String id;
   final String themeId;
   final String title;
@@ -21,6 +27,9 @@ class SourceThemeTopic {
   final String? coverLocalPath;
   final int? colorValue;
 
+  // ============================
+  // 🧬 COPY
+  // ============================
   SourceThemeTopic copyWith({
     String? id,
     String? themeId,
@@ -45,6 +54,9 @@ class SourceThemeTopic {
     );
   }
 
+  // ============================
+  // 🔁 SERIALIZACION
+  // ============================
   factory SourceThemeTopic.fromJson(Map<String, dynamic> json) {
     final rawItems = (json['itemIds'] as List?) ?? const [];
     final rawPlaylists = (json['playlistIds'] as List?) ?? const [];

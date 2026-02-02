@@ -1,5 +1,8 @@
 import 'source_origin.dart';
 
+// ============================
+// 🔍 DETECCION POR URL (LEGACY)
+// ============================
 SourceOrigin detectSourceOriginFromUrl(String url) {
   final u = url.toLowerCase();
 

@@ -1,20 +1,26 @@
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
+import '../../../app/data/repo/media_repository.dart';
 import '../controller/sources_controller.dart';
 import '../data/source_theme_pill_store.dart';
 import '../data/source_theme_topic_store.dart';
 import '../data/source_theme_topic_playlist_store.dart';
-import '../../../app/data/repo/media_repository.dart';
 import '../../playlists/data/playlist_store.dart';
 
 class SourcesBinding extends Bindings {
   @override
   void dependencies() {
+    // ============================
+    // ♻️ RESET MODULO
+    // ============================
     if (Get.isRegistered<SourcesController>()) {
       Get.delete<SourcesController>(force: true);
     }
 
+    // ============================
+    // 💾 STORES / REPO
+    // ============================
     if (!Get.isRegistered<GetStorage>()) {
       Get.put(GetStorage(), permanent: true);
     }
@@ -37,6 +43,9 @@ class SourcesBinding extends Bindings {
       Get.put(PlaylistStore(Get.find<GetStorage>()), permanent: true);
     }
 
+    // ============================
+    // 🧠 CONTROLLER
+    // ============================
     Get.put<SourcesController>(SourcesController());
   }
 }

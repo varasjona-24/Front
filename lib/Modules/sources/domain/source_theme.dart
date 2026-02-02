@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../app/models/media_item.dart';
 import 'source_origin.dart';
 
+// ============================
+// 🧩 MODELO: TEMATICA
+// ============================
 class SourceTheme {
   const SourceTheme({
     required this.id,
@@ -15,6 +18,9 @@ class SourceTheme {
     this.forceKind,
   });
 
+  // ============================
+  // 📌 PROPIEDADES
+  // ============================
   final String id;
   final String title;
   final String subtitle;

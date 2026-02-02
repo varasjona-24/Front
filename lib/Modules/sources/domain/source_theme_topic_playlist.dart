@@ -1,3 +1,6 @@
+// ============================
+// 🧩 MODELO: PLAYLIST
+// ============================
 class SourceThemeTopicPlaylist {
   const SourceThemeTopicPlaylist({
     required this.id,
@@ -12,6 +15,9 @@ class SourceThemeTopicPlaylist {
     this.colorValue,
   });
 
+  // ============================
+  // 📌 PROPIEDADES
+  // ============================
   final String id;
   final String topicId;
   final String name;
@@ -23,6 +29,9 @@ class SourceThemeTopicPlaylist {
   final String? coverLocalPath;
   final int? colorValue;
 
+  // ============================
+  // 🧬 COPY
+  // ============================
   SourceThemeTopicPlaylist copyWith({
     String? id,
     String? topicId,
@@ -49,6 +58,9 @@ class SourceThemeTopicPlaylist {
     );
   }
 
+  // ============================
+  // 🔁 SERIALIZACION
+  // ============================
   Map<String, dynamic> toJson() => {
         'id': id,
         'topicId': topicId,

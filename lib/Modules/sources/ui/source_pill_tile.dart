@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../domain/source_pill_data.dart';
 
+// ============================
+// 🧱 UI: PILL DE ORIGEN
+// ============================
 class SourcePillTile extends StatelessWidget {
   const SourcePillTile({super.key, required this.data});
 

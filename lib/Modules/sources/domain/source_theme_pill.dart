@@ -1,5 +1,8 @@
 import 'source_origin.dart';
 
+// ============================
+// 🧩 MODELO: PILL
+// ============================
 class SourceThemePill {
   const SourceThemePill({
     required this.id,
@@ -9,12 +12,18 @@ class SourceThemePill {
     required this.createdAt,
   });
 
+  // ============================
+  // 📌 PROPIEDADES
+  // ============================
   final String id;
   final String themeId;
   final String title;
   final List<SourceOrigin> origins;
   final int createdAt;
 
+  // ============================
+  // 🧬 COPY
+  // ============================
   SourceThemePill copyWith({
     String? id,
     String? themeId,
@@ -31,6 +40,9 @@ class SourceThemePill {
     );
   }
 
+  // ============================
+  // 🔁 SERIALIZACION
+  // ============================
   factory SourceThemePill.fromJson(Map<String, dynamic> json) {
     final rawOrigins = (json['origins'] as List?) ?? const [];
     return SourceThemePill(

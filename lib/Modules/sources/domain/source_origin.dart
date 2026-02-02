@@ -1,3 +1,6 @@
+// ============================
+// 🌐 ORIGENES DE MEDIA
+// ============================
 /// Mismos origins que el backend detecta + device para imports.
 enum SourceOrigin {
   device,
@@ -22,6 +25,9 @@ enum SourceOrigin {
   generic,
 }
 
+// ============================
+// 🔁 MAPEOS / SERIALIZACION
+// ============================
 extension SourceOriginX on SourceOrigin {
   String get key {
     switch (this) {

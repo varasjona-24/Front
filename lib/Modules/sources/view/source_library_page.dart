@@ -2,24 +2,24 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import '../../../app/data/repo/media_repository.dart';
-import '../../../app/models/media_item.dart';
-import '../../player/audio/view/audio_player_page.dart';
-import '../domain/source_origin.dart';
-import '../../settings/controller/settings_controller.dart';
 import 'package:file_picker/file_picker.dart';
+
+import '../../../app/models/media_item.dart';
+import '../../../app/ui/widgets/navigation/app_top_bar.dart';
+import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
+import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../home/controller/home_controller.dart';
+import '../../player/audio/view/audio_player_page.dart';
+import '../../settings/controller/settings_controller.dart';
 import '../controller/sources_controller.dart';
+import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic.dart';
 import 'source_theme_topic_page.dart';
 
-// UI
-import '../../../app/ui/widgets/navigation/app_top_bar.dart';
-import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
-import '../../../app/ui/widgets/layout/app_gradient_background.dart';
-import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
-
+// ============================
+// 🧭 PAGE: SOURCE LIBRARY
+// ============================
 class SourceLibraryPage extends StatefulWidget {
   const SourceLibraryPage({
     super.key,
@@ -43,49 +43,31 @@ class SourceLibraryPage extends StatefulWidget {
 }
 
 class _SourceLibraryPageState extends State<SourceLibraryPage> {
-  final MediaRepository _repo = Get.find<MediaRepository>();
   final SettingsController _settings = Get.find<SettingsController>();
   final SourcesController _sources = Get.find<SourcesController>();
 
+  // ============================
+  // 📚 DATA
+  // ============================
   Future<List<MediaItem>> _load([HomeMode? mode]) async {
-    final all = await _repo.getLibrary();
-    Iterable<MediaItem> items = all;
+    final modeKind = mode == null
+        ? null
+        : (mode == HomeMode.audio
+            ? MediaVariantKind.audio
+            : MediaVariantKind.video);
 
-    if (widget.onlyOffline) {
-      items = items.where((e) => e.isOfflineStored);
-    }
-
-    if (widget.origin != null) {
-      items = items.where((e) => e.origin == widget.origin);
-    }
-
-    if (widget.origins != null && widget.origins!.isNotEmpty) {
-      final set = widget.origins!.toSet();
-      items = items.where((e) => set.contains(e.origin));
-    }
-
-    final kind = widget.forceKind;
-    if (kind != null) {
-      items = items.where(
-        (e) => e.variants.any((v) => v.kind == kind),
-      );
-    } else if (mode != null) {
-      final isAudio = mode == HomeMode.audio;
-      items = items.where(
-        (e) => isAudio
-            ? e.variants.any((v) => v.kind == MediaVariantKind.audio)
-            : e.variants.any((v) => v.kind == MediaVariantKind.video),
-      );
-    }
-
-    final list = items.toList();
-    list.sort(
-      (a, b) =>
-          (b.variants.first.createdAt).compareTo(a.variants.first.createdAt),
+    return _sources.loadLibraryItems(
+      onlyOffline: widget.onlyOffline,
+      origin: widget.origin,
+      origins: widget.origins,
+      forceKind: widget.forceKind,
+      modeKind: modeKind,
     );
-    return list;
   }
 
+  // ============================
+  // 🧱 UI
+  // ============================
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -333,7 +315,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   barrierDismissible: false,
                 );
 
-                final ok = await _repo.requestAndFetchMedia(
+                final ok = await _sources.requestAndFetchMedia(
                   mediaId: mediaId,
                   url: null,
                   kind: kind,
@@ -456,6 +438,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
     );
   }
 
+  // ============================
+  // 🪄 DIALOGOS
+  // ============================
   Future<void> _openCreateTopic(SourceTheme themeMeta) async {
     String name = '';
     String? coverUrl;

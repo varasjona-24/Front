@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'source_origin.dart';
 
+// ============================
+// 🧩 MODELO UI (PILL)
+// ============================
 class SourcePillData {
   const SourcePillData({
     required this.origin,
@@ -12,6 +15,9 @@ class SourcePillData {
     this.forceDarkText = false,
   });
 
+  // ============================
+  // 📌 PROPIEDADES
+  // ============================
   final SourceOrigin origin;
   final String title;
   final String subtitle;

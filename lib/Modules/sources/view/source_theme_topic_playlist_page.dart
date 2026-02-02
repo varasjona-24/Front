@@ -4,9 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../app/data/repo/media_repository.dart';
-import '../../../app/models/media_item.dart';
 import '../../../app/controllers/media_actions_controller.dart';
+import '../../../app/models/media_item.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
@@ -16,6 +15,9 @@ import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic_playlist.dart';
 
+// ============================
+// 🧭 PAGE: PLAYLIST
+// ============================
 class SourceThemeTopicPlaylistPage extends StatefulWidget {
   const SourceThemeTopicPlaylistPage({
     super.key,
@@ -35,8 +37,10 @@ class SourceThemeTopicPlaylistPage extends StatefulWidget {
 
 class _SourceThemeTopicPlaylistPageState
     extends State<SourceThemeTopicPlaylistPage> {
+  // ============================
+  // 🔌 DEPENDENCIAS
+  // ============================
   final SourcesController _sources = Get.find<SourcesController>();
-  final MediaRepository _repo = Get.find<MediaRepository>();
   final MediaActionsController _actions = Get.find<MediaActionsController>();
 
   SourceThemeTopicPlaylist? get _playlist {
@@ -48,6 +52,9 @@ class _SourceThemeTopicPlaylistPageState
 
   @override
   Widget build(BuildContext context) {
+    // ============================
+    // 🧱 UI
+    // ============================
     final theme = Theme.of(context);
     final home = Get.find<HomeController>();
 
@@ -213,28 +220,20 @@ class _SourceThemeTopicPlaylistPageState
   }
 
   Future<List<MediaItem>> _loadItems(SourceThemeTopicPlaylist playlist) async {
-    final all = await _repo.getLibrary();
-    final origins = widget.origins;
-    final allowedOrigins = origins != null && origins.isNotEmpty
-        ? origins.toSet()
-        : widget.theme.defaultOrigins.toSet();
-
-    Iterable<MediaItem> items = all;
-    if (widget.theme.forceKind != null) {
-      final kind = widget.theme.forceKind!;
-      items = items.where((e) => e.variants.any((v) => v.kind == kind));
-    }
-
-    final filtered = allowedOrigins.isNotEmpty
-        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
-        : items.toList();
-
-    final idSet = playlist.itemIds.toSet();
-    final base = filtered.isNotEmpty ? filtered : items.toList();
-    return base.where((e) => idSet.contains(_keyForItem(e))).toList();
+    // ============================
+    // 📚 DATA: CARGA
+    // ============================
+    return _sources.loadPlaylistItems(
+      theme: widget.theme,
+      playlist: playlist,
+      origins: widget.origins,
+    );
   }
 
   Future<void> _addItems(SourceThemeTopicPlaylist playlist) async {
+    // ============================
+    // 🪄 DIALOGO: AGREGAR ITEMS
+    // ============================
     final list = await _candidateItems();
     final selected = <String>{};
 
@@ -293,7 +292,7 @@ class _SourceThemeTopicPlaylistPageState
                               itemCount: list.length,
                               itemBuilder: (ctx3, i) {
                                 final item = list[i];
-                                final key = _keyForItem(item);
+                                final key = _sources.keyForItem(item);
                                 final checked = selected.contains(key);
                                 return CheckboxListTile(
                                   value: checked,
@@ -317,12 +316,15 @@ class _SourceThemeTopicPlaylistPageState
                       child: FilledButton(
                         onPressed: () async {
                           final toAdd = list
-                              .where((item) =>
-                                  selected.contains(_keyForItem(item)))
+                              .where(
+                                (item) => selected.contains(
+                                  _sources.keyForItem(item),
+                                ),
+                              )
                               .toList();
                           final mergedIds = {
                             ...playlist.itemIds,
-                            ...toAdd.map(_keyForItem),
+                            ...toAdd.map(_sources.keyForItem),
                           }.toList();
                           await _sources.updateTopicPlaylist(
                             playlist.copyWith(itemIds: mergedIds),
@@ -485,16 +487,11 @@ class _SourceThemeTopicPlaylistPageState
     SourceThemeTopicPlaylist playlist,
     MediaItem item,
   ) async {
-    final key = _keyForItem(item);
+    final key = _sources.keyForItem(item);
     final updated = playlist.copyWith(
       itemIds: playlist.itemIds.where((e) => e != key).toList(),
     );
     await _sources.updateTopicPlaylist(updated);
-  }
-
-  String _keyForItem(MediaItem item) {
-    final pid = item.publicId.trim();
-    return pid.isNotEmpty ? pid : item.id.trim();
   }
 
   void _playItem(List<MediaItem> list, MediaItem item) {
@@ -512,23 +509,10 @@ class _SourceThemeTopicPlaylistPageState
   }
 
   Future<List<MediaItem>> _candidateItems() async {
-    final all = await _repo.getLibrary();
-    final origins = widget.origins;
-    final allowedOrigins = origins != null && origins.isNotEmpty
-        ? origins.toSet()
-        : widget.theme.defaultOrigins.toSet();
-
-    Iterable<MediaItem> items = all;
-    if (widget.theme.forceKind != null) {
-      final kind = widget.theme.forceKind!;
-      items = items.where((e) => e.variants.any((v) => v.kind == kind));
-    }
-
-    final filtered = allowedOrigins.isNotEmpty
-        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
-        : items.toList();
-
-    return filtered.isNotEmpty ? filtered : items.toList();
+    return _sources.loadCandidateItems(
+      theme: widget.theme,
+      origins: widget.origins,
+    );
   }
 
   Future<void> _showItemActions(

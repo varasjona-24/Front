@@ -4,20 +4,22 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../app/data/repo/media_repository.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 import '../../../app/models/media_item.dart';
+import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/ui/widgets/navigation/app_top_bar.dart';
+import '../../../app/ui/themes/app_spacing.dart';
+import '../../home/controller/home_controller.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic.dart';
 import '../domain/source_theme_topic_playlist.dart';
 import 'source_theme_topic_playlist_page.dart';
-import '../../../app/ui/widgets/layout/app_gradient_background.dart';
-import '../../../app/ui/widgets/navigation/app_top_bar.dart';
-import '../../../app/ui/themes/app_spacing.dart';
-import '../../home/controller/home_controller.dart';
-import '../../../app/controllers/media_actions_controller.dart';
 
+// ============================
+// 🧭 PAGE: TOPIC
+// ============================
 class SourceThemeTopicPage extends StatefulWidget {
   const SourceThemeTopicPage({
     super.key,
@@ -35,8 +37,10 @@ class SourceThemeTopicPage extends StatefulWidget {
 }
 
 class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
+  // ============================
+  // 🔌 DEPENDENCIAS
+  // ============================
   final SourcesController _sources = Get.find<SourcesController>();
-  final MediaRepository _repo = Get.find<MediaRepository>();
   final MediaActionsController _actions = Get.find<MediaActionsController>();
 
   SourceThemeTopic? get _topic {
@@ -48,6 +52,9 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
 
   @override
   Widget build(BuildContext context) {
+    // ============================
+    // 🧱 UI
+    // ============================
     final theme = Theme.of(context);
     final home = Get.find<HomeController>();
 
@@ -165,6 +172,9 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
   }
 
   Widget _itemsSection(SourceThemeTopic topic) {
+    // ============================
+    // 📚 DATA: ITEMS
+    // ============================
     return FutureBuilder<List<MediaItem>>(
       future: _loadItems(topic),
       builder: (context, snap) {
@@ -214,6 +224,9 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
     SourceThemeTopic topic,
     List<SourceThemeTopicPlaylist> list,
   ) {
+    // ============================
+    // 📚 DATA: PLAYLISTS
+    // ============================
     if (list.isEmpty) {
       return Text(
         'No hay listas aún.',
@@ -256,27 +269,20 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
   }
 
   Future<List<MediaItem>> _loadItems(SourceThemeTopic topic) async {
-    final all = await _repo.getLibrary();
-    final origins = widget.origins;
-    final allowedOrigins = origins != null && origins.isNotEmpty
-        ? origins.toSet()
-        : widget.theme.defaultOrigins.toSet();
-
-    Iterable<MediaItem> items = all;
-    if (widget.theme.forceKind != null) {
-      final kind = widget.theme.forceKind!;
-      items = items.where((e) => e.variants.any((v) => v.kind == kind));
-    }
-
-    final idSet = topic.itemIds.toSet();
-    final filtered = allowedOrigins.isNotEmpty
-        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
-        : items.toList();
-    final base = filtered.isNotEmpty ? filtered : items.toList();
-    return base.where((e) => idSet.contains(_keyForItem(e))).toList();
+    // ============================
+    // 📚 DATA: CARGA
+    // ============================
+    return _sources.loadTopicItems(
+      theme: widget.theme,
+      topic: topic,
+      origins: widget.origins,
+    );
   }
 
   Future<void> _addItems(SourceThemeTopic topic) async {
+    // ============================
+    // 🪄 DIALOGO: AGREGAR ITEMS
+    // ============================
     final list = await _candidateItems();
     final selected = <String>{};
 
@@ -335,7 +341,7 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
                               itemCount: list.length,
                               itemBuilder: (ctx3, i) {
                                 final item = list[i];
-                                final key = _keyForItem(item);
+                                final key = _sources.keyForItem(item);
                                 final checked = selected.contains(key);
                                 return CheckboxListTile(
                                   value: checked,
@@ -359,7 +365,10 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
                       child: FilledButton(
                         onPressed: () async {
                           final toAdd = list
-                              .where((item) => selected.contains(_keyForItem(item)))
+                              .where(
+                                (item) =>
+                                    selected.contains(_sources.keyForItem(item)),
+                              )
                               .toList();
                           await _sources.addItemsToTopic(topic, toAdd);
                           if (ctx2.mounted) Navigator.of(ctx2).pop();
@@ -378,6 +387,9 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
   }
 
   Future<void> _addTopicPlaylist(SourceThemeTopic topic) async {
+    // ============================
+    // 🪄 DIALOGO: CREAR LISTA
+    // ============================
     String name = '';
     String? coverUrl;
     String? coverLocal;
@@ -516,11 +528,6 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
     );
   }
 
-  String _keyForItem(MediaItem item) {
-    final pid = item.publicId.trim();
-    return pid.isNotEmpty ? pid : item.id.trim();
-  }
-
   void _playItem(List<MediaItem> list, MediaItem item) {
     final home = Get.find<HomeController>();
     final idx = list.indexWhere((e) => e.id == item.id);
@@ -536,24 +543,10 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
   }
 
   Future<List<MediaItem>> _candidateItems() async {
-    final all = await _repo.getLibrary();
-    final origins = widget.origins;
-    final allowedOrigins = origins != null && origins.isNotEmpty
-        ? origins.toSet()
-        : widget.theme.defaultOrigins.toSet();
-
-    Iterable<MediaItem> items = all;
-    if (widget.theme.forceKind != null) {
-      final kind = widget.theme.forceKind!;
-      items = items.where((e) => e.variants.any((v) => v.kind == kind));
-    }
-
-    final filtered = allowedOrigins.isNotEmpty
-        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
-        : items.toList();
-
-    // Si el filtro por origen no devuelve nada, muestra todo (solo con kind).
-    return filtered.isNotEmpty ? filtered : items.toList();
+    return _sources.loadCandidateItems(
+      theme: widget.theme,
+      origins: widget.origins,
+    );
   }
 
   Future<void> _showItemActions(SourceThemeTopic topic, MediaItem item) async {

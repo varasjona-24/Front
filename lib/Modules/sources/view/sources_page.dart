@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../home/controller/home_controller.dart';
 import '../controller/sources_controller.dart';
-
 import '../domain/source_theme.dart';
 import 'source_library_page.dart';
 
-// UI widgets
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
-import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 
+// ============================
+// 🧭 PAGE: SOURCES
+// ============================
 class SourcesPage extends GetView<SourcesController> {
   const SourcesPage({super.key});
 

@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../app/data/local/local_library_store.dart';
+import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../sources/domain/source_origin.dart';
 import '../domain/source_theme.dart';
@@ -20,12 +21,19 @@ import '../domain/source_theme_topic_playlist.dart';
 import '../data/source_theme_topic_playlist_store.dart';
 
 class SourcesController extends GetxController {
+  // ============================
+  // 🔌 DEPENDENCIAS
+  // ============================
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+  final MediaRepository _repo = Get.find<MediaRepository>();
   final SourceThemePillStore _pillStore = Get.find<SourceThemePillStore>();
   final SourceThemeTopicStore _topicStore = Get.find<SourceThemeTopicStore>();
   final SourceThemeTopicPlaylistStore _topicPlaylistStore =
       Get.find<SourceThemeTopicPlaylistStore>();
 
+  // ============================
+  // 🧠 ESTADO
+  // ============================
   /// Archivos escogidos pero todavía NO importados a la librería interna
   final RxList<MediaItem> localFiles = <MediaItem>[].obs;
 
@@ -36,6 +44,136 @@ class SourcesController extends GetxController {
   final RxList<SourceThemeTopicPlaylist> topicPlaylists =
       <SourceThemeTopicPlaylist>[].obs;
 
+  // ============================
+  // 🧭 HELPERS
+  // ============================
+  String keyForItem(MediaItem item) {
+    final pid = item.publicId.trim();
+    return pid.isNotEmpty ? pid : item.id.trim();
+  }
+
+  // ============================
+  // 📚 LIBRERIA (FILTROS)
+  // ============================
+  Future<List<MediaItem>> loadLibraryItems({
+    bool onlyOffline = false,
+    SourceOrigin? origin,
+    List<SourceOrigin>? origins,
+    MediaVariantKind? forceKind,
+    MediaVariantKind? modeKind,
+  }) async {
+    final all = await _repo.getLibrary();
+    Iterable<MediaItem> items = all;
+
+    if (onlyOffline) {
+      items = items.where((e) => e.isOfflineStored);
+    }
+
+    if (origin != null) {
+      items = items.where((e) => e.origin == origin);
+    }
+
+    if (origins != null && origins.isNotEmpty) {
+      final set = origins.toSet();
+      items = items.where((e) => set.contains(e.origin));
+    }
+
+    if (forceKind != null) {
+      items = items.where(
+        (e) => e.variants.any((v) => v.kind == forceKind),
+      );
+    } else if (modeKind != null) {
+      items = items.where(
+        (e) => e.variants.any((v) => v.kind == modeKind),
+      );
+    }
+
+    final list = items.toList();
+    list.sort(
+      (a, b) =>
+          (b.variants.first.createdAt).compareTo(a.variants.first.createdAt),
+    );
+    return list;
+  }
+
+  // ============================
+  // 🧩 TEMATICAS: ITEMS Y CANDIDATOS
+  // ============================
+  Future<List<MediaItem>> loadTopicItems({
+    required SourceTheme theme,
+    required SourceThemeTopic topic,
+    List<SourceOrigin>? origins,
+  }) async {
+    final all = await _repo.getLibrary();
+    final allowedOrigins = origins != null && origins.isNotEmpty
+        ? origins.toSet()
+        : theme.defaultOrigins.toSet();
+
+    Iterable<MediaItem> items = all;
+    if (theme.forceKind != null) {
+      final kind = theme.forceKind!;
+      items = items.where((e) => e.variants.any((v) => v.kind == kind));
+    }
+
+    final idSet = topic.itemIds.toSet();
+    final filtered = allowedOrigins.isNotEmpty
+        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
+        : items.toList();
+    final base = filtered.isNotEmpty ? filtered : items.toList();
+    return base.where((e) => idSet.contains(keyForItem(e))).toList();
+  }
+
+  Future<List<MediaItem>> loadPlaylistItems({
+    required SourceTheme theme,
+    required SourceThemeTopicPlaylist playlist,
+    List<SourceOrigin>? origins,
+  }) async {
+    final all = await _repo.getLibrary();
+    final allowedOrigins = origins != null && origins.isNotEmpty
+        ? origins.toSet()
+        : theme.defaultOrigins.toSet();
+
+    Iterable<MediaItem> items = all;
+    if (theme.forceKind != null) {
+      final kind = theme.forceKind!;
+      items = items.where((e) => e.variants.any((v) => v.kind == kind));
+    }
+
+    final filtered = allowedOrigins.isNotEmpty
+        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
+        : items.toList();
+
+    final idSet = playlist.itemIds.toSet();
+    final base = filtered.isNotEmpty ? filtered : items.toList();
+    return base.where((e) => idSet.contains(keyForItem(e))).toList();
+  }
+
+  Future<List<MediaItem>> loadCandidateItems({
+    required SourceTheme theme,
+    List<SourceOrigin>? origins,
+  }) async {
+    final all = await _repo.getLibrary();
+    final allowedOrigins = origins != null && origins.isNotEmpty
+        ? origins.toSet()
+        : theme.defaultOrigins.toSet();
+
+    Iterable<MediaItem> items = all;
+    if (theme.forceKind != null) {
+      final kind = theme.forceKind!;
+      items = items.where((e) => e.variants.any((v) => v.kind == kind));
+    }
+
+    final filtered = allowedOrigins.isNotEmpty
+        ? items.where((e) => allowedOrigins.contains(e.origin)).toList()
+        : items.toList();
+
+    // Si el filtro por origen no devuelve nada, muestra todo (solo con kind).
+    return filtered.isNotEmpty ? filtered : items.toList();
+  }
+
+  // ============================
+  // 📥 IMPORTS DESDE DISPOSITIVO
+  // ============================
   Future<void> pickLocalFiles() async {
     final res = await FilePicker.platform.pickFiles(
       allowMultiple: true,
@@ -156,6 +294,28 @@ class SourcesController extends GetxController {
 
   void clearLocal() => localFiles.clear();
 
+  // ============================
+  // ⬇️ DESCARGAS (BACKEND)
+  // ============================
+  Future<bool> requestAndFetchMedia({
+    required String mediaId,
+    String? url,
+    required String kind,
+    required String format,
+    String? quality,
+  }) async {
+    return _repo.requestAndFetchMedia(
+      mediaId: mediaId,
+      url: url,
+      kind: kind,
+      format: format,
+      quality: quality,
+    );
+  }
+
+  // ============================
+  // 🧹 CACHE / ALMACENAMIENTO
+  // ============================
   /// 🗑️ Limpia el caché de descargas y archivos temporales
   Future<void> clearCache() async {
     try {
@@ -198,9 +358,9 @@ class SourcesController extends GetxController {
     }
   }
 
-  // -------------------------
-  // Helpers
-  // -------------------------
+  // ============================
+  // 🧰 HELPERS INTERNOS
+  // ============================
 
   Future<String> _buildStableId(String filePath) async {
     try {
@@ -232,6 +392,9 @@ class SourcesController extends GetxController {
     _loadTopicPlaylists();
   }
 
+  // ============================
+  // 🎛️ CATÁLOGO DE TEMATICAS
+  // ============================
   List<SourceTheme> get themes => [
         SourceTheme(
           id: 'offline',
@@ -326,6 +489,9 @@ class SourcesController extends GetxController {
         ),
       ];
 
+  // ============================
+  // 🧩 CONSULTAS RAPIDAS
+  // ============================
   List<SourceThemePill> pillsForTheme(String themeId) {
     return pills.where((p) => p.themeId == themeId).toList();
   }
@@ -343,6 +509,9 @@ class SourcesController extends GetxController {
         .toList();
   }
 
+  // ============================
+  // 🗂️ TEMATICAS (TOPICS)
+  // ============================
   Future<void> addTopic({
     required String themeId,
     required String title,
@@ -382,6 +551,9 @@ class SourcesController extends GetxController {
     await _loadTopics();
   }
 
+  // ============================
+  // 📚 LISTAS (PLAYLISTS)
+  // ============================
   Future<bool> addTopicPlaylist({
     required String topicId,
     required String name,
@@ -397,7 +569,7 @@ class SourcesController extends GetxController {
     if (depth > 10) return false;
     final now = DateTime.now().millisecondsSinceEpoch;
     final id = 'stpl_${topicId}_$now';
-    final itemIds = items.map(_keyForItem).toList();
+    final itemIds = items.map(keyForItem).toList();
     final playlist = SourceThemeTopicPlaylist(
       id: id,
       topicId: topicId,
@@ -434,7 +606,7 @@ class SourcesController extends GetxController {
     if (items.isEmpty) return;
     final ids = topic.itemIds.toSet();
     for (final item in items) {
-      ids.add(_keyForItem(item));
+      ids.add(keyForItem(item));
     }
     final updated = topic.copyWith(itemIds: ids.toList());
     await _topicStore.upsert(updated);
@@ -445,7 +617,7 @@ class SourcesController extends GetxController {
     SourceThemeTopic topic,
     MediaItem item,
   ) async {
-    final key = _keyForItem(item);
+    final key = keyForItem(item);
     final updated =
         topic.copyWith(itemIds: topic.itemIds.where((e) => e != key).toList());
     await _topicStore.upsert(updated);
@@ -474,6 +646,9 @@ class SourcesController extends GetxController {
     await _loadTopics();
   }
 
+  // ============================
+  // 🧷 PILLS (FILTROS RAPIDOS)
+  // ============================
   Future<void> addPill({
     required String themeId,
     required String title,
@@ -499,6 +674,9 @@ class SourcesController extends GetxController {
     await _loadPills();
   }
 
+  // ============================
+  // 🔄 CARGA DE STORES
+  // ============================
   Future<void> _loadPills() async {
     final list = await _pillStore.readAll();
     pills.assignAll(list);
@@ -514,12 +692,11 @@ class SourcesController extends GetxController {
     topicPlaylists.assignAll(list);
   }
 
-  String _keyForItem(MediaItem item) {
-    final pid = item.publicId.trim();
-    return pid.isNotEmpty ? pid : item.id.trim();
-  }
 }
 
+// ============================
+// 🎧 HELPERS DE REPRODUCCION
+// ============================
 extension SourcesControllerPlayable on SourcesController {
   /// Devuelve un URL reproducible.
   /// - Local: file:///...

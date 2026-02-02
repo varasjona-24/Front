@@ -5,6 +5,9 @@ import 'source_origin.dart';
 import 'source_pill_data.dart';
 
 class SourcePillsCatalog {
+  // ============================
+  // 🧱 FACTORY UI
+  // ============================
   static SourcePillData pill({
     required String title,
     required String subtitle,
@@ -29,6 +32,9 @@ class SourcePillsCatalog {
     );
   }
 
+  // ============================
+  // 🧪 PLACEHOLDER
+  // ============================
   static VoidCallback placeholderTap(String title) {
     return () => Get.snackbar(
       'Source',
