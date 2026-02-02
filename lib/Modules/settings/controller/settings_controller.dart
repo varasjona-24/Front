@@ -190,6 +190,9 @@ class SettingsController extends GetxController {
     if (!value) {
       _cancelSleepTimer();
       _clearSleepTimerPersisted();
+      if (Get.isRegistered<AudioService>()) {
+        Get.find<AudioService>().refreshNotification();
+      }
       return;
     }
     final minutes = sleepTimerMinutes.value;
@@ -222,10 +225,14 @@ class SettingsController extends GetxController {
         _clearSleepTimerPersisted();
         if (Get.isRegistered<AudioService>()) {
           await Get.find<AudioService>().pause();
+          Get.find<AudioService>().refreshNotification();
         }
         return;
       }
       sleepRemaining.value = remaining;
+      if (Get.isRegistered<AudioService>()) {
+        Get.find<AudioService>().refreshNotification();
+      }
     });
   }
 

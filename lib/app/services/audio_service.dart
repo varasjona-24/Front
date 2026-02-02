@@ -597,13 +597,34 @@ class AudioService extends GetxService {
         ? Duration(seconds: durSec)
         : null;
 
+    String? subtitle =
+        item.displaySubtitle.isNotEmpty ? item.displaySubtitle : null;
+    if (Get.isRegistered<SettingsController>()) {
+      final settings = Get.find<SettingsController>();
+      final remaining = settings.sleepRemaining.value;
+      if (settings.sleepTimerEnabled.value &&
+          remaining > Duration.zero) {
+        final tag = _formatRemaining(remaining);
+        subtitle = (subtitle == null || subtitle.isEmpty)
+            ? 'Temporizador $tag'
+            : '$subtitle • Temporizador $tag';
+      }
+    }
+
     return aud.MediaItem(
       id: item.id,
       title: item.title,
-      artist: item.displaySubtitle.isNotEmpty ? item.displaySubtitle : null,
+      artist: subtitle,
       duration: dur,
       artUri: artUri,
     );
+  }
+
+  String _formatRemaining(Duration d) {
+    final total = d.inSeconds;
+    final mm = (total ~/ 60).toString().padLeft(2, '0');
+    final ss = (total % 60).toString().padLeft(2, '0');
+    return '$mm:$ss';
   }
 
   // ==========================================================================
@@ -623,6 +644,11 @@ class AudioService extends GetxService {
     if (_currentItem != null) {
       handler.updateMediaItem(_buildBackgroundItem(_currentItem!));
     }
+  }
+
+  void refreshNotification() {
+    if (_currentItem == null) return;
+    _syncQueueToHandler();
   }
 
   // ==========================================================================
