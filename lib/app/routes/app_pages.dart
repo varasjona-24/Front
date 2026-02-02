@@ -22,6 +22,8 @@ import 'package:flutter_listenfy/Modules/sources/view/sources_page.dart';
 // Downloads
 import 'package:flutter_listenfy/Modules/downloads/binding/downloads_binding.dart';
 import 'package:flutter_listenfy/Modules/downloads/view/downloads_page.dart';
+import 'package:flutter_listenfy/Modules/downloads/binding/download_history_binding.dart';
+import 'package:flutter_listenfy/Modules/downloads/view/download_history_page.dart';
 
 // History
 import 'package:flutter_listenfy/Modules/history/binding/history_binding.dart';
@@ -81,6 +83,11 @@ abstract class AppPages {
       name: AppRoutes.downloads,
       page: () => const DownloadsPage(),
       binding: DownloadsBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.downloadsHistory,
+      page: () => const DownloadHistoryPage(),
+      binding: DownloadHistoryBinding(),
     ),
 
     // History
