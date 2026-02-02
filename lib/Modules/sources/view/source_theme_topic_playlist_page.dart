@@ -14,6 +14,8 @@ import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic_playlist.dart';
+import '../ui/source_color_picker_field.dart';
+import '../ui/source_playlist_card.dart';
 
 // ============================
 // 🧭 PAGE: PLAYLIST
@@ -200,7 +202,7 @@ class _SourceThemeTopicPlaylistPageState
         ...lists.map(
           (pl) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _PlaylistCard(
+            child: SourcePlaylistCard(
               theme: widget.theme,
               playlist: pl,
               onOpen: () => Get.to(
@@ -409,7 +411,7 @@ class _SourceThemeTopicPlaylistPageState
                     const SizedBox(height: 10),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: _ColorPickerField(
+                      child: SourceColorPickerField(
                         color: colorValue != null
                             ? Color(colorValue!)
                             : draftColor,
@@ -589,7 +591,7 @@ class _SourceThemeTopicPlaylistPageState
                     ),
                   ),
                   const SizedBox(height: 10),
-                  _ColorPickerField(
+                  SourceColorPickerField(
                     color: colorValue != null
                         ? Color(colorValue!)
                         : draftColor,
@@ -691,224 +693,3 @@ class _SourceThemeTopicPlaylistPageState
     );
   }
 }
-
-class _PlaylistCard extends StatelessWidget {
-  const _PlaylistCard({
-    required this.theme,
-    required this.playlist,
-    required this.onOpen,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final SourceTheme theme;
-  final SourceThemeTopicPlaylist playlist;
-  final VoidCallback onOpen;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context);
-    final base = playlist.colorValue != null
-        ? Color(playlist.colorValue!)
-        : theme.colors.first;
-    final textColor = Colors.white;
-
-    ImageProvider? provider;
-    final path = playlist.coverLocalPath?.trim();
-    final url = playlist.coverUrl?.trim();
-    if (path != null && path.isNotEmpty) {
-      provider = FileImage(File(path));
-    } else if (url != null && url.isNotEmpty) {
-      provider = NetworkImage(url);
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: base.withOpacity(0.92),
-          ),
-          child: InkWell(
-            onTap: onOpen,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      color: Colors.black.withOpacity(0.18),
-                      child: provider != null
-                          ? Image(image: provider, fit: BoxFit.cover)
-                          : Icon(Icons.queue_music_rounded, color: textColor),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          playlist.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: t.textTheme.titleMedium?.copyWith(
-                            color: textColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${playlist.itemIds.length} items',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: t.textTheme.bodySmall?.copyWith(
-                            color: textColor.withOpacity(0.85),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  PopupMenuButton<_PlaylistAction>(
-                    onSelected: (value) {
-                      if (value == _PlaylistAction.edit) onEdit();
-                      if (value == _PlaylistAction.delete) onDelete();
-                    },
-                    icon: Icon(Icons.more_vert_rounded, color: textColor),
-                    itemBuilder: (ctx) => const [
-                      PopupMenuItem(
-                        value: _PlaylistAction.edit,
-                        child: Text('Editar'),
-                      ),
-                      PopupMenuItem(
-                        value: _PlaylistAction.delete,
-                        child: Text('Eliminar'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ColorPickerField extends StatelessWidget {
-  const _ColorPickerField({
-    required this.color,
-    required this.onChanged,
-  });
-
-  final Color color;
-  final ValueChanged<Color> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textColor = theme.colorScheme.onSurface;
-    final r = color.red;
-    final g = color.green;
-    final b = color.blue;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Color',
-          style: theme.textTheme.labelLarge,
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 36,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: theme.colorScheme.onSurface.withOpacity(0.2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        _colorSlider(
-          context,
-          label: 'R',
-          value: r.toDouble(),
-          color: const Color(0xFFE53935),
-          onChanged: (v) => onChanged(
-            Color.fromARGB(255, v.round(), g, b),
-          ),
-        ),
-        _colorSlider(
-          context,
-          label: 'G',
-          value: g.toDouble(),
-          color: const Color(0xFF43A047),
-          onChanged: (v) => onChanged(
-            Color.fromARGB(255, r, v.round(), b),
-          ),
-        ),
-        _colorSlider(
-          context,
-          label: 'B',
-          value: b.toDouble(),
-          color: const Color(0xFF1E88E5),
-          onChanged: (v) => onChanged(
-            Color.fromARGB(255, r, g, v.round()),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '#${color.value.toRadixString(16).padLeft(8, '0').toUpperCase()}',
-          style: theme.textTheme.labelMedium?.copyWith(color: textColor),
-        ),
-      ],
-    );
-  }
-
-  Widget _colorSlider(
-    BuildContext context, {
-    required String label,
-    required double value,
-    required Color color,
-    required ValueChanged<double> onChanged,
-  }) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 18,
-          child: Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
-        ),
-        Expanded(
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: color,
-              thumbColor: color,
-              overlayColor: color.withOpacity(0.2),
-            ),
-            child: Slider(
-              min: 0,
-              max: 255,
-              divisions: 255,
-              value: value,
-              onChanged: onChanged,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-enum _PlaylistAction { edit, delete }

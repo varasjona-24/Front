@@ -10,6 +10,7 @@ import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../controller/artists_controller.dart';
+import 'widgets/artist_avatar.dart';
 import 'artist_detail_page.dart';
 import 'edit_artist_page.dart';
 
@@ -329,7 +330,7 @@ class _ArtistCard extends StatelessWidget {
       color: scheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       child: ListTile(
-        leading: _ArtistAvatar(thumb: thumb),
+        leading: ArtistAvatar(thumb: thumb, radius: 24),
         title: Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
         subtitle: Text('${artist.count} canciones'),
         trailing: IconButton(
@@ -425,33 +426,6 @@ class _SortOption extends StatelessWidget {
         color: selected ? scheme.primary : scheme.onSurfaceVariant,
       ),
       onTap: onTap,
-    );
-  }
-}
-
-class _ArtistAvatar extends StatelessWidget {
-  const _ArtistAvatar({required this.thumb});
-
-  final String? thumb;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    if (thumb != null && thumb!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 24,
-        backgroundColor: scheme.surface,
-        backgroundImage: thumb!.startsWith('http')
-            ? NetworkImage(thumb!)
-            : FileImage(File(thumb!)) as ImageProvider,
-      );
-    }
-
-    return CircleAvatar(
-      radius: 24,
-      backgroundColor: scheme.surface,
-      child: Icon(Icons.person_rounded, color: scheme.onSurfaceVariant),
     );
   }
 }

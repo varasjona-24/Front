@@ -1,10 +1,9 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controller/artists_controller.dart';
+import 'widgets/artist_avatar.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/controllers/navigation_controller.dart';
 
@@ -134,7 +133,7 @@ class _EditArtistPageState extends State<EditArtistPage> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    _ArtistAvatar(thumb: thumb),
+                    ArtistAvatar(thumb: thumb, radius: 32),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Text(
@@ -199,36 +198,6 @@ class _EditArtistPageState extends State<EditArtistPage> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ArtistAvatar extends StatelessWidget {
-  const _ArtistAvatar({required this.thumb});
-
-  final String? thumb;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    if (thumb != null && thumb!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 32,
-        backgroundColor: scheme.surface,
-        backgroundImage: thumb!.startsWith('http')
-            ? NetworkImage(thumb!)
-            : FileImage(File(thumb!)) as ImageProvider,
-      );
-    }
-
-    return CircleAvatar(
-      radius: 32,
-      backgroundColor: scheme.surface,
-      child: Icon(
-        Icons.person_rounded,
-        color: scheme.onSurfaceVariant,
       ),
     );
   }

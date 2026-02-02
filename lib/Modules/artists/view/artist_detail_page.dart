@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -8,6 +6,7 @@ import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../controller/artists_controller.dart';
 import 'edit_artist_page.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import 'widgets/artist_avatar.dart';
 
 class ArtistDetailPage extends GetView<ArtistsController> {
   const ArtistDetailPage({super.key, required this.artistKey});
@@ -69,7 +68,7 @@ class ArtistDetailPage extends GetView<ArtistsController> {
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      _ArtistAvatar(thumb: thumb),
+                      ArtistAvatar(thumb: thumb, radius: 36),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -117,36 +116,6 @@ class ArtistDetailPage extends GetView<ArtistsController> {
         ),
       );
     });
-  }
-}
-
-class _ArtistAvatar extends StatelessWidget {
-  const _ArtistAvatar({required this.thumb});
-
-  final String? thumb;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    if (thumb != null && thumb!.isNotEmpty) {
-      return CircleAvatar(
-        radius: 36,
-        backgroundColor: scheme.surface,
-        backgroundImage: thumb!.startsWith('http')
-            ? NetworkImage(thumb!)
-            : FileImage(File(thumb!)) as ImageProvider,
-      );
-    }
-
-    return CircleAvatar(
-      radius: 36,
-      backgroundColor: scheme.surface,
-      child: Icon(
-        Icons.person_rounded,
-        color: scheme.onSurfaceVariant,
-      ),
-    );
   }
 }
 

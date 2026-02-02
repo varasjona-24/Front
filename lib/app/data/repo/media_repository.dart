@@ -221,6 +221,10 @@ class MediaRepository {
           if (quality != null && quality.trim().isNotEmpty)
             'quality': quality.trim(),
         },
+        options: dio.Options(
+          receiveTimeout: const Duration(minutes: 10),
+          sendTimeout: const Duration(minutes: 2),
+        ),
       );
 
       // resolvedId = prefer backend response, then client mediaId, then fallback
@@ -315,7 +319,14 @@ class MediaRepository {
       } catch (e) {
         attempts++;
         if (attempts >= maxAttempts) {
-          print('Download failed after $maxAttempts attempts: $e');
+          if (e is dio.DioException) {
+            print('Download failed after $maxAttempts attempts: ${e.type}');
+            print('URL: ${e.requestOptions.uri}');
+            print('STATUS: ${e.response?.statusCode}');
+            print('DATA: ${e.response?.data}');
+          } else {
+            print('Download failed after $maxAttempts attempts: $e');
+          }
           return false;
         }
 

@@ -204,8 +204,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
       backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Editar metadatos'),
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
+        backgroundColor: theme.colorScheme.surface,
+        surfaceTintColor: theme.colorScheme.surface,
+        foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
       ),
       bottomNavigationBar: SafeArea(
