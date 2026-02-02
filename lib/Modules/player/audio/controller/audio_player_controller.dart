@@ -437,6 +437,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> togglePlay() async {
+    _touchActivity();
     final item = currentItemOrNull;
     final v = currentAudioVariant;
     if (item == null || v == null) return;
@@ -450,6 +451,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> _playItem(MediaItem item, MediaVariant variant) async {
+    _touchActivity();
     // ✅ reset visual inmediato
     position.value = Duration.zero;
     duration.value = Duration.zero;
@@ -487,6 +489,7 @@ class AudioPlayerController extends GetxController {
           }
         }
         await audioService.resume();
+        _touchActivity();
       }
       await _trackPlay(item);
     } catch (e) {
@@ -592,6 +595,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> next() async {
+    _touchActivity();
     if (!hasQueue) return;
 
     if (currentIndex.value < queue.length - 1) {
@@ -601,6 +605,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> previous() async {
+    _touchActivity();
     if (!hasQueue) return;
 
     if (currentIndex.value > 0) {
@@ -622,6 +627,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> playAt(int index) async {
+    _touchActivity();
     if (index < 0 || index >= queue.length) return;
 
     currentIndex.value = index;
@@ -697,6 +703,7 @@ class AudioPlayerController extends GetxController {
   // ===========================================================================
 
   Future<void> cyclePlaybackSpeed() async {
+    _touchActivity();
     final presets = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
     final cur = audioService.speed.value;
     final idx = presets.indexWhere((p) => p == cur);
@@ -705,6 +712,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> skipForward10() async {
+    _touchActivity();
     final pos = position.value;
     final dur = duration.value;
     final target = pos + const Duration(seconds: 10);
@@ -713,6 +721,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> skipBackward10() async {
+    _touchActivity();
     final pos = position.value;
     final target = pos - const Duration(seconds: 10);
     final clamped = target.isNegative ? Duration.zero : target;
@@ -720,6 +729,11 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> seek(Duration value) async {
+    _touchActivity();
     await audioService.seek(value);
+  }
+
+  void _touchActivity() {
+    _settings.notifyPlaybackActivity();
   }
 }

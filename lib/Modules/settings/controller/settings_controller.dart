@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -38,6 +39,17 @@ class SettingsController extends GetxController {
   // 🎵 Reproducción automática
   final RxBool autoPlayNext = true.obs;
 
+  // 🌙 Sleep timer
+  final RxBool sleepTimerEnabled = false.obs;
+  final RxInt sleepTimerMinutes = 30.obs;
+  final Rx<Duration> sleepRemaining = Duration.zero.obs;
+  Timer? _sleepTimer;
+
+  // 💤 Pausa por inactividad
+  final RxBool inactivityPauseEnabled = false.obs;
+  final RxInt inactivityPauseMinutes = 15.obs;
+  Timer? _inactivityTimer;
+
   // 🎚️ Ecualizador (Android)
   final RxBool eqEnabled = false.obs;
   final RxString eqPreset = 'custom'.obs;
@@ -57,6 +69,7 @@ class SettingsController extends GetxController {
     super.onInit();
     _loadSettings();
     _configureAudioSession();
+    _bindPlaybackActivity();
   }
 
   /// 📂 Cargar configuración guardada
@@ -71,6 +84,25 @@ class SettingsController extends GetxController {
     downloadQuality.value = _storage.read('downloadQuality') ?? 'high';
     dataUsage.value = _storage.read('dataUsage') ?? 'all';
     autoPlayNext.value = _storage.read('autoPlayNext') ?? true;
+
+    sleepTimerEnabled.value = _storage.read('sleepTimerEnabled') ?? false;
+    sleepTimerMinutes.value = _storage.read('sleepTimerMinutes') ?? 30;
+    final sleepEndMs = _storage.read('sleepTimerEndMs');
+    if (sleepEndMs is int && sleepEndMs > 0) {
+      final remaining =
+          Duration(milliseconds: sleepEndMs - DateTime.now().millisecondsSinceEpoch);
+      if (remaining > Duration.zero) {
+        sleepTimerEnabled.value = true;
+        _startSleepTimer(remaining);
+      } else {
+        _clearSleepTimerPersisted();
+      }
+    }
+
+    inactivityPauseEnabled.value =
+        _storage.read('inactivityPauseEnabled') ?? false;
+    inactivityPauseMinutes.value =
+        _storage.read('inactivityPauseMinutes') ?? 15;
 
     eqEnabled.value = _storage.read('eqEnabled') ?? false;
     eqPreset.value = _storage.read('eqPreset') ?? 'custom';
@@ -147,6 +179,120 @@ class SettingsController extends GetxController {
   void setAutoPlayNext(bool value) {
     autoPlayNext.value = value;
     _storage.write('autoPlayNext', value);
+  }
+
+  // ==========================================================================
+  // SLEEP TIMER
+  // ==========================================================================
+  void setSleepTimerEnabled(bool value) {
+    sleepTimerEnabled.value = value;
+    _storage.write('sleepTimerEnabled', value);
+    if (!value) {
+      _cancelSleepTimer();
+      _clearSleepTimerPersisted();
+      return;
+    }
+    final minutes = sleepTimerMinutes.value;
+    _startSleepTimer(Duration(minutes: minutes));
+  }
+
+  void setSleepTimerMinutes(int minutes) {
+    sleepTimerMinutes.value = minutes;
+    _storage.write('sleepTimerMinutes', minutes);
+    if (sleepTimerEnabled.value) {
+      _startSleepTimer(Duration(minutes: minutes));
+    }
+  }
+
+  void _startSleepTimer(Duration duration) {
+    _cancelSleepTimer();
+    final endMs =
+        DateTime.now().millisecondsSinceEpoch + duration.inMilliseconds;
+    _storage.write('sleepTimerEndMs', endMs);
+    sleepRemaining.value = duration;
+    _sleepTimer = Timer.periodic(const Duration(seconds: 1), (t) async {
+      final remaining =
+          Duration(milliseconds: endMs - DateTime.now().millisecondsSinceEpoch);
+      if (remaining <= Duration.zero) {
+        sleepRemaining.value = Duration.zero;
+        t.cancel();
+        _sleepTimer = null;
+        sleepTimerEnabled.value = false;
+        _storage.write('sleepTimerEnabled', false);
+        _clearSleepTimerPersisted();
+        if (Get.isRegistered<AudioService>()) {
+          await Get.find<AudioService>().pause();
+        }
+        return;
+      }
+      sleepRemaining.value = remaining;
+    });
+  }
+
+  void _cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    sleepRemaining.value = Duration.zero;
+  }
+
+  void _clearSleepTimerPersisted() {
+    _storage.remove('sleepTimerEndMs');
+  }
+
+  // ==========================================================================
+  // INACTIVITY PAUSE
+  // ==========================================================================
+  void setInactivityPauseEnabled(bool value) {
+    inactivityPauseEnabled.value = value;
+    _storage.write('inactivityPauseEnabled', value);
+    if (!value) {
+      _cancelInactivityTimer();
+      return;
+    }
+    _resetInactivityTimer();
+  }
+
+  void setInactivityPauseMinutes(int minutes) {
+    inactivityPauseMinutes.value = minutes;
+    _storage.write('inactivityPauseMinutes', minutes);
+    if (inactivityPauseEnabled.value) {
+      _resetInactivityTimer();
+    }
+  }
+
+  void notifyPlaybackActivity() {
+    if (!inactivityPauseEnabled.value) return;
+    _resetInactivityTimer();
+  }
+
+  void _resetInactivityTimer() {
+    _cancelInactivityTimer();
+    final minutes = inactivityPauseMinutes.value;
+    _inactivityTimer = Timer(Duration(minutes: minutes), () async {
+      if (Get.isRegistered<AudioService>()) {
+        final audio = Get.find<AudioService>();
+        if (audio.isPlaying.value) {
+          await audio.pause();
+        }
+      }
+    });
+  }
+
+  void _cancelInactivityTimer() {
+    _inactivityTimer?.cancel();
+    _inactivityTimer = null;
+  }
+
+  void _bindPlaybackActivity() {
+    if (!Get.isRegistered<AudioService>()) return;
+    final audio = Get.find<AudioService>();
+    ever<bool>(audio.isPlaying, (playing) {
+      if (!playing) {
+        _cancelInactivityTimer();
+      } else if (inactivityPauseEnabled.value) {
+        _resetInactivityTimer();
+      }
+    });
   }
 
   Future<void> setEqEnabled(bool value) async {
