@@ -11,6 +11,7 @@ import '../../../app/ui/widgets/list/media_horizontal_list.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/controllers/media_actions_controller.dart';
+import '../../../app/routes/app_routes.dart';
 import 'section_list_page.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 
@@ -170,29 +171,13 @@ class HomePage extends GetView<HomeController> {
                                 const SizedBox(height: 18),
                               ],
 
-                              // ---- Recientes ----
+                              // ---- Reproducciones recientes ----
                               if (controller.recentlyPlayed.isNotEmpty)
                                 MediaHorizontalList(
                                   title: 'Reproducciones recientes',
                                   items: controller.recentlyPlayed,
-                                  onHeaderTap: () => Get.to(
-                                    () => SectionListPage(
-                                      title: 'Reproducciones recientes',
-                                      items: controller.recentlyPlayed,
-                                      onItemTap: (item, index) =>
-                                          controller.openMedia(
-                                            item,
-                                            index,
-                                            controller.recentlyPlayed,
-                                          ),
-                                      onItemLongPress: (item, _) =>
-                                          actions.showItemActions(
-                                            context,
-                                            item,
-                                            onChanged: controller.loadHome,
-                                          ),
-                                    ),
-                                  ),
+                                  onHeaderTap: () =>
+                                      Get.toNamed(AppRoutes.history),
                                   onItemTap: (item, index) =>
                                       controller.openMedia(
                                         item,
