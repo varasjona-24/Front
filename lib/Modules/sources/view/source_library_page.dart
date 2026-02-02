@@ -99,8 +99,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
         extendBody: true,
         appBar: AppTopBar(
           title: Text(widget.title),
-          onSearch: home.onSearch,
-          onToggleMode: widget.forceKind == null ? home.toggleMode : null,
+                    onToggleMode: widget.forceKind == null ? home.toggleMode : null,
           mode: mode == HomeMode.audio
               ? AppMediaMode.audio
               : AppMediaMode.video,

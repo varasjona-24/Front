@@ -36,7 +36,6 @@ class _ImportsWebViewPageState extends State<ImportsWebViewPage> {
       backgroundColor: Colors.transparent,
       appBar: AppTopBar(
         title: const Text('Navegador'),
-        onSearch: () {},
         leading: IconButton(
           onPressed: () => Get.back(),
           icon: const Icon(Icons.arrow_back_rounded),

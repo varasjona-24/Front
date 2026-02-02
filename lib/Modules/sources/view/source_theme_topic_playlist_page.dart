@@ -77,8 +77,7 @@ class _SourceThemeTopicPlaylistPageState
         backgroundColor: Colors.transparent,
         appBar: AppTopBar(
           title: Text(playlist.name),
-          onSearch: home.onSearch,
-          onToggleMode: null,
+                    onToggleMode: null,
         ),
         body: AppGradientBackground(
           child: ListView(

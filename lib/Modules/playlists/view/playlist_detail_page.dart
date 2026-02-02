@@ -48,8 +48,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
         backgroundColor: Colors.transparent,
         appBar: AppTopBar(
           title: Text(title ?? 'Lista'),
-          onSearch: home.onSearch,
-        ),
+                  ),
         body: AppGradientBackground(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(

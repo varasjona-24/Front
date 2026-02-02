@@ -73,8 +73,7 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
         backgroundColor: Colors.transparent,
         appBar: AppTopBar(
           title: Text(topic.title),
-          onSearch: home.onSearch,
-          onToggleMode: null,
+                    onToggleMode: null,
         ),
         body: AppGradientBackground(
           child: ListView(

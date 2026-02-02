@@ -36,8 +36,7 @@ class ArtistsPage extends GetView<ArtistsController> {
         extendBody: true,
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
-          onSearch: home.onSearch,
-        ),
+                  ),
         body: AppGradientBackground(
           child: Stack(
             children: [

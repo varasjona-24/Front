@@ -70,8 +70,7 @@ class DownloadsPage extends GetView<DownloadsController> {
         extendBody: true,
         appBar: AppTopBar(
           title: ListenfyLogo(size: 28, color: scheme.primary),
-          onSearch: home.onSearch,
-        ),
+                  ),
 
         // ============================
         // 📄 LISTA

@@ -1,14 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
 import '../../../app/ui/themes/app_spacing.dart';
-import '../../../app/ui/widgets/navigation/app_top_bar.dart';
-import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
-import '../controller/home_controller.dart';
 
 class SectionListPage extends StatelessWidget {
   const SectionListPage({
@@ -28,19 +24,15 @@ class SectionListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    final home = Get.find<HomeController>();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      appBar: AppTopBar(
-        title: ListenfyLogo(size: 26, color: scheme.primary),
-        onSearch: home.onSearch,
-        onToggleMode: home.toggleMode,
-        mode: home.mode.value == HomeMode.audio
-            ? AppMediaMode.audio
-            : AppMediaMode.video,
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: scheme.surface,
+        surfaceTintColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
+        elevation: 0,
       ),
       body: AppGradientBackground(
         child: ListView.separated(

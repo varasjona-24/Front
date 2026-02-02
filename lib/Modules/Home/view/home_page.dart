@@ -409,6 +409,10 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final titleStyle = theme.textTheme.titleLarge?.copyWith(
+      color: scheme.onSurface,
+      fontWeight: FontWeight.w700,
+    );
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -420,14 +424,14 @@ class _SectionHeader extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: titleStyle,
               ),
             ),
-            if (trailing != null) trailing!,
-            if (trailing == null)
-              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+            if (trailing != null) ...[
+              trailing!,
+              const SizedBox(width: 8),
+            ],
+            Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
           ],
         ),
       ),
