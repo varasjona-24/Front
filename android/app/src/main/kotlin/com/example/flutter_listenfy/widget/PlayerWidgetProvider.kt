@@ -98,6 +98,7 @@ class PlayerWidgetProvider : AppWidgetProvider() {
         tintImageButton(views, R.id.widget_prev, iconColor)
         tintImageButton(views, R.id.widget_next, iconColor)
         tintImageButton(views, R.id.widget_play_pause, iconColor)
+        views.setInt(R.id.widget_logo, "setColorFilter", iconColor)
 
         // Play / Pause icon
         val playRes =
@@ -203,5 +204,6 @@ class PlayerWidgetProvider : AppWidgetProvider() {
         const val KEY_ART_PATH = "artPath"
         const val KEY_PLAYING = "playing"
         const val KEY_BAR_COLOR = "barColor"
+        const val KEY_LOGO_COLOR = "logoColor"
     }
 }

@@ -757,6 +757,8 @@ class AudioService extends GetxService {
       final theme = Get.find<ThemeController>();
       barColor = theme.palette.value.primary;
     }
+    final logoColor =
+        barColor.computeLuminance() > 0.55 ? Colors.black : Colors.white;
 
     try {
       await _widgetChannel.invokeMethod('updateWidget', {
@@ -765,6 +767,7 @@ class AudioService extends GetxService {
         'artPath': artPath,
         'playing': isPlaying.value,
         'barColor': barColor.value,
+        'logoColor': logoColor.value,
       });
     } catch (_) {
       // peluches 🧸: si falla el widget, no afecta reproducción

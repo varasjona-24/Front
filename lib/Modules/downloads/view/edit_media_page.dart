@@ -98,13 +98,22 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     }
 
     final remoteThumb = _thumbCtrl.text.trim();
+    final localThumb = _localThumbPath?.trim() ?? '';
+    final initialRemote = widget.item.thumbnail?.trim() ?? '';
+    final initialLocal = widget.item.thumbnailLocalPath?.trim() ?? '';
+    final thumbChanged = remoteThumb != initialRemote || localThumb != initialLocal;
     final useRemoteThumb = remoteThumb.isNotEmpty;
+    final useLocalThumb = !useRemoteThumb && localThumb.isNotEmpty;
 
     final updated = widget.item.copyWith(
       title: title,
       subtitle: _artistCtrl.text.trim(),
-      thumbnail: useRemoteThumb ? remoteThumb : null,
-      thumbnailLocalPath: useRemoteThumb ? null : _localThumbPath,
+      thumbnail: !thumbChanged
+          ? null
+          : (useRemoteThumb ? remoteThumb : ''),
+      thumbnailLocalPath: !thumbChanged
+          ? null
+          : (useLocalThumb ? localThumb : ''),
       durationSeconds: durationSeconds ?? widget.item.durationSeconds,
     );
 

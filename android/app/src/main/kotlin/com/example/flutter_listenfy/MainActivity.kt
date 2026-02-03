@@ -254,6 +254,13 @@ class MainActivity : AudioServiceActivity() {
                     is Double -> barColorAny.toInt()
                     else -> 0xFF1E2633.toInt()
                 }
+                val logoColorAny = call.argument<Any>("logoColor")
+                val logoColor = when (logoColorAny) {
+                    is Int -> logoColorAny
+                    is Long -> logoColorAny.toInt()
+                    is Double -> logoColorAny.toInt()
+                    else -> 0xFFFFFFFF.toInt()
+                }
 
                 val prefs = getSharedPreferences(PlayerWidgetProvider.PREFS, Context.MODE_PRIVATE)
                 prefs.edit()
@@ -262,6 +269,7 @@ class MainActivity : AudioServiceActivity() {
                     .putString(PlayerWidgetProvider.KEY_ART_PATH, artPath)
                     .putBoolean(PlayerWidgetProvider.KEY_PLAYING, playing)
                     .putInt(PlayerWidgetProvider.KEY_BAR_COLOR, barColor)
+                    .putInt(PlayerWidgetProvider.KEY_LOGO_COLOR, logoColor)
                     .apply()
 
                 val intent = Intent(this, PlayerWidgetProvider::class.java).apply {
