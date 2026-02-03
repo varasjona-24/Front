@@ -5,17 +5,22 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Build
 import android.widget.RemoteViews
 import androidx.media.session.MediaButtonReceiver
+import androidx.palette.graphics.Palette
 import android.support.v4.media.session.PlaybackStateCompat
 import com.example.flutter_listenfy.MainActivity
 import com.example.flutter_listenfy.R
 import android.view.View
 import java.io.File
+import kotlin.math.pow
 
 class PlayerWidgetProvider : AppWidgetProvider() {
+
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (ACTION_WIDGET_UPDATE == intent.action) {
@@ -27,7 +32,11 @@ class PlayerWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
         for (id in appWidgetIds) {
             val views = buildViews(context)
             appWidgetManager.updateAppWidget(id, views)
@@ -40,33 +49,63 @@ class PlayerWidgetProvider : AppWidgetProvider() {
         val artist = prefs.getString(KEY_ARTIST, "") ?: ""
         val artPath = prefs.getString(KEY_ART_PATH, "") ?: ""
         val playing = prefs.getBoolean(KEY_PLAYING, false)
-        val barColor = prefs.getInt(KEY_BAR_COLOR, 0xFF1E2633.toInt())
+
+        // Tu color guardado (lo usamos si no hay portada)
+        val fallbackBg = Color.parseColor("#151A23")
+        val fallbackBar = prefs.getInt(KEY_BAR_COLOR, 0xFF1E2633.toInt())
 
         val views = RemoteViews(context.packageName, R.layout.player_widget)
+
+        // Text
         views.setTextViewText(R.id.widget_title, title)
         views.setTextViewText(R.id.widget_artist, artist)
         views.setViewVisibility(
             R.id.widget_artist,
             if (artist.isBlank()) View.GONE else View.VISIBLE
         )
-        views.setInt(R.id.widget_controls, "setBackgroundColor", barColor)
 
+        // --- Load cover bitmap (si existe) ---
         val coverFile = if (artPath.isNotEmpty()) File(artPath) else null
-        if (coverFile != null && coverFile.exists()) {
-            val bitmap = BitmapFactory.decodeFile(coverFile.absolutePath)
-            if (bitmap != null) {
-                views.setImageViewBitmap(R.id.widget_cover, bitmap)
-            } else {
-                views.setImageViewResource(R.id.widget_cover, R.mipmap.ic_launcher)
-            }
+        val bitmap: Bitmap? =
+            if (coverFile != null && coverFile.exists()) BitmapFactory.decodeFile(coverFile.absolutePath)
+            else null
+
+        val bgColor: Int
+        if (bitmap != null) {
+            views.setImageViewBitmap(R.id.widget_cover, bitmap)
+            bgColor = extractCoverBackground(bitmap, fallbackBg)
         } else {
             views.setImageViewResource(R.id.widget_cover, R.mipmap.ic_launcher)
+            bgColor = fallbackBg
         }
 
-        val playRes = if (playing) android.R.drawable.ic_media_pause
-        else android.R.drawable.ic_media_play
+        // Fondo del widget completo
+        views.setInt(R.id.widget_root, "setBackgroundColor", bgColor)
+
+        // Controles: mismo color pero un poco más oscuro (se ve más “pro”)
+        val barColor = if (bgColor != fallbackBg) darkenColor(bgColor, 0.78f) else fallbackBar
+        views.setInt(R.id.widget_controls, "setBackgroundColor", barColor)
+
+        // Contraste automático
+        val primaryTextColor = chooseTextColor(bgColor)
+        val secondaryTextColor = adjustSecondaryTextColor(primaryTextColor)
+
+        views.setTextColor(R.id.widget_title, primaryTextColor)
+        views.setTextColor(R.id.widget_artist, secondaryTextColor)
+
+        // Iconos según contraste (RemoteViews-friendly)
+        val iconColor = primaryTextColor
+        tintImageButton(views, R.id.widget_prev, iconColor)
+        tintImageButton(views, R.id.widget_next, iconColor)
+        tintImageButton(views, R.id.widget_play_pause, iconColor)
+
+        // Play / Pause icon
+        val playRes =
+            if (playing) android.R.drawable.ic_media_pause
+            else android.R.drawable.ic_media_play
         views.setImageViewResource(R.id.widget_play_pause, playRes)
 
+        // Open app on click
         val contentIntent = Intent(context, MainActivity::class.java)
         val contentPending = PendingIntent.getActivity(
             context,
@@ -76,6 +115,7 @@ class PlayerWidgetProvider : AppWidgetProvider() {
         )
         views.setOnClickPendingIntent(R.id.widget_root, contentPending)
 
+        // Media buttons
         val prevIntent = MediaButtonReceiver.buildMediaButtonPendingIntent(
             context,
             PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
@@ -96,12 +136,61 @@ class PlayerWidgetProvider : AppWidgetProvider() {
         return views
     }
 
+    private fun tintImageButton(views: RemoteViews, viewId: Int, color: Int) {
+        // setColorFilter(int) existe en ImageView y suele funcionar bien en widgets
+        views.setInt(viewId, "setColorFilter", color)
+    }
+
     private fun pendingFlags(): Int {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         } else {
             PendingIntent.FLAG_UPDATE_CURRENT
         }
+    }
+
+    // -------------------------
+    // Color helpers
+    // -------------------------
+
+   private fun extractCoverBackground(bitmap: Bitmap, fallback: Int): Int {
+    return try {
+        val palette = Palette.from(bitmap).generate()
+        palette.getDominantColor(fallback) // <- tal cual, sin oscurecer
+    } catch (e: Exception) {
+        fallback
+    }
+}
+
+
+
+    private fun darkenColor(color: Int, factor: Float = 0.88f): Int {
+        val r = (Color.red(color) * factor).toInt().coerceIn(0, 255)
+        val g = (Color.green(color) * factor).toInt().coerceIn(0, 255)
+        val b = (Color.blue(color) * factor).toInt().coerceIn(0, 255)
+        return Color.rgb(r, g, b)
+    }
+
+    private fun chooseTextColor(bgColor: Int): Int {
+        val luminance = relativeLuminance(bgColor)
+        return if (luminance > 0.55) Color.BLACK else Color.WHITE
+    }
+
+    private fun adjustSecondaryTextColor(primary: Int): Int {
+        return if (primary == Color.WHITE) Color.parseColor("#C9D1E3")
+        else Color.parseColor("#2B3342")
+    }
+
+    private fun relativeLuminance(color: Int): Double {
+        fun channel(c: Int): Double {
+            val v = c / 255.0
+            return if (v <= 0.03928) v / 12.92 else ((v + 0.055) / 1.055).pow(2.4)
+        }
+
+        val r = channel(Color.red(color))
+        val g = channel(Color.green(color))
+        val b = channel(Color.blue(color))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
     }
 
     companion object {

@@ -2,67 +2,71 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="110dp"
+    android:layout_height="90dp"
     android:background="#151A23"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:gravity="center_vertical"
+    android:paddingStart="10dp"
+    android:paddingEnd="10dp">
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <ImageView
-                android:id="@+id/widget_cover"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:contentDescription="cover"
-                android:scaleType="centerCrop"
-                android:src="@mipmap/ic_launcher" />
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/widget_title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="Listenfy"
-                    android:textColor="#F2F5FB"
-                    android:textSize="14sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/widget_artist"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:text="Artista"
-                    android:textColor="#AAB4C4"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </LinearLayout>
-
+    <!-- Top: Cover + Info -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:gravity="center"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/widget_cover"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:contentDescription="cover"
+            android:scaleType="centerCrop"
+            android:src="@mipmap/ic_launcher" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Listenfy"
+                android:textColor="#F2F5FB"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_artist"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Artista"
+                android:textColor="#AAB4C4"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Bottom: Controls -->
+    <LinearLayout
         android:id="@+id/widget_controls"
+        android:layout_width="match_parent"
+        android:layout_height="32dp"
+        android:gravity="center"
         android:orientation="horizontal">
 
         <ImageButton
             android:id="@+id/widget_prev"
-            android:layout_width="36dp"
-            android:layout_height="32dp"
+            android:layout_width="32dp"
+            android:layout_height="24dp"
             android:background="@android:color/transparent"
             android:contentDescription="previous"
             android:src="@android:drawable/ic_media_previous"
@@ -71,9 +75,9 @@
         <ImageButton
             android:id="@+id/widget_play_pause"
             android:layout_width="40dp"
-            android:layout_height="32dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
+            android:layout_height="28dp"
+            android:layout_marginStart="12dp"
+            android:layout_marginEnd="12dp"
             android:background="@android:color/transparent"
             android:contentDescription="play_pause"
             android:src="@android:drawable/ic_media_play"
@@ -81,11 +85,12 @@
 
         <ImageButton
             android:id="@+id/widget_next"
-            android:layout_width="36dp"
-            android:layout_height="32dp"
+            android:layout_width="32dp"
+            android:layout_height="24dp"
             android:background="@android:color/transparent"
             android:contentDescription="next"
             android:src="@android:drawable/ic_media_next"
             android:tint="#F2F5FB" />
     </LinearLayout>
+
 </LinearLayout>
