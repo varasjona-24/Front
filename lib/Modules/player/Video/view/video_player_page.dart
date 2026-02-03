@@ -41,6 +41,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
@@ -58,6 +59,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();

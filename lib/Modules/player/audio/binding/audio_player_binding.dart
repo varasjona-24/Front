@@ -7,7 +7,7 @@ class AudioPlayerBinding extends Bindings {
   void dependencies() {
     Get.put<AudioPlayerController>(
       AudioPlayerController(audioService: Get.find<AudioService>()),
-      permanent: false,
+      permanent: true,
     );
   }
 }

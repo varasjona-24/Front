@@ -6,12 +6,15 @@ import 'dart:io';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart' as aud;
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/services.dart';
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
+import '../controllers/theme_controller.dart';
 import '../../Modules/settings/controller/settings_controller.dart';
 
 // ============================================================================
@@ -29,6 +32,8 @@ enum PlaybackState { stopped, loading, playing, paused }
 /// - cola interna + sincronización con AudioHandler (notificación)
 /// - persistencia del último item reproducido
 class AudioService extends GetxService {
+  static const MethodChannel _widgetChannel =
+      MethodChannel('listenfy/player_widget');
   // ==========================================================================
   // STORAGE / KEYS
   // ==========================================================================
@@ -115,6 +120,7 @@ class AudioService extends GetxService {
   void attachHandler(dynamic handler) {
     _handler = handler;
     _syncQueueToHandler();
+    _updateWidget();
   }
 
   // ==========================================================================
@@ -147,6 +153,7 @@ class AudioService extends GetxService {
 
     // peluches 🧸: restaurar último item (solo para UI/estado, NO reproduce)
     _restoreLastItem();
+    _updateWidget();
 
     // ------------------------------------------------------------------------
     // LISTEN: playerStateStream -> actualizar UI state
@@ -180,6 +187,8 @@ class AudioService extends GetxService {
           currentVariant.value = null;
         }
       }
+
+      _updateWidget();
     });
 
     // ------------------------------------------------------------------------
@@ -374,6 +383,7 @@ class AudioService extends GetxService {
         _currentVariant = variant;
         currentItem.value = item;
         currentVariant.value = variant;
+        _updateWidget();
 
         _persistLastItem(item, variant);
         _keepLastItem = true;
@@ -471,6 +481,7 @@ class AudioService extends GetxService {
       _currentVariant = variant;
       currentItem.value = item;
       currentVariant.value = variant;
+      _updateWidget();
 
       _persistLastItem(item, variant);
       _keepLastItem = true;
@@ -597,17 +608,17 @@ class AudioService extends GetxService {
         ? Duration(seconds: durSec)
         : null;
 
-    String? subtitle =
-        item.displaySubtitle.isNotEmpty ? item.displaySubtitle : null;
+    String? subtitle = item.displaySubtitle.isNotEmpty
+        ? item.displaySubtitle
+        : null;
     if (Get.isRegistered<SettingsController>()) {
       final settings = Get.find<SettingsController>();
       final remaining = settings.sleepRemaining.value;
-      if (settings.sleepTimerEnabled.value &&
-          remaining > Duration.zero) {
+      if (settings.sleepTimerEnabled.value && remaining > Duration.zero) {
         final tag = _formatRemaining(remaining);
         subtitle = (subtitle == null || subtitle.isEmpty)
             ? 'Temporizador $tag'
-            : '$subtitle • Temporizador $tag';
+            : '$subtitle\nTemporizador $tag';
       }
     }
 
@@ -644,6 +655,8 @@ class AudioService extends GetxService {
     if (_currentItem != null) {
       handler.updateMediaItem(_buildBackgroundItem(_currentItem!));
     }
+
+    _updateWidget();
   }
 
   void refreshNotification() {
@@ -721,6 +734,41 @@ class AudioService extends GetxService {
     currentVariant.value = null;
 
     _keepLastItem = false;
+    _updateWidget();
+  }
+
+  Future<void> _updateWidget() async {
+    if (!Platform.isAndroid) return;
+
+    final item = _currentItem;
+    final hasItem = item != null;
+    final title = hasItem ? item!.title : 'Listenfy';
+    final artist = hasItem ? item.displaySubtitle : '';
+    String artPath = '';
+    if (hasItem) {
+      final local = item!.thumbnailLocalPath?.trim();
+      if (local != null && local.isNotEmpty) {
+        artPath = local;
+      }
+    }
+
+    Color barColor = const Color(0xFF1E2633);
+    if (Get.isRegistered<ThemeController>()) {
+      final theme = Get.find<ThemeController>();
+      barColor = theme.palette.value.primary;
+    }
+
+    try {
+      await _widgetChannel.invokeMethod('updateWidget', {
+        'title': title,
+        'artist': artist,
+        'artPath': artPath,
+        'playing': isPlaying.value,
+        'barColor': barColor.value,
+      });
+    } catch (_) {
+      // peluches 🧸: si falla el widget, no afecta reproducción
+    }
   }
 
   // ==========================================================================

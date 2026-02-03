@@ -15,6 +15,9 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.applyRouteArgs(Get.arguments);
+    });
 
     return Scaffold(
       backgroundColor: Colors.transparent,

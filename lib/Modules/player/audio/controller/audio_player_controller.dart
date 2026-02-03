@@ -46,6 +46,7 @@ class AudioPlayerController extends GetxController {
 
   bool _handlingCompleted = false;
   bool _hydratedFromStorage = false;
+  String? _lastArgsSignature;
 
   static const _queueKey = 'audio_queue_items';
   static const _queueIndexKey = 'audio_queue_index';
@@ -122,9 +123,26 @@ class AudioPlayerController extends GetxController {
         final pid = item.publicId.trim();
         return pid.isNotEmpty && e.publicId.trim() == pid;
       });
-      if (idx >= 0 && idx != currentIndex.value) {
-        currentIndex.value = idx;
+      if (idx >= 0) {
+        if (idx != currentIndex.value) {
+          currentIndex.value = idx;
+        }
+        return;
       }
+
+      // Si no está en la cola local, intenta resync desde AudioService.
+      final serviceQueue = audioService.queueItems;
+      if (serviceQueue.isEmpty) return;
+
+      final serviceIdx = serviceQueue.indexWhere((e) {
+        if (e.id == item.id) return true;
+        final pid = item.publicId.trim();
+        return pid.isNotEmpty && e.publicId.trim() == pid;
+      });
+      if (serviceIdx < 0) return;
+
+      queue.assignAll(serviceQueue);
+      currentIndex.value = serviceIdx;
     });
 
     ever<List<MediaItem>>(queue, (_) => _persistQueue());
@@ -206,6 +224,39 @@ class AudioPlayerController extends GetxController {
     queue.clear();
     currentIndex.value = 0;
     return false;
+  }
+
+  void applyRouteArgs(dynamic args) {
+    if (args is! Map) return;
+
+    final rawQueue = args['queue'];
+    final rawIndex = args['index'];
+
+    List<MediaItem> incoming = [];
+    if (rawQueue is List<MediaItem>) {
+      incoming = rawQueue;
+    } else if (rawQueue is List) {
+      incoming = rawQueue.whereType<MediaItem>().toList();
+    }
+    if (incoming.isEmpty) return;
+
+    final idx = (rawIndex is int) ? rawIndex : 0;
+    final safeIndex = idx.clamp(0, incoming.length - 1).toInt();
+    final signature =
+        '${incoming.length}:${safeIndex}:${incoming.map((e) => e.id).join(",")}';
+    if (_lastArgsSignature == signature) return;
+    _lastArgsSignature = signature;
+
+    queue.assignAll(incoming);
+    currentIndex.value = safeIndex;
+    _hydratedFromStorage = true;
+    _persistQueue();
+
+    if (isShuffling.value) {
+      _applyShuffleOrder();
+    }
+
+    _ensurePlayingCurrent();
   }
 
   @override

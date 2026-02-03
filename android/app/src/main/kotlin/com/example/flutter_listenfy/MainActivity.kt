@@ -17,6 +17,8 @@ import android.media.audiofx.Virtualizer
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.example.flutter_listenfy.widget.PlayerWidgetProvider
+import android.content.Intent
 import kotlin.math.roundToInt
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -25,6 +27,7 @@ class MainActivity : AudioServiceActivity() {
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
     private val pipChannel = "listenfy/pip"
+    private val widgetChannel = "listenfy/player_widget"
     private var pipEnabled: Boolean = false
     private var pipAspect: Double = 1.777777
     private var pipWidth: Int? = null
@@ -231,6 +234,42 @@ class MainActivity : AudioServiceActivity() {
                     }
                     else -> result.notImplemented()
                 }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, widgetChannel)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "updateWidget") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+
+                val title = call.argument<String>("title") ?: ""
+                val artist = call.argument<String>("artist") ?: ""
+                val artPath = call.argument<String>("artPath") ?: ""
+                val playing = call.argument<Boolean>("playing") ?: false
+                val barColorAny = call.argument<Any>("barColor")
+                val barColor = when (barColorAny) {
+                    is Int -> barColorAny
+                    is Long -> barColorAny.toInt()
+                    is Double -> barColorAny.toInt()
+                    else -> 0xFF1E2633.toInt()
+                }
+
+                val prefs = getSharedPreferences(PlayerWidgetProvider.PREFS, Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString(PlayerWidgetProvider.KEY_TITLE, title)
+                    .putString(PlayerWidgetProvider.KEY_ARTIST, artist)
+                    .putString(PlayerWidgetProvider.KEY_ART_PATH, artPath)
+                    .putBoolean(PlayerWidgetProvider.KEY_PLAYING, playing)
+                    .putInt(PlayerWidgetProvider.KEY_BAR_COLOR, barColor)
+                    .apply()
+
+                val intent = Intent(this, PlayerWidgetProvider::class.java).apply {
+                    action = PlayerWidgetProvider.ACTION_WIDGET_UPDATE
+                }
+                sendBroadcast(intent)
+
+                result.success(true)
             }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, openalChannel)

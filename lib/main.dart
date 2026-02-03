@@ -35,6 +35,7 @@ Future<void> main() async {
   }
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
   ]);
 
   // 🎨 Controller global de tema
