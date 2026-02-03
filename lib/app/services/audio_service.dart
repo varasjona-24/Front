@@ -11,6 +11,8 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
@@ -746,10 +748,7 @@ class AudioService extends GetxService {
     final artist = hasItem ? item.displaySubtitle : '';
     String artPath = '';
     if (hasItem) {
-      final local = item!.thumbnailLocalPath?.trim();
-      if (local != null && local.isNotEmpty) {
-        artPath = local;
-      }
+      artPath = await _resolveWidgetArtPath(item!);
     }
 
     Color barColor = const Color(0xFF1E2633);
@@ -772,6 +771,44 @@ class AudioService extends GetxService {
     } catch (_) {
       // peluches 🧸: si falla el widget, no afecta reproducción
     }
+  }
+
+  Future<String> _resolveWidgetArtPath(MediaItem item) async {
+    final local = item.thumbnailLocalPath?.trim();
+    if (local != null && local.isNotEmpty) {
+      final file = File(local);
+      if (await file.exists()) return file.path;
+    }
+
+    final remote = item.thumbnail?.trim();
+    if (remote == null || remote.isEmpty) return '';
+
+    final uri = Uri.tryParse(remote);
+    if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
+      return '';
+    }
+
+    try {
+      final dir = await getTemporaryDirectory();
+      final fileName = 'widget_thumb_${remote.hashCode}.img';
+      final file = File(p.join(dir.path, fileName));
+      if (await file.exists() && await file.length() > 0) {
+        return file.path;
+      }
+
+      final client = HttpClient();
+      final request = await client.getUrl(uri);
+      final response = await request.close();
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        await file.create(recursive: true);
+        await response.pipe(file.openWrite());
+        return file.path;
+      }
+    } catch (_) {
+      // peluches 🧸: si falla el fetch del thumb, ignoramos
+    }
+
+    return '';
   }
 
   // ==========================================================================
