@@ -202,12 +202,20 @@ class AudioPlayerController extends GetxController {
       final rawQueue = args['queue'];
       final rawIndex = args['index'];
 
+      List<MediaItem> incoming = [];
       if (rawQueue is List<MediaItem>) {
-        queue.assignAll(rawQueue);
+        incoming = rawQueue;
       } else if (rawQueue is List) {
         // por si viene List<dynamic>
-        queue.assignAll(rawQueue.whereType<MediaItem>().toList());
+        incoming = rawQueue.whereType<MediaItem>().toList();
       }
+
+      // Si no hay cola en los argumentos, dejamos que se restaure desde storage.
+      if (incoming.isEmpty) {
+        return false;
+      }
+
+      queue.assignAll(incoming);
 
       final idx = (rawIndex is int) ? rawIndex : 0;
       if (queue.isEmpty) {
@@ -220,9 +228,6 @@ class AudioPlayerController extends GetxController {
       return true;
     }
 
-    // fallback: vacío
-    queue.clear();
-    currentIndex.value = 0;
     return false;
   }
 

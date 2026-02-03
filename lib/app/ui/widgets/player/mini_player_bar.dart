@@ -108,15 +108,21 @@ class MiniPlayerBar extends StatelessWidget {
         onOpen: () {
           final route =
               isVideo ? AppRoutes.videoPlayer : AppRoutes.audioPlayer;
-          final audioQueue = (audioCtrl != null && audioCtrl.queue.isNotEmpty)
-              ? audioCtrl.queue.toList()
-              : <MediaItem>[item];
-          Get.toNamed(route, arguments: {
-            'queue': isVideo ? <MediaItem>[item] : audioQueue,
-            'index': isVideo
-                ? 0
-                : (audioCtrl != null ? audioCtrl.currentIndex.value : 0),
-          });
+
+          final args = <String, dynamic>{};
+          if (isVideo) {
+            if (videoCtrl != null && videoCtrl.queue.isNotEmpty) {
+              args['queue'] = videoCtrl.queue.toList();
+              args['index'] = videoCtrl.currentIndex.value;
+            }
+          } else {
+            if (audioCtrl != null && audioCtrl.queue.isNotEmpty) {
+              args['queue'] = audioCtrl.queue.toList();
+              args['index'] = audioCtrl.currentIndex.value;
+            }
+          }
+
+          Get.toNamed(route, arguments: args.isEmpty ? null : args);
         },
       );
     });
