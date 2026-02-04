@@ -35,6 +35,7 @@ class ArtistsController extends GetxController {
   final ArtistStore _artistStore = Get.find<ArtistStore>();
 
   final RxList<ArtistGroup> artists = <ArtistGroup>[].obs;
+  final RxList<ArtistGroup> recentArtists = <ArtistGroup>[].obs;
   final RxBool isLoading = false.obs;
   final RxString query = ''.obs;
   final Rx<ArtistSort> sort = ArtistSort.name.obs;
@@ -94,6 +95,7 @@ class ArtistsController extends GetxController {
       }
 
       artists.assignAll(_applySort(list));
+      _refreshRecentArtists(list);
     } catch (e) {
       print('Error loading artists: $e');
     } finally {
@@ -116,11 +118,13 @@ class ArtistsController extends GetxController {
   void setSort(ArtistSort value) {
     sort.value = value;
     artists.assignAll(_applySort(artists));
+    _refreshRecentArtists(artists);
   }
 
   void setSortAscending(bool value) {
     sortAscending.value = value;
     artists.assignAll(_applySort(artists));
+    _refreshRecentArtists(artists);
   }
 
   List<ArtistGroup> _applySort(List<ArtistGroup> input) {
@@ -141,6 +145,25 @@ class ArtistsController extends GetxController {
       return list.reversed.toList();
     }
     return list;
+  }
+
+  void _refreshRecentArtists(List<ArtistGroup> source) {
+    final recent = source
+        .map(
+          (artist) => MapEntry(
+            artist,
+            artist.items
+                .map((e) => e.lastPlayedAt ?? 0)
+                .fold<int>(0, (a, b) => a > b ? a : b),
+          ),
+        )
+        .where((entry) => entry.value > 0)
+        .toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    recentArtists.assignAll(
+      recent.map((e) => e.key).take(8),
+    );
   }
 
   Future<void> updateArtist({

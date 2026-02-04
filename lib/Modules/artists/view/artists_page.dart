@@ -131,7 +131,7 @@ class ArtistsPage extends GetView<ArtistsController> {
 
   Widget _recentArtists(ThemeData theme) {
     return Obx(() {
-      final list = controller.filtered.take(8).toList();
+      final list = controller.recentArtists;
       if (list.isEmpty) return const SizedBox.shrink();
 
       return Column(

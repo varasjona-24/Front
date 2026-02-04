@@ -56,7 +56,7 @@ class ArtistDetailPage extends GetView<ArtistsController> {
           elevation: 0,
           actions: [
             IconButton(
-              icon: const Icon(Icons.edit_rounded),
+              icon: const Icon(Icons.more_vert),
               onPressed: () => Get.to(
                 () => EditArtistPage(artist: resolved),
               ),
