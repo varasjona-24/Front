@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 
 class SectionListPage extends StatelessWidget {
   const SectionListPage({
@@ -31,7 +32,10 @@ class SectionListPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: Text(title),
+        title: ListenfyLogo(
+          size: 28,
+          color: scheme.primary,
+        ),
         backgroundColor: scheme.surface,
         surfaceTintColor: scheme.surface,
         foregroundColor: scheme.onSurface,

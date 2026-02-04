@@ -9,6 +9,7 @@ import '../controller/artists_controller.dart';
 import 'edit_artist_page.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import 'widgets/artist_avatar.dart';
+import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 
 class ArtistDetailPage extends GetView<ArtistsController> {
   const ArtistDetailPage({super.key, required this.artistKey});
@@ -49,7 +50,10 @@ class ArtistDetailPage extends GetView<ArtistsController> {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
-          title: Text(resolved.name),
+          title: ListenfyLogo(
+            size: 28,
+            color: theme.colorScheme.primary,
+          ),
           backgroundColor: theme.colorScheme.surface,
           surfaceTintColor: theme.colorScheme.surface,
           foregroundColor: theme.colorScheme.onSurface,

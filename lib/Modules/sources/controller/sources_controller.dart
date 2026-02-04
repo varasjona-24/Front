@@ -454,6 +454,7 @@ class SourcesController extends GetxController {
             SourceOrigin.facebook,
             SourceOrigin.telegram,
           ],
+          forceKind: MediaVariantKind.video,
         ),
         SourceTheme(
           id: 'social',
@@ -497,6 +498,7 @@ class SourcesController extends GetxController {
           defaultOrigins: [
             SourceOrigin.device,
           ],
+          forceKind: MediaVariantKind.video,
         ),
       ];
 

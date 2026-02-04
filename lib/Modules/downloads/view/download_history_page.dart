@@ -7,6 +7,7 @@ import '../../../app/models/media_item.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/controllers/media_actions_controller.dart';
+import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../home/controller/home_controller.dart';
 import '../controller/download_history_controller.dart';
 
@@ -26,7 +27,10 @@ class DownloadHistoryPage extends GetView<DownloadHistoryController> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: const Text('Historial de imports'),
+        title: ListenfyLogo(
+          size: 28,
+          color: scheme.primary,
+        ),
         backgroundColor: scheme.surface,
         surfaceTintColor: scheme.surface,
         foregroundColor: scheme.onSurface,

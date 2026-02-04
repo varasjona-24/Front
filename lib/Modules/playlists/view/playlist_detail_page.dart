@@ -7,6 +7,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
+import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/models/media_item.dart';
 import '../controller/playlists_controller.dart';
 import '../domain/playlist.dart';
@@ -47,8 +48,12 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
       return Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppTopBar(
-          title: Text(title ?? 'Lista'),
-                  ),
+          title: ListenfyLogo(size: 28, color: theme.colorScheme.primary),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: Get.back,
+          ),
+        ),
         body: AppGradientBackground(
           child: RefreshIndicator(
             onRefresh: controller.load,
