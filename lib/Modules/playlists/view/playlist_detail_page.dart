@@ -8,7 +8,6 @@ import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/models/media_item.dart';
-import '../../home/controller/home_controller.dart';
 import '../controller/playlists_controller.dart';
 import '../domain/playlist.dart';
 import '../../../app/utils/format_bytes.dart';
@@ -30,7 +29,6 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final home = Get.find<HomeController>();
 
     return Obx(() {
       final smart = isSmart ? controller.getSmartById(playlistId) : null;

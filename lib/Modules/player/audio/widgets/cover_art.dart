@@ -40,9 +40,9 @@ class _SquareCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumb = item.effectiveThumbnail;
-    final hasThumb = thumb != null && thumb.isNotEmpty;
-    final isLocal = hasThumb && thumb!.startsWith('/');
+    final thumb = item.effectiveThumbnail ?? '';
+    final hasThumb = thumb.isNotEmpty;
+    final isLocal = hasThumb && thumb.startsWith('/');
 
     return Container(
       key: const ValueKey('square'),
@@ -144,9 +144,9 @@ class _VinylCoverState extends State<_VinylCover>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final thumb = widget.item.effectiveThumbnail;
-    final hasThumb = thumb != null && thumb.isNotEmpty;
-    final isLocal = hasThumb && thumb!.startsWith('/');
+    final thumb = widget.item.effectiveThumbnail ?? '';
+    final hasThumb = thumb.isNotEmpty;
+    final isLocal = hasThumb && thumb.startsWith('/');
 
     const double diskSize = 280;
     const double labelSize = 215;

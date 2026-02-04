@@ -54,8 +54,8 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
     final modeKind = mode == null
         ? null
         : (mode == HomeMode.audio
-            ? MediaVariantKind.audio
-            : MediaVariantKind.video);
+              ? MediaVariantKind.audio
+              : MediaVariantKind.video);
 
     return _sources.loadLibraryItems(
       onlyOffline: widget.onlyOffline,
@@ -99,7 +99,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
         extendBody: true,
         appBar: AppTopBar(
           title: Text(widget.title),
-                    onToggleMode: widget.forceKind == null ? home.toggleMode : null,
+          onToggleMode: widget.forceKind == null ? home.toggleMode : null,
           mode: mode == HomeMode.audio
               ? AppMediaMode.audio
               : AppMediaMode.video,
@@ -117,12 +117,10 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
 
                     final list = snap.data ?? const <MediaItem>[];
 
-                    final hasAudio = (MediaItem e) => e.variants.any(
-                          (v) => v.kind == MediaVariantKind.audio,
-                        );
-                    final hasVideo = (MediaItem e) => e.variants.any(
-                          (v) => v.kind == MediaVariantKind.video,
-                        );
+                    final hasAudio = (MediaItem e) =>
+                        e.variants.any((v) => v.kind == MediaVariantKind.audio);
+                    final hasVideo = (MediaItem e) =>
+                        e.variants.any((v) => v.kind == MediaVariantKind.video);
 
                     final modeList = mode == HomeMode.audio
                         ? list.where(hasAudio).toList()
@@ -354,9 +352,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
       children: [
         Text(
           'Temáticas',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const Spacer(),
         IconButton(
@@ -384,8 +382,8 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
         return Text(
           'Crea una temática para agrupar contenidos.',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         );
       }
 
@@ -414,30 +412,6 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
     });
   }
 
-  Widget _topicThumb(SourceThemeTopic topic) {
-    final scheme = Theme.of(context).colorScheme;
-    final path = topic.coverLocalPath?.trim();
-    final url = topic.coverUrl?.trim();
-    ImageProvider? provider;
-    if (path != null && path.isNotEmpty) {
-      provider = FileImage(File(path));
-    } else if (url != null && url.isNotEmpty) {
-      provider = NetworkImage(url);
-    }
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 48,
-        height: 48,
-        color: scheme.surfaceContainerHighest,
-        child: provider != null
-            ? Image(image: provider, fit: BoxFit.cover)
-            : Icon(Icons.folder_rounded, color: scheme.onSurfaceVariant),
-      ),
-    );
-  }
-
   // ============================
   // 🪄 DIALOGOS
   // ============================
@@ -461,9 +435,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   children: [
                     TextField(
                       onChanged: (v) => name = v,
-                      decoration: const InputDecoration(
-                        hintText: 'Nombre',
-                      ),
+                      decoration: const InputDecoration(hintText: 'Nombre'),
                     ),
                     const SizedBox(height: 10),
                     TextField(
@@ -474,8 +446,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                     ),
                     const SizedBox(height: 10),
                     SourceColorPickerField(
-                      color:
-                          colorValue != null ? Color(colorValue!) : draftColor,
+                      color: colorValue != null
+                          ? Color(colorValue!)
+                          : draftColor,
                       onChanged: (c) => setState(() {
                         draftColor = c;
                         colorValue = c.value;
@@ -496,8 +469,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                         final file = (res != null && res.files.isNotEmpty)
                             ? res.files.first
                             : null;
-                        if (file?.path != null) {
-                          coverLocal = file!.path!;
+                        final path = file?.path;
+                        if (path != null && path.isNotEmpty) {
+                          coverLocal = path;
                         }
                       },
                       icon: const Icon(Icons.folder_open_rounded),
@@ -541,7 +515,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
     String? coverLocal = topic.coverLocalPath;
     int? colorValue = topic.colorValue;
     Color draftColor = colorValue != null
-        ? Color(colorValue!)
+        ? Color(colorValue)
         : Theme.of(context).colorScheme.primary;
     final controller = TextEditingController(text: name);
 
@@ -558,21 +532,19 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   TextField(
                     controller: controller,
                     onChanged: (v) => name = v,
-                    decoration: const InputDecoration(
-                      hintText: 'Nombre',
-                    ),
+                    decoration: const InputDecoration(hintText: 'Nombre'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
                     onChanged: (v) => setState(() => coverUrl = v),
                     decoration: InputDecoration(
                       hintText: 'URL de imagen (opcional)',
-                      hintStyle:
-                          Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
+                      hintStyle: Theme.of(context).textTheme.bodySmall
+                          ?.copyWith(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                          ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -595,14 +567,15 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                                 'jpg',
                                 'jpeg',
                                 'png',
-                                'webp'
+                                'webp',
                               ],
                             );
                             final file = (res != null && res.files.isNotEmpty)
                                 ? res.files.first
                                 : null;
-                            if (file?.path != null) {
-                              setState(() => coverLocal = file!.path!);
+                            final path = file?.path;
+                            if (path != null && path.isNotEmpty) {
+                              setState(() => coverLocal = path);
                             }
                           },
                           icon: const Icon(Icons.folder_open_rounded),
@@ -636,9 +609,12 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                 await _sources.updateTopic(
                   topic.copyWith(
                     title: name.trim(),
-                    coverUrl: coverUrl?.trim().isEmpty == true ? null : coverUrl,
-                    coverLocalPath:
-                        coverLocal?.trim().isEmpty == true ? null : coverLocal,
+                    coverUrl: coverUrl?.trim().isEmpty == true
+                        ? null
+                        : coverUrl,
+                    coverLocalPath: coverLocal?.trim().isEmpty == true
+                        ? null
+                        : coverLocal,
                     colorValue: colorValue,
                   ),
                 );
@@ -716,9 +692,7 @@ class _TopicCard extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: Ink(
-          decoration: BoxDecoration(
-            color: base.withOpacity(0.92),
-          ),
+          decoration: BoxDecoration(color: base.withOpacity(0.92)),
           child: InkWell(
             onTap: onOpen,
             child: Padding(

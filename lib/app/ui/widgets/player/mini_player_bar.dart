@@ -52,7 +52,10 @@ class MiniPlayerBar extends StatelessWidget {
       }
 
       final isVideo = videoActive && !audioActive;
-      final item = isVideo ? videoItem! : audioItem!;
+      final item = isVideo ? videoItem : audioItem;
+      if (item == null) {
+        return const SizedBox.shrink();
+      }
       final isPlaying =
           isVideo ? video.isPlaying.value : audio.isPlaying.value;
 

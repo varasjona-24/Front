@@ -16,7 +16,7 @@ import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
-import '../../home/controller/home_controller.dart';
+
 import '../../sources/domain/source_origin.dart';
 
 class DownloadsController extends GetxController {

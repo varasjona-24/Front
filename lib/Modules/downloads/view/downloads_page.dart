@@ -45,9 +45,9 @@ class DownloadsPage extends GetView<DownloadsController> {
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if ((controller.sharedUrl.value.isEmpty) &&
-            (argUrl != null && argUrl!.isNotEmpty) &&
+            (argUrl?.isNotEmpty ?? false) &&
             controller.sharedArgConsumed.value == false) {
-          controller.sharedUrl.value = argUrl!;
+          controller.sharedUrl.value = argUrl ?? '';
           controller.sharedArgConsumed.value = true;
         }
 

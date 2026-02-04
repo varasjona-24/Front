@@ -510,7 +510,6 @@ class SettingsController extends GetxController {
   /// 🗑️ Limpiar caché (mantiene thumbnails)
   Future<void> clearCache() async {
     try {
-      final appDir = await getApplicationDocumentsDirectory();
       // No borrar archivos de audio/video descargados ni thumbnails.
       // Sólo limpiamos temporales y estado de configuración (cache lógica).
 

@@ -262,18 +262,21 @@ class AudioService extends GetxService {
   // EQ (ANDROID)
   // ==========================================================================
   Future<AndroidEqualizerParameters?> getEqParameters() async {
-    if (_equalizer == null) return null;
-    return _equalizer!.parameters;
+    final eq = _equalizer;
+    if (eq == null) return null;
+    return eq.parameters;
   }
 
   Future<void> setEqEnabled(bool enabled) async {
-    if (_equalizer == null) return;
-    await _equalizer!.setEnabled(enabled);
+    final eq = _equalizer;
+    if (eq == null) return;
+    await eq.setEnabled(enabled);
   }
 
   Future<void> setEqBandGain(int index, double gain) async {
-    if (_equalizer == null) return;
-    final params = await _equalizer!.parameters;
+    final eq = _equalizer;
+    if (eq == null) return;
+    final params = await eq.parameters;
     if (index < 0 || index >= params.bands.length) return;
     await params.bands[index].setGain(gain);
   }
@@ -685,7 +688,8 @@ class AudioService extends GetxService {
   // APPLY EQ FROM SETTINGS
   // ==========================================================================
   Future<void> _applyEqFromSettings() async {
-    if (_equalizer == null) return;
+    final eq = _equalizer;
+    if (eq == null) return;
     if (!Get.isRegistered<SettingsController>()) return;
 
     final settings = Get.find<SettingsController>();
@@ -693,7 +697,7 @@ class AudioService extends GetxService {
       await setEqEnabled(settings.eqEnabled.value);
       if (settings.eqGains.isEmpty) return;
 
-      final params = await _equalizer!.parameters;
+      final params = await eq.parameters;
       final bands = params.bands.length;
       final gains = settings.eqGains;
 
@@ -743,12 +747,13 @@ class AudioService extends GetxService {
     if (!Platform.isAndroid) return;
 
     final item = _currentItem;
-    final hasItem = item != null;
-    final title = hasItem ? item!.title : 'Listenfy';
-    final artist = hasItem ? item.displaySubtitle : '';
+    String title = 'Listenfy';
+    String artist = '';
     String artPath = '';
-    if (hasItem) {
-      artPath = await _resolveWidgetArtPath(item!);
+    if (item != null) {
+      title = item.title;
+      artist = item.displaySubtitle;
+      artPath = await _resolveWidgetArtPath(item);
     }
 
     Color barColor = const Color(0xFF1E2633);

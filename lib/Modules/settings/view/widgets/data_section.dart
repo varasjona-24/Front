@@ -6,7 +6,6 @@ import 'package:app_settings/app_settings.dart';
 
 import '../../controller/settings_controller.dart';
 import '../widgets/section_header.dart';
-import '../widgets/value_pill.dart';
 import '../widgets/choice_chip_row.dart';
 import '../widgets/info_tile.dart';
 

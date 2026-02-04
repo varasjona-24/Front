@@ -25,9 +25,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    final barColor = isDark ? const Color(0xFF0B0B0B) : Colors.white;
+    final barColor = theme.appBarTheme.backgroundColor ?? scheme.surface;
 
     return AppBar(
       backgroundColor: barColor,

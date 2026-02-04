@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -29,7 +31,13 @@ class ArtistDetailPage extends GetView<ArtistsController> {
 
       if (artist == null) {
         return Scaffold(
-          appBar: AppBar(title: const Text('Artista')),
+          appBar: AppBar(
+            title: const Text('Artista'),
+            backgroundColor: theme.colorScheme.surface,
+            surfaceTintColor: theme.colorScheme.surface,
+            foregroundColor: theme.colorScheme.onSurface,
+            elevation: 0,
+          ),
           body: const Center(child: Text('Artista no encontrado')),
         );
       }
@@ -42,8 +50,9 @@ class ArtistDetailPage extends GetView<ArtistsController> {
         backgroundColor: Colors.transparent,
         appBar: AppBar(
           title: Text(resolved.name),
-          backgroundColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
+          backgroundColor: theme.colorScheme.surface,
+          surfaceTintColor: theme.colorScheme.surface,
+          foregroundColor: theme.colorScheme.onSurface,
           elevation: 0,
           actions: [
             IconButton(
@@ -132,15 +141,35 @@ class _SongTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isVideo = item.hasVideoLocal || item.localVideoVariant != null;
+    final thumb = item.effectiveThumbnail ?? '';
+    final hasThumb = thumb.isNotEmpty;
+    final isLocal = hasThumb && thumb.startsWith('/');
 
     return Card(
       elevation: 0,
       color: theme.colorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ListTile(
-        leading: Icon(
-          isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
-        ),
+        leading: hasThumb
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: isLocal
+                    ? Image.file(
+                        File(thumb),
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                      )
+                    : Image.network(
+                        thumb,
+                        width: 44,
+                        height: 44,
+                        fit: BoxFit.cover,
+                      ),
+              )
+            : Icon(
+                isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
+              ),
         title: Text(
           item.title,
           maxLines: 1,

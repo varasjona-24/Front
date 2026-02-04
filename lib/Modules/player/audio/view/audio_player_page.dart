@@ -97,7 +97,8 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Obx(() {
-                          final enabled = controller.spatialMode.value ==
+                          final enabled =
+                              controller.spatialMode.value ==
                               SpatialAudioMode.virtualizer;
                           return IconButton(
                             tooltip: 'Envolvente',
@@ -163,54 +164,6 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
               ],
             );
           }),
-        ),
-      ),
-    );
-  }
-}
-
-class _AudioModeChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback? onTap;
-
-  const _AudioModeChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final enabled = onTap != null;
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? colors.primary.withOpacity(0.18)
-              : colors.surface.withOpacity(enabled ? 0.12 : 0.06),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: selected
-                ? colors.primary.withOpacity(0.5)
-                : colors.onSurface.withOpacity(enabled ? 0.08 : 0.04),
-          ),
-        ),
-        child: Text(
-          label,
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: selected
-                ? colors.primary
-                : colors.onSurface.withOpacity(enabled ? 1 : 0.6),
-          ),
         ),
       ),
     );

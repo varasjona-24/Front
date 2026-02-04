@@ -133,7 +133,6 @@ class ArtistsController extends GetxController {
         list.shuffle(Random());
         break;
       case ArtistSort.name:
-      default:
         list.sort(
           (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
         );

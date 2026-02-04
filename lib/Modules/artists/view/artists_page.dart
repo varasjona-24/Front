@@ -353,10 +353,10 @@ class _ArtistCoverCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final thumb = artist.thumbnailLocalPath ?? artist.thumbnail;
 
-    final imageProvider = (thumb != null && thumb!.isNotEmpty)
-        ? (thumb!.startsWith('http')
-              ? NetworkImage(thumb!)
-              : FileImage(File(thumb!)) as ImageProvider)
+    final imageProvider = (thumb != null && thumb.isNotEmpty)
+        ? (thumb.startsWith('http')
+              ? NetworkImage(thumb)
+              : FileImage(File(thumb)) as ImageProvider)
         : null;
 
     return SizedBox(

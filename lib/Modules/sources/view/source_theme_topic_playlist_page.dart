@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -60,14 +58,11 @@ class _SourceThemeTopicPlaylistPageState
     // 🧱 UI
     // ============================
     final theme = Theme.of(context);
-    final home = Get.find<HomeController>();
 
     return Obx(() {
       final playlist = _playlist;
       if (playlist == null) {
-        return const Scaffold(
-          body: Center(child: Text('Lista no encontrada')),
-        );
+        return const Scaffold(body: Center(child: Text('Lista no encontrada')));
       }
 
       final children = _sources.playlistsForTopic(
@@ -77,10 +72,7 @@ class _SourceThemeTopicPlaylistPageState
 
       return Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: AppTopBar(
-          title: Text(playlist.name),
-                    onToggleMode: null,
-        ),
+        appBar: AppTopBar(title: Text(playlist.name), onToggleMode: null),
         body: AppGradientBackground(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -146,8 +138,8 @@ class _SourceThemeTopicPlaylistPageState
           return Text(
             'No hay items todavía.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           );
         }
         return Column(
@@ -155,9 +147,9 @@ class _SourceThemeTopicPlaylistPageState
           children: [
             Text(
               'Items',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             ...items.map(
@@ -208,8 +200,8 @@ class _SourceThemeTopicPlaylistPageState
       return Text(
         'No hay listas aún.',
         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       );
     }
 
@@ -218,9 +210,9 @@ class _SourceThemeTopicPlaylistPageState
       children: [
         Text(
           'Listas',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 8),
         ...lists.map(
@@ -287,9 +279,8 @@ class _SourceThemeTopicPlaylistPageState
                           const SizedBox(width: 8),
                           Text(
                             'Agregar items',
-                            style: Theme.of(ctx2).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: Theme.of(ctx2).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const Spacer(),
                           TextButton(
@@ -304,13 +295,11 @@ class _SourceThemeTopicPlaylistPageState
                           ? Center(
                               child: Text(
                                 'No hay items disponibles para esta temática.',
-                                style: Theme.of(ctx2)
-                                    .textTheme
-                                    .bodyMedium
+                                style: Theme.of(ctx2).textTheme.bodyMedium
                                     ?.copyWith(
-                                      color: Theme.of(ctx2)
-                                          .colorScheme
-                                          .onSurfaceVariant,
+                                      color: Theme.of(
+                                        ctx2,
+                                      ).colorScheme.onSurfaceVariant,
                                     ),
                               ),
                             )
@@ -401,9 +390,8 @@ class _SourceThemeTopicPlaylistPageState
                           const SizedBox(width: 8),
                           Text(
                             'Nueva lista',
-                            style: Theme.of(ctx2).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            style: Theme.of(ctx2).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const Spacer(),
                           TextButton(
@@ -456,14 +444,15 @@ class _SourceThemeTopicPlaylistPageState
                               'jpg',
                               'jpeg',
                               'png',
-                              'webp'
+                              'webp',
                             ],
                           );
                           final file = (res != null && res.files.isNotEmpty)
                               ? res.files.first
                               : null;
-                          if (file?.path != null) {
-                            setState(() => coverLocal = file!.path!);
+                          final path = file?.path;
+                          if (path != null && path.isNotEmpty) {
+                            setState(() => coverLocal = path);
                           }
                         },
                         icon: const Icon(Icons.folder_open_rounded),
@@ -586,7 +575,7 @@ class _SourceThemeTopicPlaylistPageState
     String? coverLocal = playlist.coverLocalPath;
     int? colorValue = playlist.colorValue;
     Color draftColor = colorValue != null
-        ? Color(colorValue!)
+        ? Color(colorValue)
         : Theme.of(context).colorScheme.primary;
     final controller = TextEditingController(text: name);
 
@@ -603,9 +592,7 @@ class _SourceThemeTopicPlaylistPageState
                   TextField(
                     controller: controller,
                     onChanged: (v) => name = v,
-                    decoration: const InputDecoration(
-                      hintText: 'Nombre',
-                    ),
+                    decoration: const InputDecoration(hintText: 'Nombre'),
                   ),
                   const SizedBox(height: 10),
                   TextField(
@@ -616,9 +603,7 @@ class _SourceThemeTopicPlaylistPageState
                   ),
                   const SizedBox(height: 10),
                   SourceColorPickerField(
-                    color: colorValue != null
-                        ? Color(colorValue!)
-                        : draftColor,
+                    color: colorValue != null ? Color(colorValue!) : draftColor,
                     onChanged: (c) => setState(() {
                       draftColor = c;
                       colorValue = c.value;
@@ -636,14 +621,15 @@ class _SourceThemeTopicPlaylistPageState
                                 'jpg',
                                 'jpeg',
                                 'png',
-                                'webp'
+                                'webp',
                               ],
                             );
                             final file = (res != null && res.files.isNotEmpty)
                                 ? res.files.first
                                 : null;
-                            if (file?.path != null) {
-                              setState(() => coverLocal = file!.path!);
+                            final path = file?.path;
+                            if (path != null && path.isNotEmpty) {
+                              setState(() => coverLocal = path);
                             }
                           },
                           icon: const Icon(Icons.folder_open_rounded),
@@ -677,9 +663,12 @@ class _SourceThemeTopicPlaylistPageState
                 await _sources.updateTopicPlaylist(
                   playlist.copyWith(
                     name: name.trim(),
-                    coverUrl: coverUrl?.trim().isEmpty == true ? null : coverUrl,
-                    coverLocalPath:
-                        coverLocal?.trim().isEmpty == true ? null : coverLocal,
+                    coverUrl: coverUrl?.trim().isEmpty == true
+                        ? null
+                        : coverUrl,
+                    coverLocalPath: coverLocal?.trim().isEmpty == true
+                        ? null
+                        : coverLocal,
                     colorValue: colorValue,
                   ),
                 );
@@ -692,28 +681,5 @@ class _SourceThemeTopicPlaylistPageState
     );
 
     controller.dispose();
-  }
-
-  Widget _playlistThumb(SourceThemeTopicPlaylist pl) {
-    final scheme = Theme.of(context).colorScheme;
-    final path = pl.coverLocalPath?.trim();
-    final url = pl.coverUrl?.trim();
-    ImageProvider? provider;
-    if (path != null && path.isNotEmpty) {
-      provider = FileImage(File(path));
-    } else if (url != null && url.isNotEmpty) {
-      provider = NetworkImage(url);
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        width: 52,
-        height: 52,
-        color: Colors.black.withOpacity(0.18),
-        child: provider != null
-            ? Image(image: provider, fit: BoxFit.cover)
-            : Icon(Icons.queue_music_rounded, color: scheme.onSurfaceVariant),
-      ),
-    );
   }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
 import '../controller/home_controller.dart';
@@ -26,10 +25,7 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
   List<Widget>? buildActions(BuildContext context) {
     return [
       if (query.isNotEmpty)
-        IconButton(
-          icon: const Icon(Icons.clear),
-          onPressed: () => query = '',
-        ),
+        IconButton(icon: const Icon(Icons.clear), onPressed: () => query = ''),
     ];
   }
 
@@ -95,9 +91,7 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
     final isAudioMode = controller.mode.value == HomeMode.audio;
 
     return controller.allItems.where((item) {
-      final matchesMode = isAudioMode
-          ? item.hasAudioLocal
-          : item.hasVideoLocal;
+      final matchesMode = isAudioMode ? item.hasAudioLocal : item.hasVideoLocal;
       if (!matchesMode) return false;
 
       final title = item.title.toLowerCase();
@@ -113,16 +107,11 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
     int index,
   ) {
     final isVideo = item.hasVideoLocal || item.localVideoVariant != null;
-    final icon =
-        isVideo ? Icons.videocam_rounded : Icons.music_note_rounded;
+    final icon = isVideo ? Icons.videocam_rounded : Icons.music_note_rounded;
 
     return ListTile(
       leading: Icon(icon),
-      title: Text(
-        item.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         item.displaySubtitle,
         maxLines: 1,

@@ -641,10 +641,10 @@ class _PlaylistTile extends StatelessWidget {
               : null);
 
     ImageProvider? provider;
-    if (thumb != null && thumb!.isNotEmpty) {
-      provider = thumb!.startsWith('http')
-          ? NetworkImage(thumb!)
-          : FileImage(File(thumb!));
+    if (thumb != null && thumb.isNotEmpty) {
+      provider = thumb.startsWith('http')
+          ? NetworkImage(thumb)
+          : FileImage(File(thumb));
     }
 
     return Card(

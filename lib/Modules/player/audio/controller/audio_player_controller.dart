@@ -188,7 +188,7 @@ class AudioPlayerController extends GetxController {
   }
 
   bool _is8dVariant(MediaVariant v) {
-    final name = v.fileName?.toLowerCase() ?? '';
+    final name = v.fileName.toLowerCase();
     final path = v.localPath?.toLowerCase() ?? '';
     return name.contains('_8d') ||
         path.contains('/converted/') ||
