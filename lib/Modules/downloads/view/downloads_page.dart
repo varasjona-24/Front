@@ -92,57 +92,62 @@ class DownloadsPage extends GetView<DownloadsController> {
                     )
                     .toList();
 
-                return ScrollConfiguration(
-                  behavior: const _NoGlowScrollBehavior(),
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.only(
-                      top: AppSpacing.md,
-                      bottom: kBottomNavigationBarHeight + 18,
-                      left: AppSpacing.md,
-                      right: AppSpacing.md,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _header(theme: theme, context: context),
-                        const SizedBox(height: AppSpacing.lg),
+                return RefreshIndicator(
+                  onRefresh: controller.load,
+                  child: ScrollConfiguration(
+                    behavior: const _NoGlowScrollBehavior(),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        top: AppSpacing.md,
+                        bottom: kBottomNavigationBarHeight + 18,
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _header(theme: theme, context: context),
+                          const SizedBox(height: AppSpacing.lg),
 
-                        // 📥 Pill de Imports (Online + Dispositivo)
-                        const DownloadsPill(),
-                        const SizedBox(height: AppSpacing.lg),
+                          // 📥 Pill de Imports (Online + Dispositivo)
+                          const DownloadsPill(),
+                          const SizedBox(height: AppSpacing.lg),
 
-                        if (list.isEmpty)
-                          Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(AppSpacing.lg),
-                              child: Text(
-                                'No hay imports aún.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
+                          if (list.isEmpty)
+                            Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(AppSpacing.lg),
+                                child: Text(
+                                  'No hay imports aún.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            )
+                          else
+                            Column(
+                              children: List.generate(
+                                list.length,
+                                (i) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _DownloadTile(
+                                    item: list[i],
+                                    onPlay: (item) =>
+                                        _playItem(mode, list, item),
+                                    onHold: (item) => actions.showItemActions(
+                                          context,
+                                          item,
+                                          onChanged: controller.load,
+                                        ),
+                                  ),
                                 ),
                               ),
                             ),
-                          )
-                        else
-                          Column(
-                            children: List.generate(
-                              list.length,
-                              (i) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _DownloadTile(
-                                  item: list[i],
-                                  onPlay: (item) => _playItem(mode, list, item),
-                                  onHold: (item) => actions.showItemActions(
-                                        context,
-                                        item,
-                                        onChanged: controller.load,
-                                      ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: AppSpacing.lg),
-                      ],
+                          const SizedBox(height: AppSpacing.lg),
+                        ],
+                      ),
                     ),
                   ),
                 );

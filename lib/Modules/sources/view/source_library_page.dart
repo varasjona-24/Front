@@ -126,40 +126,49 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                         ? list.where(hasAudio).toList()
                         : list.where(hasVideo).toList();
 
-                    return ScrollConfiguration(
-                      behavior: const _NoGlowScrollBehavior(),
-                      child: SingleChildScrollView(
-                        padding: EdgeInsets.only(
-                          top: 12,
-                          bottom: kBottomNavigationBarHeight + 18,
-                          left: 12,
-                          right: 12,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (themeMeta != null &&
-                                themeMeta.onlyOffline != true) ...[
-                              _topicHeader(themeMeta),
-                              const SizedBox(height: 8),
-                              _topicList(themeMeta),
-                              const SizedBox(height: 18),
-                            ],
-                            if (modeList.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: Text(
-                                  'No hay contenido aquí todavía.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant,
+                    return RefreshIndicator(
+                      onRefresh: () async {
+                        await _sources.refreshAll();
+                        await _load(mode);
+                        if (mounted) setState(() {});
+                      },
+                      child: ScrollConfiguration(
+                        behavior: const _NoGlowScrollBehavior(),
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.only(
+                            top: 12,
+                            bottom: kBottomNavigationBarHeight + 18,
+                            left: 12,
+                            right: 12,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (themeMeta != null &&
+                                  themeMeta.onlyOffline != true) ...[
+                                _topicHeader(themeMeta),
+                                const SizedBox(height: 8),
+                                _topicList(themeMeta),
+                                const SizedBox(height: 18),
+                              ],
+                              if (modeList.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: Text(
+                                    'No hay contenido aquí todavía.',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color:
+                                          theme.colorScheme.onSurfaceVariant,
+                                    ),
                                   ),
+                                )
+                              else
+                                ...modeList.map(
+                                  (item) => _itemTile(item, modeList),
                                 ),
-                              )
-                            else
-                              ...modeList.map(
-                                (item) => _itemTile(item, modeList),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     );

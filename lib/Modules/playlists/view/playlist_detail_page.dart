@@ -50,46 +50,50 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
           title: Text(title ?? 'Lista'),
                   ),
         body: AppGradientBackground(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.lg,
+          child: RefreshIndicator(
+            onRefresh: controller.load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.lg,
+              ),
+              children: [
+                _header(theme, title, cover, items.length, totalBytes),
+                const SizedBox(height: 14),
+                _actionRow(items),
+                const SizedBox(height: 16),
+                if (!isSmart)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton.icon(
+                      onPressed: () => _openAddSongs(context, playlist),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar canciones'),
+                    ),
+                  ),
+                if (!isSmart) const SizedBox(height: 10),
+                if (items.isEmpty)
+                  Text(
+                    'No hay canciones en esta lista.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  )
+                else
+                  ...items.asMap().entries.map(
+                    (entry) => _trackTile(
+                      theme,
+                      entry.value,
+                      entry.key,
+                      items,
+                      isSmart ? null : playlist,
+                    ),
+                  ),
+              ],
             ),
-            children: [
-              _header(theme, title, cover, items.length, totalBytes),
-              const SizedBox(height: 14),
-              _actionRow(items),
-              const SizedBox(height: 16),
-              if (!isSmart)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _openAddSongs(context, playlist),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Agregar canciones'),
-                  ),
-                ),
-              if (!isSmart) const SizedBox(height: 10),
-              if (items.isEmpty)
-                Text(
-                  'No hay canciones en esta lista.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                )
-              else
-                ...items.asMap().entries.map(
-                  (entry) => _trackTile(
-                    theme,
-                    entry.value,
-                    entry.key,
-                    items,
-                    isSmart ? null : playlist,
-                  ),
-                ),
-            ],
           ),
         ),
       );

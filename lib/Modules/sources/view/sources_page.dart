@@ -41,26 +41,30 @@ class SourcesPage extends GetView<SourcesController> {
           child: Stack(
             children: [
               Positioned.fill(
-                child: ScrollConfiguration(
-                  behavior: const _NoGlowScrollBehavior(),
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.only(
-                      top: AppSpacing.md,
-                      bottom: kBottomNavigationBarHeight + 18,
-                      left: AppSpacing.md,
-                      right: AppSpacing.md,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _header(theme: theme, scheme: scheme, home: home),
-                        const SizedBox(height: AppSpacing.lg),
+                child: RefreshIndicator(
+                  onRefresh: controller.refreshAll,
+                  child: ScrollConfiguration(
+                    behavior: const _NoGlowScrollBehavior(),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: EdgeInsets.only(
+                        top: AppSpacing.md,
+                        bottom: kBottomNavigationBarHeight + 18,
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _header(theme: theme, scheme: scheme, home: home),
+                          const SizedBox(height: AppSpacing.lg),
 
-                        ..._themeSections(
-                          theme: theme,
-                          themes: controller.themes,
-                        ),
-                      ],
+                          ..._themeSections(
+                            theme: theme,
+                            themes: controller.themes,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

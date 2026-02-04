@@ -64,63 +64,67 @@ class ArtistDetailPage extends GetView<ArtistsController> {
           ],
         ),
         body: AppGradientBackground(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceContainer,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      ArtistAvatar(thumb: thumb, radius: 36),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              resolved.name,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w700,
+          child: RefreshIndicator(
+            onRefresh: controller.load,
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(
+                  elevation: 0,
+                  color: theme.colorScheme.surfaceContainer,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Row(
+                      children: [
+                        ArtistAvatar(thumb: thumb, radius: 36),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                resolved.name,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${resolved.count} canciones',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
+                              const SizedBox(height: 4),
+                              Text(
+                                '${resolved.count} canciones',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Canciones',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 8),
-              for (int i = 0; i < resolved.items.length; i++)
-                _SongTile(
-                  item: resolved.items[i],
-                  onPlay: () => home.openMedia(
-                    resolved.items[i],
-                    i,
-                    resolved.items,
+                const SizedBox(height: 16),
+                Text(
+                  'Canciones',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-            ],
+                const SizedBox(height: 8),
+                for (int i = 0; i < resolved.items.length; i++)
+                  _SongTile(
+                    item: resolved.items[i],
+                    onPlay: () => home.openMedia(
+                      resolved.items[i],
+                      i,
+                      resolved.items,
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       );

@@ -43,26 +43,30 @@ class ArtistsPage extends GetView<ArtistsController> {
               Positioned.fill(
                 child: controller.isLoading.value
                     ? const Center(child: CircularProgressIndicator())
-                    : ScrollConfiguration(
-                        behavior: const _NoGlowScrollBehavior(),
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.only(
-                            top: AppSpacing.md,
-                            bottom: kBottomNavigationBarHeight + 18,
-                            left: AppSpacing.md,
-                            right: AppSpacing.md,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _header(theme),
-                              const SizedBox(height: AppSpacing.md),
-                              _recentArtists(theme),
-                              const SizedBox(height: AppSpacing.lg),
-                              _summaryRow(theme, context),
-                              const SizedBox(height: AppSpacing.md),
-                              _artistList(),
-                            ],
+                    : RefreshIndicator(
+                        onRefresh: controller.load,
+                        child: ScrollConfiguration(
+                          behavior: const _NoGlowScrollBehavior(),
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.only(
+                              top: AppSpacing.md,
+                              bottom: kBottomNavigationBarHeight + 18,
+                              left: AppSpacing.md,
+                              right: AppSpacing.md,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _header(theme),
+                                const SizedBox(height: AppSpacing.md),
+                                _recentArtists(theme),
+                                const SizedBox(height: AppSpacing.lg),
+                                _summaryRow(theme, context),
+                                const SizedBox(height: AppSpacing.md),
+                                _artistList(),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -359,38 +363,42 @@ class _ArtistCoverCard extends StatelessWidget {
               : FileImage(File(thumb)) as ImageProvider)
         : null;
 
-    return SizedBox(
-      width: 96,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(16),
-              image: imageProvider != null
-                  ? DecorationImage(
-                      image: imageProvider,
-                      fit: BoxFit.cover,
-                    )
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => Get.to(() => ArtistDetailPage(artistKey: artist.key)),
+      child: SizedBox(
+        width: 96,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(16),
+                image: imageProvider != null
+                    ? DecorationImage(
+                        image: imageProvider,
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+              ),
+              child: imageProvider == null
+                  ? Icon(Icons.person_rounded, color: scheme.onSurfaceVariant)
                   : null,
             ),
-            child: imageProvider == null
-                ? Icon(Icons.person_rounded, color: scheme.onSurfaceVariant)
-                : null,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            artist.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 6),
+            Text(
+              artist.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

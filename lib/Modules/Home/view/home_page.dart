@@ -110,6 +110,11 @@ class HomePage extends GetView<HomeController> {
                                             item,
                                             onChanged: controller.loadHome,
                                           ),
+                                      onShuffle: (queue) => controller.openMedia(
+                                        queue.first,
+                                        0,
+                                        queue,
+                                      ),
                                     ),
                                   ),
                                   onItemTap: (item, index) =>
@@ -149,6 +154,11 @@ class HomePage extends GetView<HomeController> {
                                             item,
                                             onChanged: controller.loadHome,
                                           ),
+                                      onShuffle: (queue) => controller.openMedia(
+                                        queue.first,
+                                        0,
+                                        queue,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -215,17 +225,14 @@ class HomePage extends GetView<HomeController> {
                                             item,
                                             onChanged: controller.loadHome,
                                           ),
+                                      onShuffle: (queue) => controller.openMedia(
+                                        queue.first,
+                                        0,
+                                        queue,
+                                      ),
                                     ),
                                   ),
-                                  trailing: _PillButton(
-                                    label: 'Aleatorio',
-                                    icon: Icons.shuffle_rounded,
-                                    onTap: () => controller.openMedia(
-                                      controller.featured.first,
-                                      0,
-                                      controller.featured,
-                                    ),
-                                  ),
+                                  trailing: null,
                                 ),
                                 const SizedBox(height: 10),
                                 _FeaturedList(
@@ -266,6 +273,11 @@ class HomePage extends GetView<HomeController> {
                                             item,
                                             onChanged: controller.loadHome,
                                           ),
+                                      onShuffle: (queue) => controller.openMedia(
+                                        queue.first,
+                                        0,
+                                        queue,
+                                      ),
                                     ),
                                   ),
                                   onItemTap: (item, index) =>

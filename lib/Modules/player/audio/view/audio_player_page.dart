@@ -21,9 +21,13 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: AppGradientBackground(
-        child: SafeArea(
-          child: Obx(() {
+      body: Dismissible(
+        key: const ValueKey('audio-player-dismiss'),
+        direction: DismissDirection.down,
+        onDismissed: (_) => Get.back(),
+        child: AppGradientBackground(
+          child: SafeArea(
+            child: Obx(() {
             final queue = controller.queue;
             final idx = controller.currentIndex.value;
             final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
@@ -163,7 +167,8 @@ class AudioPlayerPage extends GetView<AudioPlayerController> {
                 const Spacer(),
               ],
             );
-          }),
+            }),
+          ),
         ),
       ),
     );

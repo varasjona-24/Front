@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -13,12 +14,14 @@ class SectionListPage extends StatelessWidget {
     required this.items,
     required this.onItemTap,
     required this.onItemLongPress,
+    this.onShuffle,
   });
 
   final String title;
   final List<MediaItem> items;
   final void Function(MediaItem item, int index) onItemTap;
   final void Function(MediaItem item, int index) onItemLongPress;
+  final void Function(List<MediaItem> queue)? onShuffle;
 
   @override
   Widget build(BuildContext context) {
@@ -46,14 +49,33 @@ class SectionListPage extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             if (index == 0) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                child: Text(
-                  title,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
+                  if (onShuffle != null) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          final queue = List<MediaItem>.from(items);
+                          queue.shuffle(Random());
+                          if (queue.isEmpty) return;
+                          onShuffle?.call(queue);
+                        },
+                        icon: const Icon(Icons.shuffle_rounded),
+                        label: const Text('Reproducción aleatoria'),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: AppSpacing.md),
+                ],
               );
             }
 

@@ -393,6 +393,17 @@ class SourcesController extends GetxController {
   }
 
   // ============================
+  // 🔄 REFRESCO GENERAL
+  // ============================
+  Future<void> refreshAll() async {
+    await Future.wait([
+      _loadPills(),
+      _loadTopics(),
+      _loadTopicPlaylists(),
+    ]);
+  }
+
+  // ============================
   // 🎛️ CATÁLOGO DE TEMATICAS
   // ============================
   List<SourceTheme> get themes => [

@@ -74,22 +74,29 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
         backgroundColor: Colors.transparent,
         appBar: AppTopBar(title: Text(topic.title), onToggleMode: null),
         body: AppGradientBackground(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.lg,
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _sources.refreshAll();
+              if (mounted) setState(() {});
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.lg,
+              ),
+              children: [
+                _header(topic, theme, lists.length),
+                const SizedBox(height: 14),
+                _actionRow(topic),
+                const SizedBox(height: 18),
+                _itemsSection(topic),
+                const SizedBox(height: 18),
+                _playlistsSection(topic, lists),
+              ],
             ),
-            children: [
-              _header(topic, theme, lists.length),
-              const SizedBox(height: 14),
-              _actionRow(topic),
-              const SizedBox(height: 18),
-              _itemsSection(topic),
-              const SizedBox(height: 18),
-              _playlistsSection(topic, lists),
-            ],
           ),
         ),
       );

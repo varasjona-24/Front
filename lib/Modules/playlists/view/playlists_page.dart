@@ -40,46 +40,47 @@ class PlaylistsPage extends GetView<PlaylistsController> {
       final total = smart.length + list.length;
 
       return Scaffold(
-        backgroundColor: Colors.transparent,
         extendBody: true,
-        appBar: AppTopBar(
-          title: ListenfyLogo(size: 28, color: scheme.primary),
-                  ),
+        appBar: AppTopBar(title: ListenfyLogo(size: 28, color: scheme.primary)),
         body: AppGradientBackground(
           child: Stack(
             children: [
               Positioned.fill(
                 child: controller.isLoading.value
                     ? const Center(child: CircularProgressIndicator())
-                    : ScrollConfiguration(
-                        behavior: const _NoGlowScrollBehavior(),
-                        child: SingleChildScrollView(
-                          padding: EdgeInsets.only(
-                            top: AppSpacing.md,
-                            bottom: kBottomNavigationBarHeight + 18,
-                            left: AppSpacing.md,
-                            right: AppSpacing.md,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _header(theme),
-                              const SizedBox(height: 10),
-                              _summaryRow(
-                                theme: theme,
-                                total: total,
-                                onAdd: () => _createPlaylist(context),
-                              ),
-                              const SizedBox(height: AppSpacing.lg),
-                              if (smart.isNotEmpty) ...[
-                                _smartGrid(smart),
+                    : RefreshIndicator(
+                        onRefresh: controller.load,
+                        child: ScrollConfiguration(
+                          behavior: const _NoGlowScrollBehavior(),
+                          child: SingleChildScrollView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.only(
+                              top: AppSpacing.md,
+                              bottom: kBottomNavigationBarHeight + 18,
+                              left: AppSpacing.md,
+                              right: AppSpacing.md,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _header(theme),
+                                const SizedBox(height: 10),
+                                _summaryRow(
+                                  theme: theme,
+                                  total: total,
+                                  onAdd: () => _createPlaylist(context),
+                                ),
+                                const SizedBox(height: AppSpacing.lg),
+                                if (smart.isNotEmpty) ...[
+                                  _smartGrid(smart),
+                                  const SizedBox(height: AppSpacing.lg),
+                                ],
+                                _myPlaylistsHeader(theme, list.length),
+                                const SizedBox(height: 10),
+                                _myPlaylists(list),
                                 const SizedBox(height: AppSpacing.lg),
                               ],
-                              _myPlaylistsHeader(theme, list.length),
-                              const SizedBox(height: 10),
-                              _myPlaylists(list),
-                              const SizedBox(height: AppSpacing.lg),
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -166,22 +167,34 @@ class PlaylistsPage extends GetView<PlaylistsController> {
   }
 
   Widget _smartGrid(List<SmartPlaylist> smart) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: smart.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.0,
-      ),
-      itemBuilder: (context, index) {
-        final data = smart[index];
-        return _SmartPlaylistCard(
-          data: data,
-          onOpen: () =>
-              Get.to(() => PlaylistDetailPage.smart(playlistId: data.id)),
+    return Builder(
+      builder: (context) {
+        final scheme = Theme.of(context).colorScheme;
+        return Container(
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          padding: const EdgeInsets.all(12),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: smart.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 28,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.0,
+            ),
+            itemBuilder: (context, index) {
+              final data = smart[index];
+              return _SmartPlaylistCard(
+                data: data,
+                onOpen: () =>
+                    Get.to(() => PlaylistDetailPage.smart(playlistId: data.id)),
+              );
+            },
+          ),
         );
       },
     );
@@ -535,6 +548,7 @@ class _SmartPlaylistCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final scheme = theme.colorScheme;
     final thumb = data.items.isNotEmpty
         ? data.items.first.effectiveThumbnail
         : null;
@@ -545,28 +559,18 @@ class _SmartPlaylistCard extends StatelessWidget {
           : FileImage(File(thumb));
     }
 
-    final primary = theme.colorScheme.primary;
-    final textColor = theme.colorScheme.primary;
-    final subColor = theme.colorScheme.primary;
-    final iconColor = theme.colorScheme.primary;
+    final textColor = scheme.onSurface;
+    final subColor = scheme.onSurfaceVariant;
+    final iconColor = scheme.primary;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onOpen,
       child: Ink(
         decoration: BoxDecoration(
-          color: primary,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.black.withOpacity(isDark ? 0.18 : 0.12),
-          ),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-              color: Colors.black.withOpacity(isDark ? 0.35 : 0.2),
-            ),
-          ],
+          border: Border.all(color: scheme.onSurface.withOpacity(0.2)),
+          boxShadow: [BoxShadow(blurRadius: 18, offset: const Offset(0, 10))],
         ),
         child: Padding(
           padding: const EdgeInsets.all(12),

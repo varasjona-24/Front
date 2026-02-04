@@ -56,6 +56,8 @@ class _MediaCardState extends State<MediaCard> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final audioFormat = _audioFormat();
+    final cardBg = colors.surfaceContainerHighest;
+    final cardStroke = colors.onSurface.withOpacity(0.08);
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -76,11 +78,12 @@ class _MediaCardState extends State<MediaCard> {
             children: [
               // 🎨 THUMBNAIL / COVER
               SizedBox(
-                height: 110,
+                height: widget.width,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: colors.surfaceContainerHigh,
+                    color: cardBg,
                     borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: cardStroke),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(18),

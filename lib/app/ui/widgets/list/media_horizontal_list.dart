@@ -75,7 +75,7 @@ class MediaHorizontalList extends StatelessWidget {
         header(),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
-          height: 170,
+          height: 200,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             scrollDirection: Axis.horizontal,

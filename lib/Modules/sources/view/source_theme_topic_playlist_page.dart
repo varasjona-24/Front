@@ -74,27 +74,34 @@ class _SourceThemeTopicPlaylistPageState
         backgroundColor: Colors.transparent,
         appBar: AppTopBar(title: Text(playlist.name), onToggleMode: null),
         body: AppGradientBackground(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.md,
-              AppSpacing.lg,
-            ),
-            children: [
-              Text(
-                _buildMetaLine(playlist.itemIds.length, children.length),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+          child: RefreshIndicator(
+            onRefresh: () async {
+              await _sources.refreshAll();
+              if (mounted) setState(() {});
+            },
+            child: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.md,
+                AppSpacing.lg,
               ),
-              const SizedBox(height: 12),
-              _actionRow(playlist),
-              const SizedBox(height: 18),
-              _itemsSection(playlist),
-              const SizedBox(height: 18),
-              _subListsSection(playlist, children),
-            ],
+              children: [
+                Text(
+                  _buildMetaLine(playlist.itemIds.length, children.length),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _actionRow(playlist),
+                const SizedBox(height: 18),
+                _itemsSection(playlist),
+                const SizedBox(height: 18),
+                _subListsSection(playlist, children),
+              ],
+            ),
           ),
         ),
       );
