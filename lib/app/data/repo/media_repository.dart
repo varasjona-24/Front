@@ -341,6 +341,19 @@ class MediaRepository {
   }
 
   // ============================
+  // 🧩 HELPERS (THUMBNAIL EXTERNO)
+  // ============================
+  Future<String?> cacheThumbnailForItem({
+    required String itemId,
+    required String thumbnailUrl,
+  }) {
+    return _downloadThumbnailToDisk(
+      resolvedId: itemId,
+      thumbnailUrl: thumbnailUrl,
+    );
+  }
+
+  // ============================
   // 🧩 HELPERS (THUMBNAIL OFFLINE)
   // ============================
   Future<String?> _downloadThumbnailToDisk({
