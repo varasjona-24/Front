@@ -128,7 +128,10 @@ class DownloadsPill extends GetView<DownloadsController> {
       );
 
       if (result != null) {
-        await controller.downloadFromUrl(url: result.url, kind: result.kind);
+        await controller.downloadFromUrl(
+          url: result.url,
+          kind: result.kind,
+        );
       }
     } finally {
       if (clearSharedOnClose) {

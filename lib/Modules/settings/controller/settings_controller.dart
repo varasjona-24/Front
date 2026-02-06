@@ -13,8 +13,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
 import 'package:flutter/services.dart';
+import 'package:dio/dio.dart' as dio;
 
 import '../../../app/controllers/theme_controller.dart';
+import '../../../app/data/network/dio_client.dart';
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/models/media_item.dart';
 import '../../../Modules/playlists/data/playlist_store.dart';
@@ -82,6 +84,11 @@ class SettingsController extends GetxController {
   final RxInt bluetoothTick = 0.obs;
   final BluetoothAudioService _bluetoothAudio = BluetoothAudioService();
 
+  // 🍪 YouTube cookies
+  final TextEditingController ytdlpAdminTokenController =
+      TextEditingController();
+  final RxString ytdlpAdminToken = ''.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -102,6 +109,9 @@ class SettingsController extends GetxController {
     downloadQuality.value = _storage.read('downloadQuality') ?? 'high';
     dataUsage.value = _storage.read('dataUsage') ?? 'all';
     autoPlayNext.value = _storage.read('autoPlayNext') ?? true;
+
+    ytdlpAdminToken.value = _storage.read('ytdlpAdminToken') ?? '';
+    ytdlpAdminTokenController.text = ytdlpAdminToken.value;
 
     sleepTimerEnabled.value = _storage.read('sleepTimerEnabled') ?? false;
     sleepTimerMinutes.value = _storage.read('sleepTimerMinutes') ?? 30;
@@ -587,6 +597,66 @@ class SettingsController extends GetxController {
     }
   }
 
+  void setYtDlpAdminToken(String value) {
+    ytdlpAdminToken.value = value.trim();
+    _storage.write('ytdlpAdminToken', ytdlpAdminToken.value);
+  }
+
+  Future<void> uploadYtDlpCookies() async {
+    try {
+      final token = ytdlpAdminTokenController.text.trim();
+      if (token.isEmpty) {
+        Get.snackbar(
+          'Cookies de YouTube',
+          'Primero ingresa el token de administrador',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final res = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['txt'],
+      );
+      final file = res?.files.first;
+      final path = file?.path;
+      if (path == null || path.trim().isEmpty) return;
+
+      final raw = await File(path).readAsString();
+      if (!raw.contains('Netscape HTTP Cookie File')) {
+        Get.snackbar(
+          'Cookies de YouTube',
+          'El archivo no parece estar en formato Netscape',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final b64 = base64.encode(utf8.encode(raw));
+      final client = Get.find<DioClient>();
+      await client.post(
+        '/media/admin/ytdlp-cookies',
+        data: {'cookiesBase64': b64},
+        options: dio.Options(
+          headers: {'x-admin-token': token},
+        ),
+      );
+
+      Get.snackbar(
+        'Cookies de YouTube',
+        'Actualizadas correctamente',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      Get.snackbar(
+        'Cookies de YouTube',
+        'No se pudo actualizar',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      print('uploadYtDlpCookies error: $e');
+    }
+  }
+
   Future<void> exportLibrary() async {
     try {
       final libraryStore = Get.find<LocalLibraryStore>();
@@ -1020,6 +1090,14 @@ class SettingsController extends GetxController {
     final audio = getAudioBitrate(q);
     final video = getVideoResolution(q);
     return 'Audio: $audio | Video: $video';
+  }
+
+  @override
+  void onClose() {
+    _sleepTimer?.cancel();
+    _inactivityTimer?.cancel();
+    ytdlpAdminTokenController.dispose();
+    super.onClose();
   }
 }
 

@@ -254,12 +254,43 @@ class MediaRepository {
         print('URL: ${e.requestOptions.uri}');
         print('STATUS: ${e.response?.statusCode}');
         print('DATA: ${e.response?.data}');
+        final msg = e.response?.data is Map
+            ? (e.response?.data['error']?.toString() ?? '')
+            : (e.response?.data?.toString() ?? '');
+        _maybeNotifyCookiesIssue(msg);
+        _maybeNotifyDrmIssue(msg);
       } else {
         print('Error: $e');
       }
       // 🔥 importante: si falla, retorna vacío para que requestAndFetchMedia haga return false
       return '';
     }
+  }
+
+  void _maybeNotifyCookiesIssue(String message) {
+    final m = message.toLowerCase();
+    if (!m.contains('cookie') &&
+        !m.contains('not a bot') &&
+        !m.contains('sign in')) {
+      return;
+    }
+
+    Get.snackbar(
+      'YouTube',
+      'Cookies expiradas. Actualiza en Ajustes > Datos y descargas.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  void _maybeNotifyDrmIssue(String message) {
+    final m = message.toLowerCase();
+    if (!m.contains('drm')) return;
+
+    Get.snackbar(
+      'Contenido protegido',
+      'Este contenido usa DRM y no se puede descargar.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   Future<MediaItem?> _fetchResolvedInfo(String url) async {

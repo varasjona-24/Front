@@ -200,6 +200,34 @@ class DataSection extends GetView<SettingsController> {
                     ),
                   ],
                 ),
+
+                const SizedBox(height: 12),
+                Divider(color: theme.dividerColor.withOpacity(.12)),
+                const SizedBox(height: 12),
+
+                const SectionHeader(
+                  title: 'Cookies de YouTube',
+                  subtitle:
+                      'Sube el archivo cookies.txt para descargas de YouTube.',
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: controller.ytdlpAdminTokenController,
+                  decoration: const InputDecoration(
+                    labelText: 'Token admin',
+                    hintText: 'Pega tu token',
+                  ),
+                  onChanged: controller.setYtDlpAdminToken,
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: controller.uploadYtDlpCookies,
+                    icon: const Icon(Icons.upload_rounded),
+                    label: const Text('Actualizar cookies'),
+                  ),
+                ),
               ],
             ),
           ),

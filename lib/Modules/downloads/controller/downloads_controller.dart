@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -25,6 +26,7 @@ class DownloadsController extends GetxController {
   // ============================
   final MediaRepository _repo = Get.find<MediaRepository>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+  final GetStorage _storage = GetStorage();
 
   // ============================
   // 🧭 ESTADO UI
@@ -245,6 +247,7 @@ class DownloadsController extends GetxController {
     String? mediaId,
     required String url,
     required String kind,
+    String? quality,
   }) async {
     if (url.trim().isEmpty) {
       Get.snackbar(
@@ -257,6 +260,10 @@ class DownloadsController extends GetxController {
     }
 
     final format = kind == 'video' ? 'mp4' : 'mp3';
+    final resolvedQuality = (quality ?? _storage.read('downloadQuality') ?? 'high')
+        .toString()
+        .trim()
+        .toLowerCase();
 
     try {
       Get.dialog(
@@ -264,14 +271,18 @@ class DownloadsController extends GetxController {
         barrierDismissible: false,
       );
 
-      final ok = await _repo.requestAndFetchMedia(
-        mediaId: mediaId?.trim().isEmpty == true ? null : mediaId,
-        url: url.trim(),
-        kind: kind,
-        format: format,
-      );
-
-      if (Get.isDialogOpen ?? false) Get.back();
+      final ok = await _repo
+          .requestAndFetchMedia(
+            mediaId: mediaId?.trim().isEmpty == true ? null : mediaId,
+            url: url.trim(),
+            kind: kind,
+            format: format,
+            quality: resolvedQuality,
+          )
+          .timeout(
+            const Duration(minutes: 5),
+            onTimeout: () => false,
+          );
 
       if (ok) {
         await load();
@@ -290,7 +301,6 @@ class DownloadsController extends GetxController {
         );
       }
     } catch (e) {
-      if (Get.isDialogOpen ?? false) Get.back();
 
       String msg = 'Error inesperado';
 
@@ -319,6 +329,10 @@ class DownloadsController extends GetxController {
       );
 
       debugPrint('downloadFromUrl error: $e');
+    } finally {
+      if (Get.isDialogOpen ?? false) {
+        Get.back();
+      }
     }
   }
 
