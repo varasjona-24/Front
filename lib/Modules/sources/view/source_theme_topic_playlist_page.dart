@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/controllers/media_actions_controller.dart';
+import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
+import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
 import '../../home/controller/home_controller.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
@@ -43,6 +45,7 @@ class _SourceThemeTopicPlaylistPageState
   // ============================
   final SourcesController _sources = Get.find<SourcesController>();
   final MediaActionsController _actions = Get.find<MediaActionsController>();
+  final MediaRepository _repo = Get.find<MediaRepository>();
   String? _playlistSizeLabel;
 
   SourceThemeTopicPlaylist? get _playlist {
@@ -603,9 +606,32 @@ class _SourceThemeTopicPlaylistPageState
                   ),
                   const SizedBox(height: 10),
                   TextField(
-                    onChanged: (v) => setState(() => coverUrl = v),
+                    readOnly: true,
+                    onTap: () async {
+                      await showDialog<void>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => ImageSearchDialog(
+                          initialQuery: name,
+                          onImageSelected: (url) async {
+                            if (url.trim().isEmpty) return;
+                            final cleaned = url.trim();
+                            final cached = await _repo.cacheThumbnailForItem(
+                              itemId: playlist.id,
+                              thumbnailUrl: cleaned,
+                            );
+                            setState(() {
+                              coverUrl = cleaned;
+                              if (cached != null && cached.trim().isNotEmpty) {
+                                coverLocal = cached;
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    },
                     decoration: const InputDecoration(
-                      hintText: 'URL de imagen (opcional)',
+                      hintText: 'Imagen web seleccionada',
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -642,6 +668,36 @@ class _SourceThemeTopicPlaylistPageState
                           icon: const Icon(Icons.folder_open_rounded),
                           label: const Text('Elegir imagen'),
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await showDialog<void>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => ImageSearchDialog(
+                              initialQuery: name,
+                              onImageSelected: (url) async {
+                                if (url.trim().isEmpty) return;
+                                final cleaned = url.trim();
+                                final cached = await _repo
+                                    .cacheThumbnailForItem(
+                                      itemId: playlist.id,
+                                      thumbnailUrl: cleaned,
+                                    );
+                                setState(() {
+                                  coverUrl = cleaned;
+                                  if (cached != null &&
+                                      cached.trim().isNotEmpty) {
+                                    coverLocal = cached;
+                                  }
+                                });
+                              },
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.public_rounded),
+                        label: const Text('Buscar'),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton(

@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
-import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../app/models/media_item.dart';
 import '../../sources/domain/source_origin.dart';
@@ -14,7 +13,10 @@ import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/controllers/navigation_controller.dart';
 import '../../../app/utils/format_bytes.dart';
-import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
+import 'package:flutter_listenfy/Modules/artists/controller/artists_controller.dart';
+import 'package:flutter_listenfy/Modules/playlists/controller/playlists_controller.dart';
+import 'package:flutter_listenfy/Modules/sources/controller/sources_controller.dart';
 
 class EditMediaMetadataPage extends StatefulWidget {
   const EditMediaMetadataPage({super.key, required this.item});
@@ -114,8 +116,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
       title: title,
       subtitle: _artistCtrl.text.trim(),
       thumbnail: !thumbChanged ? null : (useRemoteThumb ? remoteThumb : ''),
-      thumbnailLocalPath:
-          !thumbChanged ? null : (useLocalThumb ? localThumb : ''),
+      thumbnailLocalPath: !thumbChanged
+          ? null
+          : (useLocalThumb ? localThumb : ''),
       durationSeconds: durationSeconds ?? widget.item.durationSeconds,
     );
 
@@ -126,6 +129,15 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     }
     if (Get.isRegistered<HomeController>()) {
       await Get.find<HomeController>().loadHome();
+    }
+    if (Get.isRegistered<ArtistsController>()) {
+      await Get.find<ArtistsController>().load();
+    }
+    if (Get.isRegistered<PlaylistsController>()) {
+      await Get.find<PlaylistsController>().load();
+    }
+    if (Get.isRegistered<SourcesController>()) {
+      await Get.find<SourcesController>().refreshAll();
     }
 
     if (mounted) {
@@ -185,7 +197,8 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
   }
 
   int? _resolveSizeBytes() {
-    final local = widget.item.localAudioVariant ?? widget.item.localVideoVariant;
+    final local =
+        widget.item.localAudioVariant ?? widget.item.localVideoVariant;
     if (local?.size != null && local!.size! > 0) return local.size;
 
     for (final v in widget.item.variants) {
@@ -214,23 +227,34 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
   Future<void> _searchWebThumbnail() async {
     final rawQuery = _titleCtrl.text.trim();
     final query = rawQuery.isEmpty ? 'album cover' : rawQuery;
-    final selected = await Get.dialog<String>(
-      _ImageSearchDialog(initialQuery: query),
+
+    await showDialog<void>(
+      context: context,
       barrierDismissible: false,
+      builder: (_) => ImageSearchDialog(
+        initialQuery: query,
+        onImageSelected: (url) async {
+          if (!mounted || url.trim().isEmpty) return;
+          final cleaned = url.trim();
+
+          // Actualiza UI de inmediato (URL remota), luego cachea y fija local.
+          setState(() {
+            _thumbCtrl.text = cleaned;
+            _localThumbPath = null;
+          });
+
+          final cached = await _repo.cacheThumbnailForItem(
+            itemId: widget.item.id,
+            thumbnailUrl: cleaned,
+          );
+
+          if (!mounted) return;
+          if (cached != null && cached.trim().isNotEmpty) {
+            setState(() => _localThumbPath = cached);
+          }
+        },
+      ),
     );
-    if (!mounted || selected == null || selected.trim().isEmpty) return;
-    final cleaned = selected.trim();
-    final cached = await _repo.cacheThumbnailForItem(
-      itemId: widget.item.id,
-      thumbnailUrl: cleaned,
-    );
-    if (!mounted) return;
-    setState(() {
-      _thumbCtrl.text = cleaned;
-      if (cached != null && cached.trim().isNotEmpty) {
-        _localThumbPath = cached;
-      }
-    });
   }
 
   void _clearThumbnail() {
@@ -359,21 +383,21 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-          TextField(
-            controller: _titleCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Titulo',
-              prefixIcon: Icon(Icons.music_note_rounded),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _artistCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Artista',
-              prefixIcon: Icon(Icons.person_rounded),
-            ),
-          ),
+                    TextField(
+                      controller: _titleCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Titulo',
+                        prefixIcon: Icon(Icons.music_note_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _artistCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Artista',
+                        prefixIcon: Icon(Icons.person_rounded),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -396,55 +420,55 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: _pickLocalThumbnail,
-                          icon: const Icon(Icons.photo_library_rounded),
-                          label: const Text('Elegir imagen'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: FilledButton.tonalIcon(
-                          onPressed: _searchWebThumbnail,
-                          icon: const Icon(Icons.public_rounded),
-                          label: const Text('Buscar en web'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _thumbCtrl,
-                          readOnly: true,
-                          onTap: _searchWebThumbnail,
-                          decoration: const InputDecoration(
-                            labelText: 'Imagen web seleccionada',
-                            prefixIcon: Icon(Icons.image_rounded),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: _pickLocalThumbnail,
+                            icon: const Icon(Icons.photo_library_rounded),
+                            label: const Text('Elegir imagen'),
                           ),
                         ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: _searchWebThumbnail,
+                            icon: const Icon(Icons.public_rounded),
+                            label: const Text('Buscar en web'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _thumbCtrl,
+                            readOnly: true,
+                            onTap: _searchWebThumbnail,
+                            decoration: const InputDecoration(
+                              labelText: 'Imagen web seleccionada',
+                              prefixIcon: Icon(Icons.image_rounded),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        OutlinedButton(
+                          onPressed: _clearThumbnail,
+                          child: const Text('Limpiar'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _durationCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Duracion en segundos (opcional)',
+                        prefixIcon: Icon(Icons.timer_rounded),
                       ),
-                      const SizedBox(width: 12),
-                      OutlinedButton(
-                        onPressed: _clearThumbnail,
-                        child: const Text('Limpiar'),
-                      ),
-                    ],
-                  ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _durationCtrl,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              labelText: 'Duracion en segundos (opcional)',
-              prefixIcon: Icon(Icons.timer_rounded),
-            ),
-          ),
+                    ),
                   ],
                 ),
               ),
@@ -454,167 +478,6 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
               'Fuente: ${widget.item.source.name}',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ImageSearchDialog extends StatefulWidget {
-  const _ImageSearchDialog({required this.initialQuery});
-
-  final String initialQuery;
-
-  @override
-  State<_ImageSearchDialog> createState() => _ImageSearchDialogState();
-}
-
-class _ImageSearchDialogState extends State<_ImageSearchDialog> {
-  late final WebViewController _controller;
-  bool _loading = true;
-
-  static const String _imageTapScript = r'''
-(function() {
-  function pickUrl(img) {
-    if (!img) return '';
-    var dataIurl = img.getAttribute('data-iurl');
-    if (dataIurl && dataIurl.startsWith('http')) return dataIurl;
-    var dataSrc = img.getAttribute('data-src') || img.getAttribute('data-lowsrc');
-    if (dataSrc && dataSrc.startsWith('http')) return dataSrc;
-    var src = img.getAttribute('src');
-    if (src && src.startsWith('http')) return src;
-    var srcset = img.getAttribute('srcset');
-    if (srcset) {
-      var parts = srcset.split(',').map(function(p){ return p.trim().split(' ')[0]; }).filter(Boolean);
-      if (parts.length) return parts[parts.length - 1];
-    }
-    return '';
-  }
-  document.addEventListener('click', function(e) {
-    var img = e.target.closest('img');
-    if (!img) return;
-    var url = pickUrl(img);
-    if (url) {
-      ListenfyImage.postMessage(url);
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  }, true);
-})();
-''';
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..addJavaScriptChannel(
-        'ListenfyImage',
-        onMessageReceived: (msg) {
-          final url = msg.message.trim();
-          if (url.isEmpty) return;
-          if (mounted && Get.isDialogOpen == true) {
-            Get.back(result: url);
-          }
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) => setState(() => _loading = true),
-          onPageFinished: (_) async {
-            setState(() => _loading = false);
-            await _controller.runJavaScript(_imageTapScript);
-          },
-        ),
-      );
-    _loadQuery(widget.initialQuery);
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  void _loadQuery(String query) {
-    final encoded = Uri.encodeComponent(query);
-    final url = 'https://www.google.com/search?tbm=isch&q=$encoded';
-    _controller.loadRequest(Uri.parse(url));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final onSurface70 = scheme.onSurface.withAlpha(179);
-
-    return Dialog(
-      insetPadding: const EdgeInsets.all(16),
-      backgroundColor: scheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.78,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: Row(
-                children: [
-                  const ListenfyLogo(size: 22, showText: false),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Listenfy',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 6),
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(18),
-                ),
-                child: Stack(
-                  children: [
-                    WebViewWidget(controller: _controller),
-                    if (_loading)
-                      Positioned.fill(
-                        child: Container(
-                          color: scheme.surface.withAlpha(230),
-                          child: const Center(
-                            child: CircularProgressIndicator(),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline, color: onSurface70, size: 18),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Toca una imagen para seleccionarla.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: onSurface70,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

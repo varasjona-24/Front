@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
 import '../../home/controller/home_controller.dart';
 import '../../player/audio/view/audio_player_page.dart';
 import '../../settings/controller/settings_controller.dart';
@@ -46,6 +48,7 @@ class SourceLibraryPage extends StatefulWidget {
 class _SourceLibraryPageState extends State<SourceLibraryPage> {
   final SettingsController _settings = Get.find<SettingsController>();
   final SourcesController _sources = Get.find<SourcesController>();
+  final MediaRepository _repo = Get.find<MediaRepository>();
 
   // ============================
   // 📚 DATA
@@ -158,8 +161,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                                   child: Text(
                                     'No hay contenido aquí todavía.',
                                     style: theme.textTheme.bodyMedium?.copyWith(
-                                      color:
-                                          theme.colorScheme.onSurfaceVariant,
+                                      color: theme.colorScheme.onSurfaceVariant,
                                     ),
                                   ),
                                 )
@@ -545,9 +547,32 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   ),
                   const SizedBox(height: 10),
                   TextField(
-                    onChanged: (v) => setState(() => coverUrl = v),
+                    readOnly: true,
+                    onTap: () async {
+                      await showDialog<void>(
+                        context: context,
+                        barrierDismissible: false,
+                        builder: (_) => ImageSearchDialog(
+                          initialQuery: name,
+                          onImageSelected: (url) async {
+                            if (url.trim().isEmpty) return;
+                            final cleaned = url.trim();
+                            final cached = await _repo.cacheThumbnailForItem(
+                              itemId: topic.id,
+                              thumbnailUrl: cleaned,
+                            );
+                            setState(() {
+                              coverUrl = cleaned;
+                              if (cached != null && cached.trim().isNotEmpty) {
+                                coverLocal = cached;
+                              }
+                            });
+                          },
+                        ),
+                      );
+                    },
                     decoration: InputDecoration(
-                      hintText: 'URL de imagen (opcional)',
+                      hintText: 'Imagen web seleccionada',
                       hintStyle: Theme.of(context).textTheme.bodySmall
                           ?.copyWith(
                             color: Theme.of(
@@ -590,6 +615,36 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                           icon: const Icon(Icons.folder_open_rounded),
                           label: const Text('Elegir imagen'),
                         ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          await showDialog<void>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => ImageSearchDialog(
+                              initialQuery: name,
+                              onImageSelected: (url) async {
+                                if (url.trim().isEmpty) return;
+                                final cleaned = url.trim();
+                                final cached = await _repo
+                                    .cacheThumbnailForItem(
+                                      itemId: topic.id,
+                                      thumbnailUrl: cleaned,
+                                    );
+                                setState(() {
+                                  coverUrl = cleaned;
+                                  if (cached != null &&
+                                      cached.trim().isNotEmpty) {
+                                    coverLocal = cached;
+                                  }
+                                });
+                              },
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.public_rounded),
+                        label: const Text('Buscar'),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton(

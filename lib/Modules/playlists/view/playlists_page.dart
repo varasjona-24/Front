@@ -5,9 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'playlist_detail_page.dart';
 
+import '../../../app/data/repo/media_repository.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
@@ -443,6 +445,7 @@ class PlaylistsPage extends GetView<PlaylistsController> {
   }
 
   Future<void> _changeCover(BuildContext context, Playlist playlist) async {
+    final repo = Get.find<MediaRepository>();
     final urlCtrl = TextEditingController(text: playlist.coverUrl ?? '');
     String? localPath = playlist.coverLocalPath;
     bool confirmed = false;
@@ -469,18 +472,71 @@ class PlaylistsPage extends GetView<PlaylistsController> {
           children: [
             TextField(
               controller: urlCtrl,
+              readOnly: true,
               decoration: const InputDecoration(
-                hintText: 'https://...',
-                labelText: 'URL (opcional)',
+                labelText: 'Imagen web seleccionada',
               ),
+              onTap: () async {
+                await showDialog<void>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) => ImageSearchDialog(
+                    initialQuery: playlist.name,
+                    onImageSelected: (url) async {
+                      if (url.trim().isEmpty) return;
+                      final cleaned = url.trim();
+                      final cached = await repo.cacheThumbnailForItem(
+                        itemId: playlist.id,
+                        thumbnailUrl: cleaned,
+                      );
+                      urlCtrl.text = cleaned;
+                      if (cached != null && cached.trim().isNotEmpty) {
+                        localPath = cached;
+                      }
+                    },
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: () async {
-                await pickLocal();
-              },
-              icon: const Icon(Icons.folder_open_rounded),
-              label: const Text('Elegir archivo'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await pickLocal();
+                    },
+                    icon: const Icon(Icons.folder_open_rounded),
+                    label: const Text('Elegir archivo'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    await showDialog<void>(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (_) => ImageSearchDialog(
+                        initialQuery: playlist.name,
+                        onImageSelected: (url) async {
+                          if (url.trim().isEmpty) return;
+                          final cleaned = url.trim();
+                          final cached = await repo.cacheThumbnailForItem(
+                            itemId: playlist.id,
+                            thumbnailUrl: cleaned,
+                          );
+                          urlCtrl.text = cleaned;
+                          if (cached != null && cached.trim().isNotEmpty) {
+                            localPath = cached;
+                          }
+                        },
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.public_rounded),
+                  label: const Text('Buscar'),
+                ),
+              ],
             ),
           ],
         ),

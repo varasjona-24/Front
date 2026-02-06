@@ -89,214 +89,204 @@ class HomePage extends GetView<HomeController> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                              // ---- Favoritos ----
-                              if (controller.favorites.isNotEmpty) ...[
-                                MediaHorizontalList(
-                                  title: 'Mis favoritos',
-                                  items: controller.favorites,
-                                  onHeaderTap: () => Get.to(
-                                    () => SectionListPage(
-                                      title: 'Mis favoritos',
-                                      items: controller.favorites,
-                                      onItemTap: (item, index) =>
-                                          controller.openMedia(
-                                            item,
-                                            index,
-                                            controller.favorites,
-                                          ),
-                                      onItemLongPress: (item, _) =>
-                                          actions.showItemActions(
-                                            context,
-                                            item,
-                                            onChanged: controller.loadHome,
-                                          ),
-                                      onShuffle: (queue) => controller.openMedia(
-                                        queue.first,
-                                        0,
-                                        queue,
+                                // ---- Favoritos ----
+                                if (controller.favorites.isNotEmpty) ...[
+                                  MediaHorizontalList(
+                                    title: 'Mis favoritos',
+                                    items: controller.favorites,
+                                    onHeaderTap: () => Get.to(
+                                      () => SectionListPage(
+                                        title: 'Mis favoritos',
+                                        items: controller.favorites,
+                                        onItemTap: (item, index) =>
+                                            controller.openMedia(
+                                              item,
+                                              index,
+                                              controller.favorites,
+                                            ),
+                                        onItemLongPress: (item, _) =>
+                                            actions.showItemActions(
+                                              context,
+                                              item,
+                                              onChanged: controller.loadHome,
+                                            ),
+                                        onShuffle: (queue) => controller
+                                            .openMedia(queue.first, 0, queue),
                                       ),
                                     ),
-                                  ),
-                                  onItemTap: (item, index) =>
-                                      controller.openMedia(
-                                        item,
-                                        index,
-                                      controller.favorites,
-                                    ),
-                                onItemLongPress: (item, _) {
-                                  actions.showItemActions(
-                                    context,
-                                    item,
-                                    onChanged: controller.loadHome,
-                                  );
-                                },
-                              ),
-                                const SizedBox(height: 18),
-                            ],
-
-                              // ---- Más reproducido ----
-                              if (controller.mostPlayed.isNotEmpty) ...[
-                                _SectionHeader(
-                                  title: 'Más reproducido',
-                                  onTap: () => Get.to(
-                                    () => SectionListPage(
-                                      title: 'Más reproducido',
-                                      items: controller.mostPlayed,
-                                      onItemTap: (item, index) =>
-                                          controller.openMedia(
-                                            item,
-                                            index,
-                                            controller.mostPlayed,
-                                          ),
-                                      onItemLongPress: (item, _) =>
-                                          actions.showItemActions(
-                                            context,
-                                            item,
-                                            onChanged: controller.loadHome,
-                                          ),
-                                      onShuffle: (queue) => controller.openMedia(
-                                        queue.first,
-                                        0,
-                                        queue,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                _MostPlayedRow(
-                                  items: controller.mostPlayed,
-                                  onTap: (item, index) => controller.openMedia(
-                                    item,
-                                    index,
-                                    controller.mostPlayed,
-                                  ),
-                                  onLongPress: (item, _) {
-                                    actions.showItemActions(
-                                      context,
-                                      item,
-                                      onChanged: controller.loadHome,
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: 18),
-                              ],
-
-                              // ---- Reproducciones recientes ----
-                              if (controller.recentlyPlayed.isNotEmpty)
-                                MediaHorizontalList(
-                                  title: 'Reproducciones recientes',
-                                  items: controller.recentlyPlayed,
-                                  onHeaderTap: () =>
-                                      Get.toNamed(AppRoutes.history),
-                                  onItemTap: (item, index) =>
-                                      controller.openMedia(
-                                        item,
-                                        index,
-                                        controller.recentlyPlayed,
-                                      ),
-                                  onItemLongPress: (item, _) {
-                                    actions.showItemActions(
-                                      context,
-                                      item,
-                                      onChanged: controller.loadHome,
-                                    );
-                                  },
-                                ),
-                              if (controller.recentlyPlayed.isNotEmpty)
-                                const SizedBox(height: 18),
-
-                              // ---- Destacado ----
-                              if (controller.featured.isNotEmpty) ...[
-                                _SectionHeader(
-                                  title: 'Destacado',
-                                  onTap: () => Get.to(
-                                    () => SectionListPage(
-                                      title: 'Destacado',
-                                      items: controller.featured,
-                                      onItemTap: (item, index) =>
-                                          controller.openMedia(
-                                            item,
-                                            index,
-                                            controller.featured,
-                                          ),
-                                      onItemLongPress: (item, _) =>
-                                          actions.showItemActions(
-                                            context,
-                                            item,
-                                            onChanged: controller.loadHome,
-                                          ),
-                                      onShuffle: (queue) => controller.openMedia(
-                                        queue.first,
-                                        0,
-                                        queue,
-                                      ),
-                                    ),
-                                  ),
-                                  trailing: null,
-                                ),
-                                const SizedBox(height: 10),
-                                _FeaturedList(
-                                  items: controller.featured,
-                                  onTap: (item, index) => controller.openMedia(
-                                    item,
-                                    index,
-                                    controller.featured,
-                                  ),
-                                  onLongPress: (item, _) =>
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.favorites,
+                                        ),
+                                    onItemLongPress: (item, _) {
                                       actions.showItemActions(
                                         context,
                                         item,
                                         onChanged: controller.loadHome,
-                                      ),
-                                ),
-                                const SizedBox(height: 18),
-                              ],
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 18),
+                                ],
 
-                              // ---- Últimos imports ----
-                              if (controller.latestDownloads.isNotEmpty) ...[
-                                MediaHorizontalList(
-                                  title: 'Últimos imports',
-                                  items: controller.latestDownloads,
-                                  onHeaderTap: () => Get.to(
-                                    () => SectionListPage(
-                                      title: 'Últimos imports',
-                                      items: controller.latestDownloads,
-                                      onItemTap: (item, index) =>
-                                          controller.openMedia(
-                                            item,
-                                            index,
-                                            controller.latestDownloads,
-                                          ),
-                                      onItemLongPress: (item, _) =>
-                                          actions.showItemActions(
-                                            context,
-                                            item,
-                                            onChanged: controller.loadHome,
-                                          ),
-                                      onShuffle: (queue) => controller.openMedia(
-                                        queue.first,
-                                        0,
-                                        queue,
+                                // ---- Más reproducido ----
+                                if (controller.mostPlayed.isNotEmpty) ...[
+                                  _SectionHeader(
+                                    title: 'Más reproducido',
+                                    onTap: () => Get.to(
+                                      () => SectionListPage(
+                                        title: 'Más reproducido',
+                                        items: controller.mostPlayed,
+                                        onItemTap: (item, index) =>
+                                            controller.openMedia(
+                                              item,
+                                              index,
+                                              controller.mostPlayed,
+                                            ),
+                                        onItemLongPress: (item, _) =>
+                                            actions.showItemActions(
+                                              context,
+                                              item,
+                                              onChanged: controller.loadHome,
+                                            ),
+                                        onShuffle: (queue) => controller
+                                            .openMedia(queue.first, 0, queue),
                                       ),
                                     ),
                                   ),
-                                  onItemTap: (item, index) =>
-                                      controller.openMedia(
+                                  const SizedBox(height: 10),
+                                  _MostPlayedRow(
+                                    items: controller.mostPlayed,
+                                    onTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.mostPlayed,
+                                        ),
+                                    onLongPress: (item, _) {
+                                      actions.showItemActions(
+                                        context,
                                         item,
-                                        index,
-                                        controller.latestDownloads,
-                                      ),
-                                  onItemLongPress: (item, _) {
-                                    actions.showItemActions(
-                                      context,
-                                      item,
-                                      onChanged: controller.loadHome,
-                                    );
-                                  },
-                                ),
-                              ],
+                                        onChanged: controller.loadHome,
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 18),
+                                ],
 
-                              const SizedBox(height: 24),
+                                // ---- Reproducciones recientes ----
+                                if (controller.recentlyPlayed.isNotEmpty)
+                                  MediaHorizontalList(
+                                    title: 'Reproducciones recientes',
+                                    items: controller.recentlyPlayed,
+                                    onHeaderTap: () =>
+                                        Get.toNamed(AppRoutes.history),
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.recentlyPlayed,
+                                        ),
+                                    onItemLongPress: (item, _) {
+                                      actions.showItemActions(
+                                        context,
+                                        item,
+                                        onChanged: controller.loadHome,
+                                      );
+                                    },
+                                  ),
+                                if (controller.recentlyPlayed.isNotEmpty)
+                                  const SizedBox(height: 18),
+
+                                // ---- Destacado ----
+                                if (controller.featured.isNotEmpty) ...[
+                                  _SectionHeader(
+                                    title: 'Destacado',
+                                    onTap: () => Get.to(
+                                      () => SectionListPage(
+                                        title: 'Destacado',
+                                        items: controller.featured,
+                                        onItemTap: (item, index) =>
+                                            controller.openMedia(
+                                              item,
+                                              index,
+                                              controller.featured,
+                                            ),
+                                        onItemLongPress: (item, _) =>
+                                            actions.showItemActions(
+                                              context,
+                                              item,
+                                              onChanged: controller.loadHome,
+                                            ),
+                                        onShuffle: (queue) => controller
+                                            .openMedia(queue.first, 0, queue),
+                                      ),
+                                    ),
+                                    trailing: null,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _FeaturedList(
+                                    items: controller.featured,
+                                    onTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.featured,
+                                        ),
+                                    onLongPress: (item, _) =>
+                                        actions.showItemActions(
+                                          context,
+                                          item,
+                                          onChanged: controller.loadHome,
+                                        ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                ],
+
+                                // ---- Últimos imports ----
+                                if (controller.latestDownloads.isNotEmpty) ...[
+                                  MediaHorizontalList(
+                                    title: 'Últimos imports',
+                                    items: controller.latestDownloads,
+                                    onHeaderTap: () => Get.to(
+                                      () => SectionListPage(
+                                        title: 'Últimos imports',
+                                        items: controller.latestDownloads,
+                                        onItemTap: (item, index) =>
+                                            controller.openMedia(
+                                              item,
+                                              index,
+                                              controller.latestDownloads,
+                                            ),
+                                        onItemLongPress: (item, _) =>
+                                            actions.showItemActions(
+                                              context,
+                                              item,
+                                              onChanged: controller.loadHome,
+                                            ),
+                                        onShuffle: (queue) => controller
+                                            .openMedia(queue.first, 0, queue),
+                                      ),
+                                    ),
+                                    onItemTap: (item, index) =>
+                                        controller.openMedia(
+                                          item,
+                                          index,
+                                          controller.latestDownloads,
+                                        ),
+                                    onItemLongPress: (item, _) {
+                                      actions.showItemActions(
+                                        context,
+                                        item,
+                                        onChanged: controller.loadHome,
+                                      );
+                                    },
+                                  ),
+                                ],
+
+                                const SizedBox(height: 24),
                               ],
                             ),
                           ),
@@ -433,64 +423,9 @@ class _SectionHeader extends StatelessWidget {
         onTap: onTap,
         child: Row(
           children: [
-            Expanded(
-              child: Text(
-                title,
-                style: titleStyle,
-              ),
-            ),
-            if (trailing != null) ...[
-              trailing!,
-              const SizedBox(width: 8),
-            ],
+            Expanded(child: Text(title, style: titleStyle)),
+            if (trailing != null) ...[trailing!, const SizedBox(width: 8)],
             Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// ===============================================================
-/// BOTÓN PILL (ej: Aleatorio)
-/// ===============================================================
-class _PillButton extends StatelessWidget {
-  const _PillButton({
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: scheme.primary.withOpacity(0.2)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: scheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurface,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
           ],
         ),
       ),
