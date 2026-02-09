@@ -34,6 +34,11 @@ class DownloadsController extends GetxController {
   final RxList<MediaItem> downloads = <MediaItem>[].obs;
   final RxBool isLoading = false.obs;
   final RxBool customTabOpening = false.obs;
+  final RxBool isDownloading = false.obs;
+  final RxDouble downloadProgress = (-1.0).obs;
+  final RxString downloadStatus = 'Preparando descarga...'.obs;
+
+  bool _downloadSnackOpen = false;
 
   // 📁 Archivos locales para importar
   final RxList<MediaItem> localFilesForImport = <MediaItem>[].obs;
@@ -42,6 +47,67 @@ class DownloadsController extends GetxController {
   final RxBool shareDialogOpen = false.obs;
   final RxBool sharedArgConsumed = false.obs;
   StreamSubscription<List<SharedMediaFile>>? _shareSub;
+
+  // ============================
+  // 📊 DESCARGA (PROGRESO GLOBAL)
+  // ============================
+  void _showDownloadSnack() {
+    if (_downloadSnackOpen) return;
+    _downloadSnackOpen = true;
+
+    final theme = Get.theme;
+    final scheme = theme.colorScheme;
+
+    Get.rawSnackbar(
+      snackPosition: SnackPosition.TOP,
+      isDismissible: false,
+      backgroundColor: scheme.surfaceContainerHighest,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      borderRadius: 16,
+      duration: const Duration(days: 1),
+      messageText: Obx(
+        () => Row(
+          children: [
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    downloadStatus.value,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: scheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  LinearProgressIndicator(
+                    value: (downloadProgress.value >= 0 &&
+                            downloadProgress.value <= 1)
+                        ? downloadProgress.value
+                        : null,
+                    minHeight: 6,
+                    color: scheme.primary,
+                    backgroundColor: scheme.surfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _hideDownloadSnack() {
+    if (!_downloadSnackOpen) return;
+    _downloadSnackOpen = false;
+    if (Get.isSnackbarOpen) {
+      Get.closeCurrentSnackbar();
+    }
+  }
 
   // ============================
   // 🔁 LIFECYCLE
@@ -266,10 +332,10 @@ class DownloadsController extends GetxController {
         .toLowerCase();
 
     try {
-      Get.dialog(
-        const Center(child: CircularProgressIndicator()),
-        barrierDismissible: false,
-      );
+      isDownloading.value = true;
+      downloadProgress.value = -1;
+      downloadStatus.value = 'Preparando descarga...';
+      _showDownloadSnack();
 
       final ok = await _repo
           .requestAndFetchMedia(
@@ -278,6 +344,14 @@ class DownloadsController extends GetxController {
             kind: kind,
             format: format,
             quality: resolvedQuality,
+            onProgress: (received, total) {
+              if (total > 0) {
+                downloadProgress.value = received / total;
+              } else {
+                downloadProgress.value = -1;
+              }
+              downloadStatus.value = 'Descargando...';
+            },
           )
           .timeout(
             const Duration(minutes: 5),
@@ -285,6 +359,7 @@ class DownloadsController extends GetxController {
           );
 
       if (ok) {
+        downloadStatus.value = 'Guardando en la librería...';
         await load();
         Get.snackbar(
           'Imports',
@@ -330,9 +405,9 @@ class DownloadsController extends GetxController {
 
       debugPrint('downloadFromUrl error: $e');
     } finally {
-      if (Get.isDialogOpen ?? false) {
-        Get.back();
-      }
+      isDownloading.value = false;
+      downloadProgress.value = -1;
+      _hideDownloadSnack();
     }
   }
 

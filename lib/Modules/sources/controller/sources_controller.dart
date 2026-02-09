@@ -303,6 +303,7 @@ class SourcesController extends GetxController {
     required String kind,
     required String format,
     String? quality,
+    void Function(int received, int total)? onProgress,
   }) async {
     return _repo.requestAndFetchMedia(
       mediaId: mediaId,
@@ -310,6 +311,7 @@ class SourcesController extends GetxController {
       kind: kind,
       format: format,
       quality: quality,
+      onProgress: onProgress,
     );
   }
 

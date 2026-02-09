@@ -92,6 +92,7 @@ class MediaRepository {
     required String kind, // 'audio' | 'video'
     required String format, // 'mp3' | 'm4a' | 'mp4'...
     String? quality, // 'low' | 'medium' | 'high'
+    void Function(int received, int total)? onProgress,
   }) async {
     try {
       // ----------------------------
@@ -131,6 +132,7 @@ class MediaRepository {
       final ok = await _downloadWithRetry(
         path: '/media/file/$resolvedId/$normalizedKind/$normalizedFormat',
         savePath: destPath,
+        onProgress: onProgress,
       );
 
       if (!ok) return false;
@@ -338,6 +340,7 @@ class MediaRepository {
   Future<bool> _downloadWithRetry({
     required String path,
     required String savePath,
+    void Function(int received, int total)? onProgress,
   }) async {
     int attempts = 0;
     const maxAttempts = 4;
@@ -346,7 +349,11 @@ class MediaRepository {
     while (true) {
       try {
         // Requiere que tengas _client.download(...) en DioClient
-        await _client.download(path, savePath);
+        await _client.download(
+          path,
+          savePath,
+          onProgress: onProgress,
+        );
         return true;
       } catch (e) {
         attempts++;
