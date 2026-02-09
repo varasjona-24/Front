@@ -103,22 +103,61 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
       durationSeconds = parsed;
     }
 
+    // ----------------------------
+    // 🖼️ THUMBNAIL (persistente offline)
+    // ----------------------------
     final remoteThumb = _thumbCtrl.text.trim();
-    final localThumb = _localThumbPath?.trim() ?? '';
+    final pickedLocalThumb = _localThumbPath?.trim() ?? '';
+
+    // Si hay URL, la cacheamos a un archivo local antes de guardar
+    String? cachedLocalFromRemote;
+    if (remoteThumb.isNotEmpty) {
+      try {
+        cachedLocalFromRemote = await _repo.cacheThumbnailForItem(
+          itemId: widget.item.id,
+          thumbnailUrl: remoteThumb,
+        );
+      } catch (_) {
+        cachedLocalFromRemote = null;
+      }
+    }
+
+    // Local efectivo:
+    // - Si hay remote y cache funcionó -> usa cache
+    // - Si hay remote pero cache falló -> queda vacío (y dependerá de internet)
+    // - Si no hay remote -> usa el local escogido por file picker
+    final effectiveLocal = remoteThumb.isNotEmpty
+        ? ((cachedLocalFromRemote?.trim().isNotEmpty == true)
+              ? cachedLocalFromRemote!.trim()
+              : '')
+        : pickedLocalThumb;
+
     final initialRemote = widget.item.thumbnail?.trim() ?? '';
     final initialLocal = widget.item.thumbnailLocalPath?.trim() ?? '';
+
     final thumbChanged =
-        remoteThumb != initialRemote || localThumb != initialLocal;
-    final useRemoteThumb = remoteThumb.isNotEmpty;
-    final useLocalThumb = localThumb.isNotEmpty;
+        remoteThumb != initialRemote || effectiveLocal != initialLocal;
 
     final updated = widget.item.copyWith(
       title: title,
       subtitle: _artistCtrl.text.trim(),
-      thumbnail: !thumbChanged ? null : (useRemoteThumb ? remoteThumb : ''),
+
+      // Si no cambió, null para no re-escribir
+      // Si cambió:
+      // - con remote -> guarda remote
+      // - sin remote -> guarda ''
+      thumbnail: !thumbChanged
+          ? null
+          : (remoteThumb.isNotEmpty ? remoteThumb : ''),
+
+      // Si no cambió, null
+      // Si cambió:
+      // - con local efectivo -> guarda path
+      // - sin local -> guarda ''
       thumbnailLocalPath: !thumbChanged
           ? null
-          : (useLocalThumb ? localThumb : ''),
+          : (effectiveLocal.isNotEmpty ? effectiveLocal : ''),
+
       durationSeconds: durationSeconds ?? widget.item.durationSeconds,
     );
 

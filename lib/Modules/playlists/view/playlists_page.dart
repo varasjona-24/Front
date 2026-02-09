@@ -482,17 +482,17 @@ class PlaylistsPage extends GetView<PlaylistsController> {
                   barrierDismissible: false,
                   builder: (_) => ImageSearchDialog(
                     initialQuery: playlist.name,
+                    onDownloadImage: (url) async {
+                      if (url.trim().isEmpty) return null;
+                      return await repo.cacheThumbnailForItem(
+                        itemId: playlist.id,
+                        thumbnailUrl: url.trim(),
+                      );
+                    },
                     onImageSelected: (url) async {
                       if (url.trim().isEmpty) return;
                       final cleaned = url.trim();
-                      final cached = await repo.cacheThumbnailForItem(
-                        itemId: playlist.id,
-                        thumbnailUrl: cleaned,
-                      );
                       urlCtrl.text = cleaned;
-                      if (cached != null && cached.trim().isNotEmpty) {
-                        localPath = cached;
-                      }
                     },
                   ),
                 );
@@ -518,17 +518,17 @@ class PlaylistsPage extends GetView<PlaylistsController> {
                       barrierDismissible: false,
                       builder: (_) => ImageSearchDialog(
                         initialQuery: playlist.name,
+                        onDownloadImage: (url) async {
+                          if (url.trim().isEmpty) return null;
+                          return await repo.cacheThumbnailForItem(
+                            itemId: playlist.id,
+                            thumbnailUrl: url.trim(),
+                          );
+                        },
                         onImageSelected: (url) async {
                           if (url.trim().isEmpty) return;
                           final cleaned = url.trim();
-                          final cached = await repo.cacheThumbnailForItem(
-                            itemId: playlist.id,
-                            thumbnailUrl: cleaned,
-                          );
                           urlCtrl.text = cleaned;
-                          if (cached != null && cached.trim().isNotEmpty) {
-                            localPath = cached;
-                          }
                         },
                       ),
                     );

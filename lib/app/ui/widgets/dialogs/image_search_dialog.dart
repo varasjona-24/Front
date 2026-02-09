@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -11,10 +12,12 @@ class ImageSearchDialog extends StatefulWidget {
     super.key,
     required this.initialQuery,
     this.onImageSelected,
+    this.onDownloadImage,
   });
 
   final String initialQuery;
   final ValueChanged<String>? onImageSelected;
+  final Future<String?> Function(String imageUrl)? onDownloadImage;
 
   @override
   State<ImageSearchDialog> createState() => _ImageSearchDialogState();
@@ -63,7 +66,13 @@ class _ImageSearchDialogState extends State<ImageSearchDialog> {
 
     var url = pickUrl(img);
     if (url) {
-      ListenfyImage.postMessage(url);
+      try {
+        if (window.ListenfyImage && window.ListenfyImage.postMessage) {
+          window.ListenfyImage.postMessage(url);
+        }
+      } catch (err) {
+        console.log('Error posting message: ' + err);
+      }
       e.preventDefault();
       e.stopPropagation();
     }
@@ -79,23 +88,48 @@ class _ImageSearchDialogState extends State<ImageSearchDialog> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel(
         'ListenfyImage',
-        onMessageReceived: (msg) async {
+        onMessageReceived: (msg) {
           final url = msg.message.trim();
           if (!mounted) return;
           if (url.isEmpty) return;
           if (_picked) return; // evita doble pop por doble click/mensaje
           _picked = true;
 
-          // Llama al callback si fue proporcionado antes de cerrar.
-          try {
-            if (widget.onImageSelected != null) {
-              widget.onImageSelected!(url);
-            }
-          } catch (_) {}
+          // Inicia descarga en background si se proporcionó callback, sin esperar
+          if (widget.onDownloadImage != null) {
+            widget.onDownloadImage!(url)
+                .then((localPath) {
+                  // Callback después de descarga completada
+                  try {
+                    if (widget.onImageSelected != null && mounted) {
+                      widget.onImageSelected!(url);
+                    }
+                  } catch (_) {}
+                })
+                .catchError((e) {
+                  if (kDebugMode) {
+                    print('Image download failed: $e');
+                  }
+                  // Intenta al menos llamar el callback de selección
+                  try {
+                    if (widget.onImageSelected != null && mounted) {
+                      widget.onImageSelected!(url);
+                    }
+                  } catch (_) {}
+                });
+          } else {
+            // Sin descarga, solo callback de selección
+            try {
+              if (widget.onImageSelected != null) {
+                widget.onImageSelected!(url);
+              }
+            } catch (_) {}
+          }
 
-          // Importante: cerrar el dialog del root navigator para evitar
-          // problemas con navegadores anidados (GetX/tabs, etc.)
-          Navigator.of(context, rootNavigator: true).pop(url);
+          // Cierra el diálogo inmediatamente con la URL remota
+          if (mounted) {
+            Navigator.of(context, rootNavigator: true).pop(url);
+          }
         },
       )
       ..setNavigationDelegate(
@@ -106,10 +140,18 @@ class _ImageSearchDialogState extends State<ImageSearchDialog> {
           onPageFinished: (_) async {
             if (!mounted) return;
             setState(() => _loading = false);
+
+            // Espera un poco para que la página se renderice completamente
+            await Future.delayed(const Duration(milliseconds: 500));
+
+            if (!mounted) return;
             try {
               await _controller.runJavaScript(_imageTapScript);
-            } catch (_) {
+            } catch (e) {
               // Ignora si falla la inyección (cambios en la página / WebView)
+              if (kDebugMode) {
+                print('Failed to inject image tap script: $e');
+              }
             }
           },
         ),

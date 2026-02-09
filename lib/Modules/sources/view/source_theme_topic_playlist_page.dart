@@ -616,7 +616,16 @@ class _SourceThemeTopicPlaylistPageState
                 final picked = await showDialog<String>(
                   context: ctx2,
                   barrierDismissible: true,
-                  builder: (_) => ImageSearchDialog(initialQuery: name),
+                  builder: (_) => ImageSearchDialog(
+                    initialQuery: name,
+                    onDownloadImage: (url) async {
+                      if (url.trim().isEmpty) return null;
+                      return await _repo.cacheThumbnailForItem(
+                        itemId: playlist.id,
+                        thumbnailUrl: url.trim(),
+                      );
+                    },
+                  ),
                 );
 
                 final cleaned = (picked ?? '').trim();

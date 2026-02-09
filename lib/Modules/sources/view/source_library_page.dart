@@ -554,18 +554,21 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                         barrierDismissible: false,
                         builder: (_) => ImageSearchDialog(
                           initialQuery: name,
+                          onDownloadImage: (url) async {
+                            if (url.trim().isEmpty) return null;
+                            return await _repo.cacheThumbnailForItem(
+                              itemId: topic.id,
+                              thumbnailUrl: url.trim(),
+                            );
+                          },
                           onImageSelected: (url) async {
                             if (url.trim().isEmpty) return;
                             final cleaned = url.trim();
-                            final cached = await _repo.cacheThumbnailForItem(
-                              itemId: topic.id,
-                              thumbnailUrl: cleaned,
-                            );
+                            // Note: onDownloadImage ya descargó, solo actualizar UI
                             setState(() {
                               coverUrl = cleaned;
-                              if (cached != null && cached.trim().isNotEmpty) {
-                                coverLocal = cached;
-                              }
+                              // La ruta local se obtiene del resultado del dialog
+                              // o se deja en blanco para que se descargue on-demand
                             });
                           },
                         ),
@@ -624,20 +627,18 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                             barrierDismissible: false,
                             builder: (_) => ImageSearchDialog(
                               initialQuery: name,
+                              onDownloadImage: (url) async {
+                                if (url.trim().isEmpty) return null;
+                                return await _repo.cacheThumbnailForItem(
+                                  itemId: topic.id,
+                                  thumbnailUrl: url.trim(),
+                                );
+                              },
                               onImageSelected: (url) async {
                                 if (url.trim().isEmpty) return;
                                 final cleaned = url.trim();
-                                final cached = await _repo
-                                    .cacheThumbnailForItem(
-                                      itemId: topic.id,
-                                      thumbnailUrl: cleaned,
-                                    );
                                 setState(() {
                                   coverUrl = cleaned;
-                                  if (cached != null &&
-                                      cached.trim().isNotEmpty) {
-                                    coverLocal = cached;
-                                  }
                                 });
                               },
                             ),

@@ -81,16 +81,25 @@ class _EditArtistPageState extends State<EditArtistPage> {
     final pickedUrl = await showDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => ImageSearchDialog(initialQuery: query),
+      builder: (_) => ImageSearchDialog(
+        initialQuery: query,
+        onDownloadImage: (url) async {
+          if (url.trim().isEmpty) return null;
+          return await _repo.cacheThumbnailForItem(
+            itemId: widget.artist.key,
+            thumbnailUrl: url.trim(),
+          );
+        },
+      ),
     );
 
     final cleaned = (pickedUrl ?? '').trim();
     if (!mounted || cleaned.isEmpty) return;
 
-    // Preview inmediato (solo URL; no cache aquí)
+    // Actualizar UI con la URL remota
     setState(() {
-      _thumbCtrl.text = cleaned; // preview remoto
-      _localThumbPath = null; // limpia local
+      _thumbCtrl.text = cleaned; // URL remota
+      _localThumbPath = null; // será descargado si se guarda
     });
   }
 

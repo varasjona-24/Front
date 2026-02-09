@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart' as dio;
 import 'package:get/get.dart';
@@ -401,24 +402,35 @@ class MediaRepository {
         await coversDir.create(recursive: true);
       }
 
-      // intentar sacar extensión desde la URL
-      final uri = Uri.tryParse(u);
-      var ext = '';
-      if (uri != null) {
-        ext = p.extension(uri.path).toLowerCase();
-      }
-      if (ext.isEmpty || ext.length > 6) ext = '.jpg'; // fallback seguro
-
-      final coverPath = p.join(coversDir.path, '$resolvedId$ext');
-
-      // bajar bytes
+      // ✅ bajar bytes con headers (Google Images suele exigirlos)
       final resp = await _client.dio.get<List<int>>(
         u,
-        options: dio.Options(responseType: dio.ResponseType.bytes),
+        options: dio.Options(
+          responseType: dio.ResponseType.bytes,
+          followRedirects: true,
+          receiveTimeout: const Duration(seconds: 20),
+          sendTimeout: const Duration(seconds: 20),
+          headers: const {
+            'User-Agent':
+                'Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36',
+            'Accept': 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          },
+        ),
       );
 
-      final bytes = resp.data;
-      if (bytes == null || bytes.isEmpty) return null;
+      final bytesList = resp.data;
+      if (bytesList == null || bytesList.isEmpty) return null;
+
+      final bytes = Uint8List.fromList(bytesList);
+
+      // ✅ Detectar extensión REAL por magic-bytes
+      final ext = _detectImageExt(bytes);
+      if (ext == null) {
+        // No parece imagen (HTML/JSON/etc)
+        return null;
+      }
+
+      final coverPath = p.join(coversDir.path, '$resolvedId.$ext');
 
       final f = File(coverPath);
       await f.writeAsBytes(bytes, flush: true);
@@ -428,6 +440,38 @@ class MediaRepository {
       print('thumbnail download failed: $e');
       return null;
     }
+  }
+
+  /// Retorna extensión real según magic bytes (sin punto)
+  String? _detectImageExt(Uint8List b) {
+    if (b.length < 12) return null;
+
+    // JPEG: FF D8 FF
+    if (b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) return 'jpg';
+
+    // PNG: 89 50 4E 47
+    if (b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47) {
+      return 'png';
+    }
+
+    // WEBP: "RIFF....WEBP"
+    final riff = String.fromCharCodes(b.sublist(0, 4));
+    final webp = String.fromCharCodes(b.sublist(8, 12));
+    if (riff == 'RIFF' && webp == 'WEBP') return 'webp';
+
+    // GIF: "GIF8"
+    final gif = String.fromCharCodes(b.sublist(0, 4));
+    if (gif == 'GIF8') return 'gif';
+
+    // AVIF: "....ftypavif" o "....ftypavis"
+    // (ISO BMFF) revisa caja ftyp
+    final ftyp = String.fromCharCodes(b.sublist(4, 8));
+    if (ftyp == 'ftyp') {
+      final brand = String.fromCharCodes(b.sublist(8, 12));
+      if (brand == 'avif' || brand == 'avis') return 'avif';
+    }
+
+    return null;
   }
 
   // ============================
