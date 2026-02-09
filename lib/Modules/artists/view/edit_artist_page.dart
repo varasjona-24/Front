@@ -62,8 +62,8 @@ class _EditArtistPageState extends State<EditArtistPage> {
     if (path == null || path.trim().isEmpty) return;
 
     setState(() {
-      _localThumbPath = path;
-      _thumbCtrl.text = '';
+      _localThumbPath = path; // preview local
+      _thumbCtrl.text = ''; // limpia remoto
     });
   }
 
@@ -78,30 +78,20 @@ class _EditArtistPageState extends State<EditArtistPage> {
     final rawQuery = _nameCtrl.text.trim();
     final query = rawQuery.isEmpty ? 'artist photo' : rawQuery;
 
-    await showDialog<void>(
+    final pickedUrl = await showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => ImageSearchDialog(
-        initialQuery: query,
-        onImageSelected: (url) async {
-          if (!mounted || url.trim().isEmpty) return;
-          final cleaned = url.trim();
-
-          final cached = await _repo.cacheThumbnailForItem(
-            itemId: widget.artist.key,
-            thumbnailUrl: cleaned,
-          );
-
-          if (!mounted) return;
-          setState(() {
-            _thumbCtrl.text = cleaned;
-            if (cached != null && cached.trim().isNotEmpty) {
-              _localThumbPath = cached;
-            }
-          });
-        },
-      ),
+      barrierDismissible: true,
+      builder: (_) => ImageSearchDialog(initialQuery: query),
     );
+
+    final cleaned = (pickedUrl ?? '').trim();
+    if (!mounted || cleaned.isEmpty) return;
+
+    // Preview inmediato (solo URL; no cache aquí)
+    setState(() {
+      _thumbCtrl.text = cleaned; // preview remoto
+      _localThumbPath = null; // limpia local
+    });
   }
 
   Future<void> _save() async {
@@ -118,16 +108,25 @@ class _EditArtistPageState extends State<EditArtistPage> {
     final remote = _thumbCtrl.text.trim();
     final useRemote = remote.isNotEmpty;
 
+    // Si eligieron remoto, cachea aquí (persistencia real)
+    String? cached;
+    if (useRemote) {
+      cached = await _repo.cacheThumbnailForItem(
+        itemId: widget.artist.key,
+        thumbnailUrl: remote,
+      );
+    }
+
     await _controller.updateArtist(
       key: widget.artist.key,
       newName: name,
       thumbnail: useRemote ? remote : null,
-      thumbnailLocalPath: useRemote ? null : _localThumbPath,
+      thumbnailLocalPath: useRemote
+          ? (cached ?? _localThumbPath)
+          : _localThumbPath,
     );
 
-    if (mounted) {
-      Get.back(result: true);
-    }
+    if (mounted) Get.back(result: true);
   }
 
   @override

@@ -3,15 +3,18 @@ import 'package:webview_flutter/webview_flutter.dart';
 
 import '../branding/listenfy_logo.dart';
 
+/// Dialog que permite buscar imágenes en Google Images y devuelve la URL
+/// seleccionada al caller:
+
 class ImageSearchDialog extends StatefulWidget {
   const ImageSearchDialog({
     super.key,
     required this.initialQuery,
-    required this.onImageSelected,
+    this.onImageSelected,
   });
 
   final String initialQuery;
-  final Function(String) onImageSelected;
+  final ValueChanged<String>? onImageSelected;
 
   @override
   State<ImageSearchDialog> createState() => _ImageSearchDialogState();
@@ -19,7 +22,9 @@ class ImageSearchDialog extends StatefulWidget {
 
 class _ImageSearchDialogState extends State<ImageSearchDialog> {
   late final WebViewController _controller;
+
   bool _loading = true;
+  bool _picked = false;
 
   static const String _imageTapScript = r'''
 (function() {
@@ -30,22 +35,32 @@ class _ImageSearchDialogState extends State<ImageSearchDialog> {
         return '';
       }
     } catch (e) {}
+
     var dataIurl = img.getAttribute('data-iurl');
     if (dataIurl && dataIurl.startsWith('http')) return dataIurl;
+
     var dataSrc = img.getAttribute('data-src') || img.getAttribute('data-lowsrc');
     if (dataSrc && dataSrc.startsWith('http')) return dataSrc;
+
     var src = img.getAttribute('src');
     if (src && src.startsWith('http')) return src;
+
     var srcset = img.getAttribute('srcset');
     if (srcset) {
-      var parts = srcset.split(',').map(function(p){ return p.trim().split(' ')[0]; }).filter(Boolean);
+      var parts = srcset
+        .split(',')
+        .map(function(p){ return p.trim().split(' ')[0]; })
+        .filter(Boolean);
       if (parts.length) return parts[parts.length - 1];
     }
+
     return '';
   }
+
   document.addEventListener('click', function(e) {
     var img = e.target.closest('img');
     if (!img) return;
+
     var url = pickUrl(img);
     if (url) {
       ListenfyImage.postMessage(url);
@@ -59,32 +74,53 @@ class _ImageSearchDialogState extends State<ImageSearchDialog> {
   @override
   void initState() {
     super.initState();
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..addJavaScriptChannel(
         'ListenfyImage',
-        onMessageReceived: (msg) {
+        onMessageReceived: (msg) async {
           final url = msg.message.trim();
-          if (url.isEmpty) return;
           if (!mounted) return;
-          widget.onImageSelected(url);
-          Navigator.of(context).pop();
+          if (url.isEmpty) return;
+          if (_picked) return; // evita doble pop por doble click/mensaje
+          _picked = true;
+
+          // Llama al callback si fue proporcionado antes de cerrar.
+          try {
+            if (widget.onImageSelected != null) {
+              widget.onImageSelected!(url);
+            }
+          } catch (_) {}
+
+          // Importante: cerrar el dialog del root navigator para evitar
+          // problemas con navegadores anidados (GetX/tabs, etc.)
+          Navigator.of(context, rootNavigator: true).pop(url);
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) => setState(() => _loading = true),
+          onPageStarted: (_) {
+            if (mounted) setState(() => _loading = true);
+          },
           onPageFinished: (_) async {
+            if (!mounted) return;
             setState(() => _loading = false);
-            await _controller.runJavaScript(_imageTapScript);
+            try {
+              await _controller.runJavaScript(_imageTapScript);
+            } catch (_) {
+              // Ignora si falla la inyección (cambios en la página / WebView)
+            }
           },
         ),
       );
+
     _loadQuery(widget.initialQuery);
   }
 
   void _loadQuery(String query) {
-    final encoded = Uri.encodeComponent(query);
+    final q = query.trim().isEmpty ? 'album cover' : query.trim();
+    final encoded = Uri.encodeComponent(q);
     final url = 'https://www.google.com/search?tbm=isch&q=$encoded';
     _controller.loadRequest(Uri.parse(url));
   }
@@ -117,7 +153,8 @@ class _ImageSearchDialogState extends State<ImageSearchDialog> {
                   ),
                   const Spacer(),
                   IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).pop(),
                     icon: const Icon(Icons.close_rounded),
                   ),
                 ],

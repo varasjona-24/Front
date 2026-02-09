@@ -228,33 +228,20 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     final rawQuery = _titleCtrl.text.trim();
     final query = rawQuery.isEmpty ? 'album cover' : rawQuery;
 
-    await showDialog<void>(
+    final pickedUrl = await showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (_) => ImageSearchDialog(
-        initialQuery: query,
-        onImageSelected: (url) async {
-          if (!mounted || url.trim().isEmpty) return;
-          final cleaned = url.trim();
-
-          // Actualiza UI de inmediato (URL remota), luego cachea y fija local.
-          setState(() {
-            _thumbCtrl.text = cleaned;
-            _localThumbPath = null;
-          });
-
-          final cached = await _repo.cacheThumbnailForItem(
-            itemId: widget.item.id,
-            thumbnailUrl: cleaned,
-          );
-
-          if (!mounted) return;
-          if (cached != null && cached.trim().isNotEmpty) {
-            setState(() => _localThumbPath = cached);
-          }
-        },
-      ),
+      barrierDismissible: true,
+      builder: (_) => ImageSearchDialog(initialQuery: query),
     );
+
+    final cleaned = (pickedUrl ?? '').trim();
+    if (!mounted || cleaned.isEmpty) return;
+
+    // PREVIEW inmediato (sin cachear aún)
+    setState(() {
+      _thumbCtrl.text = cleaned;
+      _localThumbPath = null;
+    });
   }
 
   void _clearThumbnail() {

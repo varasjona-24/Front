@@ -1,5 +1,5 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 
 import '../../../app/controllers/media_actions_controller.dart';
@@ -18,9 +18,9 @@ import '../ui/source_color_picker_field.dart';
 import '../ui/source_playlist_card.dart';
 import '../../../app/utils/format_bytes.dart';
 
-// ============================
-// 🧭 PAGE: PLAYLIST
-// ============================
+/// UI-only: Fuente / Theme Topic Playlist Page
+/// Nota: este archivo asume que `ImageSearchDialog` ahora devuelve `String` (url)
+/// usando: `Navigator.pop(context, url)`
 class SourceThemeTopicPlaylistPage extends StatefulWidget {
   const SourceThemeTopicPlaylistPage({
     super.key,
@@ -46,6 +46,7 @@ class _SourceThemeTopicPlaylistPageState
   final SourcesController _sources = Get.find<SourcesController>();
   final MediaActionsController _actions = Get.find<MediaActionsController>();
   final MediaRepository _repo = Get.find<MediaRepository>();
+
   String? _playlistSizeLabel;
 
   SourceThemeTopicPlaylist? get _playlist {
@@ -57,9 +58,6 @@ class _SourceThemeTopicPlaylistPageState
 
   @override
   Widget build(BuildContext context) {
-    // ============================
-    // 🧱 UI
-    // ============================
     final theme = Theme.of(context);
 
     return Obx(() {
@@ -111,6 +109,9 @@ class _SourceThemeTopicPlaylistPageState
     });
   }
 
+  // ============================
+  // 🧱 UI SECTIONS
+  // ============================
   Widget _actionRow(SourceThemeTopicPlaylist playlist) {
     return Row(
       children: [
@@ -144,6 +145,7 @@ class _SourceThemeTopicPlaylistPageState
             if (mounted) setState(() => _playlistSizeLabel = nextSize);
           });
         }
+
         if (items.isEmpty) {
           return Text(
             'No hay items todavía.',
@@ -152,6 +154,7 @@ class _SourceThemeTopicPlaylistPageState
             ),
           );
         }
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -183,23 +186,6 @@ class _SourceThemeTopicPlaylistPageState
         );
       },
     );
-  }
-
-  String _buildMetaLine(int itemCount, int listCount) {
-    final base = '$itemCount items · $listCount listas';
-    if (_playlistSizeLabel == null || _playlistSizeLabel!.isEmpty) return base;
-    return '$base · ${_playlistSizeLabel!}';
-  }
-
-  String? _formatSizeLabel(List<MediaItem> items) {
-    var total = 0;
-    for (final item in items) {
-      final v = item.localAudioVariant ?? item.localVideoVariant;
-      final size = v?.size ?? 0;
-      if (size > 0) total += size;
-    }
-    if (total <= 0) return null;
-    return formatBytes(total);
   }
 
   Widget _subListsSection(
@@ -247,10 +233,30 @@ class _SourceThemeTopicPlaylistPageState
     );
   }
 
+  // ============================
+  // 🧾 META / SIZE
+  // ============================
+  String _buildMetaLine(int itemCount, int listCount) {
+    final base = '$itemCount items · $listCount listas';
+    if (_playlistSizeLabel == null || _playlistSizeLabel!.isEmpty) return base;
+    return '$base · ${_playlistSizeLabel!}';
+  }
+
+  String? _formatSizeLabel(List<MediaItem> items) {
+    var total = 0;
+    for (final item in items) {
+      final v = item.localAudioVariant ?? item.localVideoVariant;
+      final size = v?.size ?? 0;
+      if (size > 0) total += size;
+    }
+    if (total <= 0) return null;
+    return formatBytes(total);
+  }
+
+  // ============================
+  // 📚 DATA
+  // ============================
   Future<List<MediaItem>> _loadItems(SourceThemeTopicPlaylist playlist) async {
-    // ============================
-    // 📚 DATA: CARGA
-    // ============================
     return _sources.loadPlaylistItems(
       theme: widget.theme,
       playlist: playlist,
@@ -258,10 +264,17 @@ class _SourceThemeTopicPlaylistPageState
     );
   }
 
+  Future<List<MediaItem>> _candidateItems() async {
+    return _sources.loadCandidateItems(
+      theme: widget.theme,
+      origins: widget.origins,
+    );
+  }
+
+  // ============================
+  // 🪄 ACTIONS
+  // ============================
   Future<void> _addItems(SourceThemeTopicPlaylist playlist) async {
-    // ============================
-    // 🪄 DIALOGO: AGREGAR ITEMS
-    // ============================
     final list = await _candidateItems();
     final selected = <String>{};
 
@@ -347,13 +360,16 @@ class _SourceThemeTopicPlaylistPageState
                                 ),
                               )
                               .toList();
+
                           final mergedIds = {
                             ...playlist.itemIds,
                             ...toAdd.map(_sources.keyForItem),
                           }.toList();
+
                           await _sources.updateTopicPlaylist(
                             playlist.copyWith(itemIds: mergedIds),
                           );
+
                           if (ctx2.mounted) Navigator.of(ctx2).pop();
                         },
                         child: const Text('Agregar seleccionados'),
@@ -387,6 +403,19 @@ class _SourceThemeTopicPlaylistPageState
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx2, setState) {
+            Future<void> pickLocal() async {
+              final res = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+              );
+              final file = (res != null && res.files.isNotEmpty)
+                  ? res.files.first
+                  : null;
+              final path = file?.path?.trim();
+              if (path == null || path.isEmpty) return;
+              setState(() => coverLocal = path);
+            }
+
             return SafeArea(
               child: SizedBox(
                 height: MediaQuery.of(ctx2).size.height * 0.7,
@@ -447,24 +476,7 @@ class _SourceThemeTopicPlaylistPageState
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final res = await FilePicker.platform.pickFiles(
-                            type: FileType.custom,
-                            allowedExtensions: const [
-                              'jpg',
-                              'jpeg',
-                              'png',
-                              'webp',
-                            ],
-                          );
-                          final file = (res != null && res.files.isNotEmpty)
-                              ? res.files.first
-                              : null;
-                          final path = file?.path;
-                          if (path != null && path.isNotEmpty) {
-                            setState(() => coverLocal = path);
-                          }
-                        },
+                        onPressed: pickLocal,
                         icon: const Icon(Icons.folder_open_rounded),
                         label: const Text('Elegir imagen'),
                       ),
@@ -476,16 +488,22 @@ class _SourceThemeTopicPlaylistPageState
                         onPressed: () async {
                           final trimmed = name.trim();
                           if (trimmed.isEmpty) return;
+
                           final ok = await _sources.addTopicPlaylist(
                             topicId: playlist.topicId,
                             name: trimmed,
                             items: const [],
                             parentId: playlist.id,
                             depth: playlist.depth + 1,
-                            coverUrl: coverUrl,
-                            coverLocalPath: coverLocal,
+                            coverUrl: coverUrl?.trim().isEmpty == true
+                                ? null
+                                : coverUrl,
+                            coverLocalPath: coverLocal?.trim().isEmpty == true
+                                ? null
+                                : coverLocal,
                             colorValue: colorValue,
                           );
+
                           if (!ok && context.mounted) {
                             Get.snackbar(
                               'Listas',
@@ -533,13 +551,6 @@ class _SourceThemeTopicPlaylistPageState
     home.openMedia(item, safeIdx, list);
   }
 
-  Future<List<MediaItem>> _candidateItems() async {
-    return _sources.loadCandidateItems(
-      theme: widget.theme,
-      origins: widget.origins,
-    );
-  }
-
   Future<void> _showItemActions(
     SourceThemeTopicPlaylist playlist,
     MediaItem item,
@@ -579,14 +590,19 @@ class _SourceThemeTopicPlaylistPageState
     );
   }
 
+  // ============================
+  // ✏️ EDIT PLAYLIST DIALOG (UI)
+  // ============================
   Future<void> _openEditPlaylist(SourceThemeTopicPlaylist playlist) async {
     String name = playlist.name;
     String? coverUrl = playlist.coverUrl;
     String? coverLocal = playlist.coverLocalPath;
     int? colorValue = playlist.colorValue;
+
     Color draftColor = colorValue != null
-        ? Color(colorValue)
+        ? Color(colorValue!)
         : Theme.of(context).colorScheme.primary;
+
     final controller = TextEditingController(text: name);
 
     await showDialog<void>(
@@ -596,6 +612,47 @@ class _SourceThemeTopicPlaylistPageState
           title: const Text('Editar lista'),
           content: StatefulBuilder(
             builder: (ctx2, setState) {
+              Future<void> pickWebCover() async {
+                final picked = await showDialog<String>(
+                  context: ctx2,
+                  barrierDismissible: true,
+                  builder: (_) => ImageSearchDialog(initialQuery: name),
+                );
+
+                final cleaned = (picked ?? '').trim();
+                if (cleaned.isEmpty) return;
+
+                // Preview inmediato
+                setState(() {
+                  coverUrl = cleaned;
+                  coverLocal = null;
+                });
+              }
+
+              Future<void> pickLocalCover() async {
+                final res = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
+                );
+                final file = (res != null && res.files.isNotEmpty)
+                    ? res.files.first
+                    : null;
+                final path = file?.path?.trim();
+                if (path == null || path.isEmpty) return;
+
+                setState(() {
+                  coverLocal = path;
+                  coverUrl = null;
+                });
+              }
+
+              void clearCover() {
+                setState(() {
+                  coverUrl = null;
+                  coverLocal = null;
+                });
+              }
+
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -607,29 +664,7 @@ class _SourceThemeTopicPlaylistPageState
                   const SizedBox(height: 10),
                   TextField(
                     readOnly: true,
-                    onTap: () async {
-                      await showDialog<void>(
-                        context: context,
-                        barrierDismissible: false,
-                        builder: (_) => ImageSearchDialog(
-                          initialQuery: name,
-                          onImageSelected: (url) async {
-                            if (url.trim().isEmpty) return;
-                            final cleaned = url.trim();
-                            final cached = await _repo.cacheThumbnailForItem(
-                              itemId: playlist.id,
-                              thumbnailUrl: cleaned,
-                            );
-                            setState(() {
-                              coverUrl = cleaned;
-                              if (cached != null && cached.trim().isNotEmpty) {
-                                coverLocal = cached;
-                              }
-                            });
-                          },
-                        ),
-                      );
-                    },
+                    onTap: pickWebCover,
                     decoration: const InputDecoration(
                       hintText: 'Imagen web seleccionada',
                     ),
@@ -647,66 +682,20 @@ class _SourceThemeTopicPlaylistPageState
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final res = await FilePicker.platform.pickFiles(
-                              type: FileType.custom,
-                              allowedExtensions: const [
-                                'jpg',
-                                'jpeg',
-                                'png',
-                                'webp',
-                              ],
-                            );
-                            final file = (res != null && res.files.isNotEmpty)
-                                ? res.files.first
-                                : null;
-                            final path = file?.path;
-                            if (path != null && path.isNotEmpty) {
-                              setState(() => coverLocal = path);
-                            }
-                          },
+                          onPressed: pickLocalCover,
                           icon: const Icon(Icons.folder_open_rounded),
                           label: const Text('Elegir imagen'),
                         ),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton.icon(
-                        onPressed: () async {
-                          await showDialog<void>(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (_) => ImageSearchDialog(
-                              initialQuery: name,
-                              onImageSelected: (url) async {
-                                if (url.trim().isEmpty) return;
-                                final cleaned = url.trim();
-                                final cached = await _repo
-                                    .cacheThumbnailForItem(
-                                      itemId: playlist.id,
-                                      thumbnailUrl: cleaned,
-                                    );
-                                setState(() {
-                                  coverUrl = cleaned;
-                                  if (cached != null &&
-                                      cached.trim().isNotEmpty) {
-                                    coverLocal = cached;
-                                  }
-                                });
-                              },
-                            ),
-                          );
-                        },
+                        onPressed: pickWebCover,
                         icon: const Icon(Icons.public_rounded),
                         label: const Text('Buscar'),
                       ),
                       const SizedBox(width: 8),
                       OutlinedButton(
-                        onPressed: () {
-                          setState(() {
-                            coverUrl = null;
-                            coverLocal = null;
-                          });
-                        },
+                        onPressed: clearCover,
                         child: const Text('Quitar'),
                       ),
                     ],
@@ -723,15 +712,34 @@ class _SourceThemeTopicPlaylistPageState
             FilledButton(
               onPressed: () async {
                 Navigator.of(ctx).pop();
+
+                final trimmedName = name.trim();
+                final cleanedUrl = coverUrl?.trim();
+                final useUrl = (cleanedUrl != null && cleanedUrl.isNotEmpty);
+
+                // Persistencia real: si es web, cachea aquí
+                String? finalLocal = coverLocal?.trim();
+                String? finalUrl = useUrl ? cleanedUrl : null;
+
+                if (useUrl) {
+                  final cached = await _repo.cacheThumbnailForItem(
+                    itemId: playlist.id,
+                    thumbnailUrl: cleanedUrl!,
+                  );
+                  final cachedPath = cached?.trim();
+                  if (cachedPath != null && cachedPath.isNotEmpty) {
+                    finalLocal = cachedPath;
+                  }
+                }
+
                 await _sources.updateTopicPlaylist(
                   playlist.copyWith(
-                    name: name.trim(),
-                    coverUrl: coverUrl?.trim().isEmpty == true
-                        ? null
-                        : coverUrl,
-                    coverLocalPath: coverLocal?.trim().isEmpty == true
-                        ? null
-                        : coverLocal,
+                    name: trimmedName,
+                    coverUrl: finalUrl,
+                    coverLocalPath:
+                        (finalLocal != null && finalLocal.isNotEmpty)
+                        ? finalLocal
+                        : null,
                     colorValue: colorValue,
                   ),
                 );
