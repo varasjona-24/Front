@@ -6,7 +6,8 @@ import 'package:get/get.dart';
 import '../data/local/local_library_store.dart';
 import '../models/media_item.dart';
 import 'navigation_controller.dart';
-import '../../Modules/downloads/view/edit_media_page.dart';
+import '../routes/app_routes.dart';
+import '../../Modules/edit/controller/edit_entity_controller.dart';
 
 class MediaActionsController extends GetxController {
   // ============================
@@ -18,7 +19,10 @@ class MediaActionsController extends GetxController {
   // 🧭 NAVEGACION UI
   // ============================
   Future<void> openEditPage(MediaItem item) async {
-    await Get.to(() => EditMediaMetadataPage(item: item));
+    await Get.toNamed(
+      AppRoutes.editEntity,
+      arguments: EditEntityArgs.media(item),
+    );
   }
 
   // ============================

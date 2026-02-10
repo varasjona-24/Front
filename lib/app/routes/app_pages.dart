@@ -41,6 +41,10 @@ import 'package:flutter_listenfy/Modules/playlists/view/playlists_page.dart';
 import 'package:flutter_listenfy/Modules/settings/binding/settings_binding.dart';
 import 'package:flutter_listenfy/Modules/settings/view/settings_view.dart';
 
+// Edit
+import 'package:flutter_listenfy/Modules/edit/binding/edit_entity_binding.dart';
+import 'package:flutter_listenfy/Modules/edit/view/edit_entity_page.dart';
+
 abstract class AppPages {
   static final routes = <GetPage>[
     // Entry
@@ -116,6 +120,13 @@ abstract class AppPages {
       name: AppRoutes.settings,
       page: () => const SettingsView(),
       binding: SettingsBinding(),
+    ),
+
+    // Edit
+    GetPage(
+      name: AppRoutes.editEntity,
+      page: () => const EditEntityPage(),
+      binding: EditEntityBinding(),
     ),
 
     // Video Player

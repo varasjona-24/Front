@@ -5,8 +5,9 @@ import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
+import '../../../app/routes/app_routes.dart';
 import '../controller/artists_controller.dart';
-import 'edit_artist_page.dart';
+import '../../edit/controller/edit_entity_controller.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import 'widgets/artist_avatar.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
@@ -61,8 +62,9 @@ class ArtistDetailPage extends GetView<ArtistsController> {
           actions: [
             IconButton(
               icon: const Icon(Icons.more_vert),
-              onPressed: () => Get.to(
-                () => EditArtistPage(artist: resolved),
+              onPressed: () => Get.toNamed(
+                AppRoutes.editEntity,
+                arguments: EditEntityArgs.artist(resolved),
               ),
             ),
           ],

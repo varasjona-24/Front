@@ -8,11 +8,12 @@ import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/routes/app_routes.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../controller/artists_controller.dart';
+import '../../edit/controller/edit_entity_controller.dart';
 import 'widgets/artist_avatar.dart';
 import 'artist_detail_page.dart';
-import 'edit_artist_page.dart';
 
 class ArtistsPage extends GetView<ArtistsController> {
   const ArtistsPage({super.key});
@@ -214,7 +215,10 @@ class ArtistsPage extends GetView<ArtistsController> {
                 artist: artist,
                 onOpen: () =>
                     Get.to(() => ArtistDetailPage(artistKey: artist.key)),
-                onEdit: () => Get.to(() => EditArtistPage(artist: artist)),
+                onEdit: () => Get.toNamed(
+                  AppRoutes.editEntity,
+                  arguments: EditEntityArgs.artist(artist),
+                ),
               ),
             ),
         ],

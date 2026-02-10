@@ -17,6 +17,8 @@ import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/models/media_item.dart';
+import '../../../app/routes/app_routes.dart';
+import '../../edit/controller/edit_entity_controller.dart';
 
 import '../../home/controller/home_controller.dart';
 import '../../player/audio/controller/audio_player_controller.dart';
@@ -360,18 +362,13 @@ class PlaylistsPage extends GetView<PlaylistsController> {
                   ),
                   ListTile(
                     leading: const Icon(Icons.edit_rounded),
-                    title: const Text('Renombrar'),
+                    title: const Text('Editar'),
                     onTap: () {
                       Navigator.of(ctx).pop();
-                      _renamePlaylist(context, playlist);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.image_rounded),
-                    title: const Text('Cambiar portada'),
-                    onTap: () {
-                      Navigator.of(ctx).pop();
-                      _changeCover(context, playlist);
+                      Get.toNamed(
+                        AppRoutes.editEntity,
+                        arguments: EditEntityArgs.playlist(playlist),
+                      );
                     },
                   ),
                   ListTile(
