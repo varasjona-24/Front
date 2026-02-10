@@ -100,7 +100,8 @@ class EditEntityController extends GetxController {
         await coversDir.create(recursive: true);
       }
 
-      final targetPath = p.join(coversDir.path, '$id-crop.jpg');
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final targetPath = p.join(coversDir.path, '$id-crop-$ts.jpg');
       final src = File(croppedPath);
       if (!await src.exists()) return null;
 
