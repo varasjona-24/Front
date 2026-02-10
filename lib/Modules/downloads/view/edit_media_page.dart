@@ -42,6 +42,7 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
   late final TextEditingController _thumbCtrl;
   late final TextEditingController _durationCtrl;
   String? _localThumbPath;
+  bool _thumbCleared = false;
 
   // ============================
   // 🔁 LIFECYCLE
@@ -61,6 +62,7 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
       text: widget.item.durationSeconds?.toString() ?? '',
     );
     _localThumbPath = widget.item.thumbnailLocalPath;
+    _thumbCleared = false;
   }
 
   @override
@@ -200,7 +202,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     final remote = _thumbCtrl.text.trim();
     final thumb = (local != null && local.isNotEmpty)
         ? local
-        : (remote.isNotEmpty ? remote : widget.item.effectiveThumbnail);
+        : (remote.isNotEmpty
+              ? remote
+              : (_thumbCleared ? null : widget.item.effectiveThumbnail));
 
     if (thumb != null && thumb.startsWith('http')) {
       return Image.network(
@@ -274,6 +278,7 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     setState(() {
       _localThumbPath = persisted;
       _thumbCtrl.text = '';
+      _thumbCleared = false;
     });
 
     if (prevLocal != null &&
@@ -328,6 +333,7 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     setState(() {
       _thumbCtrl.text = '';
       _localThumbPath = persisted;
+      _thumbCleared = false;
     });
 
     if (baseLocal != persisted) {
@@ -350,6 +356,7 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     setState(() {
       _localThumbPath = null;
       _thumbCtrl.text = '';
+      _thumbCleared = true;
     });
   }
 
@@ -371,6 +378,7 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     setState(() {
       _localThumbPath = null;
       _thumbCtrl.text = '';
+      _thumbCleared = true;
     });
   }
 
