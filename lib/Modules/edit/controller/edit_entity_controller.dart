@@ -212,11 +212,11 @@ class EditEntityController extends GetxController {
     if (thumbTouched) {
       final local = localThumbPath?.trim() ?? '';
       if (local.isNotEmpty) {
-        nextThumb = null;
+        nextThumb = '';
         nextLocal = local;
       } else {
-        nextThumb = null;
-        nextLocal = null;
+        nextThumb = '';
+        nextLocal = '';
       }
     }
 
