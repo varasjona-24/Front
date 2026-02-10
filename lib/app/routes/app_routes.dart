@@ -18,4 +18,5 @@ abstract class AppRoutes {
   static const sources = '/sources';
   static const settings = '/settings';
   static const editEntity = '/edit';
+  static const createEntity = '/create';
 }

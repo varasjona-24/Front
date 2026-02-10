@@ -63,6 +63,38 @@ class EditEntityArgs {
         topic = null;
 }
 
+enum CreateEntityType { playlist, topicPlaylist }
+
+class CreateEntityArgs {
+  final CreateEntityType type;
+  final String storageId;
+  final String? initialName;
+  final int? initialColorValue;
+
+  // topic playlist only
+  final String? topicId;
+  final String? parentId;
+  final int? depth;
+
+  const CreateEntityArgs.playlist({
+    required this.storageId,
+    this.initialName,
+  })  : type = CreateEntityType.playlist,
+        topicId = null,
+        parentId = null,
+        depth = null,
+        initialColorValue = null;
+
+  const CreateEntityArgs.topicPlaylist({
+    required this.storageId,
+    required this.topicId,
+    required this.depth,
+    this.parentId,
+    this.initialName,
+    this.initialColorValue,
+  }) : type = CreateEntityType.topicPlaylist;
+}
+
 class EditEntityController extends GetxController {
   final MediaRepository _repo = Get.find<MediaRepository>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
@@ -362,5 +394,45 @@ class EditEntityController extends GetxController {
     );
 
     return true;
+  }
+
+  Future<bool> createPlaylist({
+    required String name,
+    String? localThumbPath,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return false;
+    await _playlists.createPlaylist(
+      trimmed,
+      coverLocalPath: localThumbPath?.trim().isEmpty == true
+          ? null
+          : localThumbPath,
+    );
+    return true;
+  }
+
+  Future<bool> createTopicPlaylist({
+    required String topicId,
+    required String? parentId,
+    required int depth,
+    required String name,
+    String? localThumbPath,
+    int? colorValue,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return false;
+    final ok = await _sources.addTopicPlaylist(
+      topicId: topicId,
+      name: trimmed,
+      items: const [],
+      parentId: parentId,
+      depth: depth,
+      coverUrl: null,
+      coverLocalPath: localThumbPath?.trim().isEmpty == true
+          ? null
+          : localThumbPath,
+      colorValue: colorValue,
+    );
+    return ok;
   }
 }

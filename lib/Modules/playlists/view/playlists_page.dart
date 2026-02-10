@@ -246,31 +246,10 @@ class PlaylistsPage extends GetView<PlaylistsController> {
   }
 
   Future<void> _createPlaylist(BuildContext context) async {
-    String name = '';
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Nueva lista'),
-        content: TextField(
-          onChanged: (value) => name = value,
-          decoration: const InputDecoration(hintText: 'Nombre de la lista'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Crear'),
-          ),
-        ],
-      ),
+    await Get.toNamed(
+      AppRoutes.createEntity,
+      arguments: const CreateEntityArgs.playlist(storageId: 'pl_create'),
     );
-
-    if (ok == true) {
-      await controller.createPlaylist(name);
-    }
   }
 
   Future<void> _openPlaylistActions(

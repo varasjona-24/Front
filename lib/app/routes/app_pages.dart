@@ -44,6 +44,7 @@ import 'package:flutter_listenfy/Modules/settings/view/settings_view.dart';
 // Edit
 import 'package:flutter_listenfy/Modules/edit/binding/edit_entity_binding.dart';
 import 'package:flutter_listenfy/Modules/edit/view/edit_entity_page.dart';
+import 'package:flutter_listenfy/Modules/edit/view/create_entity_page.dart';
 
 abstract class AppPages {
   static final routes = <GetPage>[
@@ -126,6 +127,11 @@ abstract class AppPages {
     GetPage(
       name: AppRoutes.editEntity,
       page: () => const EditEntityPage(),
+      binding: EditEntityBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.createEntity,
+      page: () => const CreateEntityPage(),
       binding: EditEntityBinding(),
     ),
 

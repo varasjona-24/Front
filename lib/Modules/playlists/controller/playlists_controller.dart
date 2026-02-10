@@ -95,7 +95,10 @@ class PlaylistsController extends GetxController {
     return null;
   }
 
-  Future<void> createPlaylist(String name) async {
+  Future<void> createPlaylist(
+    String name, {
+    String? coverLocalPath,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -106,6 +109,9 @@ class PlaylistsController extends GetxController {
       itemIds: const [],
       createdAt: now,
       updatedAt: now,
+      coverLocalPath: coverLocalPath?.trim().isEmpty == true
+          ? null
+          : coverLocalPath,
     );
     await _store.upsert(playlist);
     await load();
