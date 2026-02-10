@@ -1,6 +1,11 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../app/data/repo/media_repository.dart';
 import '../controller/artists_controller.dart';
@@ -25,6 +30,7 @@ class _EditArtistPageState extends State<EditArtistPage> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _thumbCtrl;
   String? _localThumbPath;
+  bool _thumbCleared = false;
 
   @override
   void initState() {
@@ -37,6 +43,7 @@ class _EditArtistPageState extends State<EditArtistPage> {
     _nameCtrl = TextEditingController(text: widget.artist.name);
     _thumbCtrl = TextEditingController(text: widget.artist.thumbnail ?? '');
     _localThumbPath = widget.artist.thumbnailLocalPath;
+    _thumbCleared = false;
   }
 
   @override
@@ -61,16 +68,56 @@ class _EditArtistPageState extends State<EditArtistPage> {
     final path = file?.path;
     if (path == null || path.trim().isEmpty) return;
 
+    final prevLocal = _localThumbPath;
+    final cropped = await _cropToSquare(path);
+    if (cropped == null || cropped.trim().isEmpty) return;
+
+    final persisted = await _persistCroppedThumb(cropped);
+    if (!mounted || persisted == null || persisted.trim().isEmpty) return;
+
     setState(() {
-      _localThumbPath = path; // preview local
+      _localThumbPath = persisted; // preview local
       _thumbCtrl.text = ''; // limpia remoto
+      _thumbCleared = false;
     });
+
+    if (prevLocal != null &&
+        prevLocal.trim().isNotEmpty &&
+        prevLocal.trim() != persisted.trim()) {
+      try {
+        final f = File(prevLocal.trim());
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
   }
 
   void _clearThumbnail() {
     setState(() {
       _localThumbPath = null;
       _thumbCtrl.text = '';
+      _thumbCleared = true;
+    });
+  }
+
+  Future<void> _deleteCurrentThumbnail() async {
+    final paths = <String>{
+      if (_localThumbPath != null) _localThumbPath!.trim(),
+      if (widget.artist.thumbnailLocalPath != null)
+        widget.artist.thumbnailLocalPath!.trim(),
+    }..removeWhere((e) => e.isEmpty);
+
+    for (final pth in paths) {
+      try {
+        final f = File(pth);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _localThumbPath = null;
+      _thumbCtrl.text = '';
+      _thumbCleared = true;
     });
   }
 
@@ -81,26 +128,59 @@ class _EditArtistPageState extends State<EditArtistPage> {
     final pickedUrl = await showDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => ImageSearchDialog(
-        initialQuery: query,
-        onDownloadImage: (url) async {
-          if (url.trim().isEmpty) return null;
-          return await _repo.cacheThumbnailForItem(
-            itemId: widget.artist.key,
-            thumbnailUrl: url.trim(),
-          );
-        },
-      ),
+      builder: (_) => ImageSearchDialog(initialQuery: query),
     );
 
     final cleaned = (pickedUrl ?? '').trim();
     if (!mounted || cleaned.isEmpty) return;
 
-    // Actualizar UI con la URL remota
+    final prevLocal = _localThumbPath;
+
+    // 1) cachea remoto a archivo local base
+    String? baseLocal;
+    try {
+      baseLocal = await _repo.cacheThumbnailForItem(
+        itemId: '${widget.artist.key}-raw',
+        thumbnailUrl: cleaned,
+      );
+    } catch (_) {
+      baseLocal = null;
+    }
+    if (!mounted || baseLocal == null || baseLocal.trim().isEmpty) return;
+
+    // 2) recorta 1:1
+    final cropped = await _cropToSquare(baseLocal);
+    if (!mounted || cropped == null || cropped.trim().isEmpty) {
+      try {
+        await File(baseLocal).delete();
+      } catch (_) {}
+      return;
+    }
+
+    // 3) persiste y limpia URL (solo local)
+    final persisted = await _persistCroppedThumb(cropped);
+    if (!mounted || persisted == null || persisted.trim().isEmpty) return;
+
+    if (baseLocal != persisted) {
+      try {
+        await File(baseLocal).delete();
+      } catch (_) {}
+    }
+
     setState(() {
-      _thumbCtrl.text = cleaned; // URL remota
-      _localThumbPath = null; // será descargado si se guarda
+      _thumbCtrl.text = ''; // limpia remoto
+      _localThumbPath = persisted;
+      _thumbCleared = false;
     });
+
+    if (prevLocal != null &&
+        prevLocal.trim().isNotEmpty &&
+        prevLocal.trim() != persisted.trim()) {
+      try {
+        final f = File(prevLocal.trim());
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
   }
 
   Future<void> _save() async {
@@ -115,15 +195,21 @@ class _EditArtistPageState extends State<EditArtistPage> {
     }
 
     final remote = _thumbCtrl.text.trim();
-    final useRemote = remote.isNotEmpty;
+    final local = _localThumbPath?.trim() ?? '';
+    final hasLocal = local.isNotEmpty;
+    final useRemote = remote.isNotEmpty && !hasLocal;
 
-    // Si eligieron remoto, cachea aquí (persistencia real)
+    // Si eligieron remoto (fallback), cachea aquí
     String? cached;
     if (useRemote) {
-      cached = await _repo.cacheThumbnailForItem(
-        itemId: widget.artist.key,
-        thumbnailUrl: remote,
-      );
+      try {
+        cached = await _repo.cacheThumbnailForItem(
+          itemId: widget.artist.key,
+          thumbnailUrl: remote,
+        );
+      } catch (_) {
+        cached = null;
+      }
     }
 
     await _controller.updateArtist(
@@ -132,7 +218,7 @@ class _EditArtistPageState extends State<EditArtistPage> {
       thumbnail: useRemote ? remote : null,
       thumbnailLocalPath: useRemote
           ? (cached ?? _localThumbPath)
-          : _localThumbPath,
+          : (hasLocal ? local : null),
     );
 
     if (mounted) Get.back(result: true);
@@ -142,7 +228,10 @@ class _EditArtistPageState extends State<EditArtistPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final remote = _thumbCtrl.text.trim();
-    final thumb = _localThumbPath ?? (remote.isNotEmpty ? remote : null);
+    final thumb = _localThumbPath ??
+        (remote.isNotEmpty
+            ? remote
+            : (_thumbCleared ? null : widget.artist.thumbnail));
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -232,6 +321,15 @@ class _EditArtistPageState extends State<EditArtistPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _deleteCurrentThumbnail,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Borrar portada actual'),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _thumbCtrl,
@@ -250,5 +348,57 @@ class _EditArtistPageState extends State<EditArtistPage> {
         ),
       ),
     );
+  }
+
+  Future<String?> _cropToSquare(String sourcePath) async {
+    try {
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: sourcePath,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 92,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Recortar',
+            lockAspectRatio: true,
+            hideBottomControls: true,
+          ),
+          IOSUiSettings(
+            title: 'Recortar',
+            aspectRatioLockEnabled: true,
+          ),
+        ],
+      );
+      return cropped?.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _persistCroppedThumb(String croppedPath) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final coversDir = Directory(p.join(appDir.path, 'downloads', 'covers'));
+      if (!await coversDir.exists()) {
+        await coversDir.create(recursive: true);
+      }
+
+      final targetPath =
+          p.join(coversDir.path, '${widget.artist.key}-crop.jpg');
+      final src = File(croppedPath);
+      if (!await src.exists()) return null;
+
+      final out = await src.copy(targetPath);
+
+      if (croppedPath != targetPath) {
+        try {
+          await src.delete();
+        } catch (_) {}
+      }
+
+      return out.path;
+    } catch (_) {
+      return null;
+    }
   }
 }

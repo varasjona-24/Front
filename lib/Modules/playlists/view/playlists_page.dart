@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'playlist_detail_page.dart';
 
 import '../../../app/data/repo/media_repository.dart';
@@ -459,7 +462,72 @@ class PlaylistsPage extends GetView<PlaylistsController> {
           ? res.files.first
           : null;
       if (file?.path == null) return;
-      localPath = file!.path!;
+      final prevLocal = localPath;
+
+      final cropped = await _cropToSquare(file!.path!);
+      if (cropped == null || cropped.trim().isEmpty) return;
+
+      final persisted = await _persistCroppedCover(playlist.id, cropped);
+      if (persisted == null || persisted.trim().isEmpty) return;
+
+      localPath = persisted;
+      urlCtrl.text = '';
+
+      if (prevLocal != null &&
+          prevLocal.trim().isNotEmpty &&
+          prevLocal.trim() != persisted.trim()) {
+        await _deleteFile(prevLocal);
+      }
+    }
+
+    Future<void> pickWeb() async {
+      final pickedUrl = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => ImageSearchDialog(initialQuery: playlist.name),
+      );
+      final cleaned = (pickedUrl ?? '').trim();
+      if (cleaned.isEmpty) return;
+
+      final prevLocal = localPath;
+
+      String? baseLocal;
+      try {
+        baseLocal = await repo.cacheThumbnailForItem(
+          itemId: '${playlist.id}-raw',
+          thumbnailUrl: cleaned,
+        );
+      } catch (_) {
+        baseLocal = null;
+      }
+      if (baseLocal == null || baseLocal.trim().isEmpty) return;
+
+      final cropped = await _cropToSquare(baseLocal);
+      if (cropped == null || cropped.trim().isEmpty) {
+        await _deleteFile(baseLocal);
+        return;
+      }
+
+      final persisted = await _persistCroppedCover(playlist.id, cropped);
+      if (persisted == null || persisted.trim().isEmpty) return;
+
+      if (baseLocal != persisted) {
+        await _deleteFile(baseLocal);
+      }
+
+      localPath = persisted;
+      urlCtrl.text = '';
+
+      if (prevLocal != null &&
+          prevLocal.trim().isNotEmpty &&
+          prevLocal.trim() != persisted.trim()) {
+        await _deleteFile(prevLocal);
+      }
+    }
+
+    Future<void> deleteCurrentCover() async {
+      await _deleteFile(localPath);
+      localPath = null;
       urlCtrl.text = '';
     }
 
@@ -477,25 +545,7 @@ class PlaylistsPage extends GetView<PlaylistsController> {
                 labelText: 'Imagen web seleccionada',
               ),
               onTap: () async {
-                await showDialog<void>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (_) => ImageSearchDialog(
-                    initialQuery: playlist.name,
-                    onDownloadImage: (url) async {
-                      if (url.trim().isEmpty) return null;
-                      return await repo.cacheThumbnailForItem(
-                        itemId: playlist.id,
-                        thumbnailUrl: url.trim(),
-                      );
-                    },
-                    onImageSelected: (url) async {
-                      if (url.trim().isEmpty) return;
-                      final cleaned = url.trim();
-                      urlCtrl.text = cleaned;
-                    },
-                  ),
-                );
+                await pickWeb();
               },
             ),
             const SizedBox(height: 10),
@@ -513,30 +563,21 @@ class PlaylistsPage extends GetView<PlaylistsController> {
                 const SizedBox(width: 8),
                 OutlinedButton.icon(
                   onPressed: () async {
-                    await showDialog<void>(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (_) => ImageSearchDialog(
-                        initialQuery: playlist.name,
-                        onDownloadImage: (url) async {
-                          if (url.trim().isEmpty) return null;
-                          return await repo.cacheThumbnailForItem(
-                            itemId: playlist.id,
-                            thumbnailUrl: url.trim(),
-                          );
-                        },
-                        onImageSelected: (url) async {
-                          if (url.trim().isEmpty) return;
-                          final cleaned = url.trim();
-                          urlCtrl.text = cleaned;
-                        },
-                      ),
-                    );
+                    await pickWeb();
                   },
                   icon: const Icon(Icons.public_rounded),
                   label: const Text('Buscar'),
                 ),
               ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: deleteCurrentCover,
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: const Text('Borrar portada actual'),
+              ),
             ),
           ],
         ),
@@ -562,10 +603,11 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     }
 
     final url = urlCtrl.text.trim();
+    final hasLocal = localPath?.trim().isNotEmpty == true;
     await controller.updateCover(
       playlist.id,
-      coverUrl: url.isNotEmpty ? url : null,
-      coverLocalPath: url.isNotEmpty ? null : localPath,
+      coverUrl: hasLocal ? null : (url.isNotEmpty ? url : null),
+      coverLocalPath: hasLocal ? localPath : null,
     );
     urlCtrl.dispose();
   }
@@ -591,6 +633,66 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     if (ok == true) {
       await controller.deletePlaylist(playlist.id);
     }
+  }
+
+  Future<String?> _cropToSquare(String sourcePath) async {
+    try {
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: sourcePath,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 92,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Recortar',
+            lockAspectRatio: true,
+            hideBottomControls: true,
+          ),
+          IOSUiSettings(
+            title: 'Recortar',
+            aspectRatioLockEnabled: true,
+          ),
+        ],
+      );
+      return cropped?.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _persistCroppedCover(String id, String croppedPath) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final coversDir = Directory(p.join(appDir.path, 'downloads', 'covers'));
+      if (!await coversDir.exists()) {
+        await coversDir.create(recursive: true);
+      }
+
+      final targetPath = p.join(coversDir.path, '$id-crop.jpg');
+      final src = File(croppedPath);
+      if (!await src.exists()) return null;
+
+      final out = await src.copy(targetPath);
+
+      if (croppedPath != targetPath) {
+        try {
+          await src.delete();
+        } catch (_) {}
+      }
+
+      return out.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _deleteFile(String? path) async {
+    final pth = path?.trim();
+    if (pth == null || pth.isEmpty) return;
+    try {
+      final f = File(pth);
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
   }
 }
 
