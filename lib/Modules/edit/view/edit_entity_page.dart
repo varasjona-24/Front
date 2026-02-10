@@ -155,10 +155,12 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _thumbTouched = true;
       _thumbCleared = false;
     });
+    _evictFileImage(persisted);
 
     if (prevLocal != null &&
         prevLocal.trim().isNotEmpty &&
         prevLocal.trim() != persisted.trim()) {
+      _evictFileImage(prevLocal.trim());
       await _controller.deleteFile(prevLocal);
     }
   }
@@ -215,10 +217,12 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _thumbTouched = true;
       _thumbCleared = false;
     });
+    _evictFileImage(persisted);
 
     if (prevLocal != null &&
         prevLocal.trim().isNotEmpty &&
         prevLocal.trim() != persisted.trim()) {
+      _evictFileImage(prevLocal.trim());
       await _controller.deleteFile(prevLocal);
     }
   }
@@ -239,6 +243,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
     }..removeWhere((e) => e.isEmpty);
 
     for (final pth in paths) {
+      _evictFileImage(pth);
       await _controller.deleteFile(pth);
     }
 
@@ -325,6 +330,14 @@ class _EditEntityPageState extends State<EditEntityPage> {
         color: theme.colorScheme.onSurfaceVariant,
       ),
     );
+  }
+
+  void _evictFileImage(String path) {
+    try {
+      final file = File(path);
+      if (!file.existsSync()) return;
+      FileImage(file).evict();
+    } catch (_) {}
   }
 
   @override

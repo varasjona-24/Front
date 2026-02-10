@@ -29,12 +29,6 @@ class EditEntityBinding extends Bindings {
     if (!Get.isRegistered<ArtistStore>()) {
       Get.put(ArtistStore(Get.find<GetStorage>()), permanent: true);
     }
-    if (!Get.isRegistered<ArtistsController>()) {
-      Get.put(ArtistsController());
-    }
-    if (!Get.isRegistered<PlaylistsController>()) {
-      Get.put(PlaylistsController());
-    }
     if (!Get.isRegistered<SourceThemePillStore>()) {
       Get.put(SourceThemePillStore(Get.find<GetStorage>()), permanent: true);
     }
@@ -49,6 +43,12 @@ class EditEntityBinding extends Bindings {
     }
     if (!Get.isRegistered<PlaylistStore>()) {
       Get.put(PlaylistStore(Get.find<GetStorage>()), permanent: true);
+    }
+    if (!Get.isRegistered<ArtistsController>()) {
+      Get.put(ArtistsController());
+    }
+    if (!Get.isRegistered<PlaylistsController>()) {
+      Get.put(PlaylistsController());
     }
     if (!Get.isRegistered<SourcesController>()) {
       Get.put(SourcesController());
