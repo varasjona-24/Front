@@ -257,12 +257,17 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
   ImageProvider? _resolveCover(Playlist? playlist, List<MediaItem> items) {
     if (playlist != null) {
       final local = playlist.coverLocalPath?.trim();
-      if (local != null && local.isNotEmpty) {
+      if (local != null &&
+          local.isNotEmpty &&
+          File(local).existsSync()) {
         return FileImage(File(local));
       }
       final url = playlist.coverUrl?.trim();
       if (url != null && url.isNotEmpty) {
         return NetworkImage(url);
+      }
+      if (playlist.coverCleared) {
+        return null;
       }
     }
     final thumb = items.isNotEmpty ? items.first.effectiveThumbnail : null;

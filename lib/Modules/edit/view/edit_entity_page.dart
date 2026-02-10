@@ -9,6 +9,8 @@ import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/controllers/navigation_controller.dart';
 import '../../artists/controller/artists_controller.dart';
 import '../../playlists/domain/playlist.dart';
+import '../../sources/domain/source_theme_topic.dart';
+import '../../sources/ui/source_color_picker_field.dart';
 import '../controller/edit_entity_controller.dart';
 import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
 
@@ -32,10 +34,12 @@ class _EditEntityPageState extends State<EditEntityPage> {
   String? _remoteThumbUrl;
   bool _thumbTouched = false;
   bool _thumbCleared = false;
+  int? _colorValue;
 
   MediaItem? get _media => _args.media;
   ArtistGroup? get _artist => _args.artist;
   Playlist? get _playlist => _args.playlist;
+  SourceThemeTopic? get _topic => _args.topic;
 
   @override
   void initState() {
@@ -59,6 +63,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _thumbCtrl = TextEditingController(text: item.thumbnail ?? '');
       _localThumbPath = item.thumbnailLocalPath;
       _remoteThumbUrl = item.thumbnail;
+      _colorValue = null;
     } else if (_args.type == EditEntityType.artist) {
       final artist = _artist!;
       _titleCtrl = TextEditingController(text: artist.name);
@@ -67,14 +72,28 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _thumbCtrl = TextEditingController(text: artist.thumbnail ?? '');
       _localThumbPath = artist.thumbnailLocalPath;
       _remoteThumbUrl = artist.thumbnail;
+      _colorValue = null;
     } else {
-      final playlist = _playlist!;
-      _titleCtrl = TextEditingController(text: playlist.name);
-      _subtitleCtrl = TextEditingController(text: '');
-      _durationCtrl = TextEditingController(text: '');
-      _thumbCtrl = TextEditingController(text: playlist.coverUrl ?? '');
-      _localThumbPath = playlist.coverLocalPath;
-      _remoteThumbUrl = playlist.coverUrl;
+      if (_args.type == EditEntityType.playlist) {
+        final playlist = _playlist!;
+        _titleCtrl = TextEditingController(text: playlist.name);
+        _subtitleCtrl = TextEditingController(text: '');
+        _durationCtrl = TextEditingController(text: '');
+        _thumbCtrl = TextEditingController(text: playlist.coverUrl ?? '');
+        _localThumbPath = playlist.coverLocalPath;
+        _remoteThumbUrl = playlist.coverUrl;
+        _thumbCleared = playlist.coverCleared;
+        _colorValue = null;
+      } else {
+        final topic = _topic!;
+        _titleCtrl = TextEditingController(text: topic.title);
+        _subtitleCtrl = TextEditingController(text: '');
+        _durationCtrl = TextEditingController(text: '');
+        _thumbCtrl = TextEditingController(text: topic.coverUrl ?? '');
+        _localThumbPath = topic.coverLocalPath;
+        _remoteThumbUrl = topic.coverUrl;
+        _colorValue = topic.colorValue;
+      }
     }
   }
 
@@ -95,16 +114,19 @@ class _EditEntityPageState extends State<EditEntityPage> {
   String _entityId() {
     if (_args.type == EditEntityType.media) return _media!.id;
     if (_args.type == EditEntityType.artist) return _artist!.key;
-    return _playlist!.id;
+    if (_args.type == EditEntityType.playlist) return _playlist!.id;
+    return _topic!.id;
   }
 
   String _entityTitle() {
     if (_args.type == EditEntityType.media) return 'Editar metadatos';
     if (_args.type == EditEntityType.artist) return 'Editar artista';
-    return 'Editar playlist';
+    if (_args.type == EditEntityType.playlist) return 'Editar playlist';
+    return 'Editar temática';
   }
 
   bool get _isMedia => _args.type == EditEntityType.media;
+  bool get _isTopic => _args.type == EditEntityType.topic;
 
   Future<void> _pickLocalThumbnail() async {
     final res = await FilePicker.platform.pickFiles(
@@ -247,12 +269,20 @@ class _EditEntityPageState extends State<EditEntityPage> {
                 thumbTouched: _thumbTouched,
                 localThumbPath: _localThumbPath,
               )
-            : await _controller.savePlaylist(
-                playlist: _playlist!,
-                name: _titleCtrl.text,
-                thumbTouched: _thumbTouched,
-                localThumbPath: _localThumbPath,
-              ));
+            : (_args.type == EditEntityType.playlist
+                ? await _controller.savePlaylist(
+                    playlist: _playlist!,
+                    name: _titleCtrl.text,
+                    thumbTouched: _thumbTouched,
+                    localThumbPath: _localThumbPath,
+                  )
+                : await _controller.saveTopic(
+                    topic: _topic!,
+                    name: _titleCtrl.text,
+                    thumbTouched: _thumbTouched,
+                    localThumbPath: _localThumbPath,
+                    colorValue: _colorValue,
+                  )));
 
     if (ok && mounted) {
       Get.back(result: true);
@@ -404,7 +434,9 @@ class _EditEntityPageState extends State<EditEntityPage> {
                         prefixIcon: Icon(
                           _args.type == EditEntityType.media
                               ? Icons.music_note_rounded
-                              : Icons.person_rounded,
+                              : (_args.type == EditEntityType.artist
+                                    ? Icons.person_rounded
+                                    : Icons.folder_rounded),
                         ),
                       ),
                     ),
@@ -424,7 +456,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              'Portada',
+              _isTopic ? 'Portada y color' : 'Portada',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -489,6 +521,17 @@ class _EditEntityPageState extends State<EditEntityPage> {
                         label: const Text('Borrar portada actual'),
                       ),
                     ),
+                    if (_isTopic) ...[
+                      const SizedBox(height: 12),
+                      SourceColorPickerField(
+                        color: _colorValue != null
+                            ? Color(_colorValue!)
+                            : theme.colorScheme.primary,
+                        onChanged: (c) => setState(() {
+                          _colorValue = c.value;
+                        }),
+                      ),
+                    ],
                   ],
                 ),
               ),

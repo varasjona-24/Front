@@ -128,6 +128,7 @@ class PlaylistsController extends GetxController {
     String id, {
     String? coverUrl,
     String? coverLocalPath,
+    bool? coverCleared,
   }) async {
     final current = getPlaylistById(id);
     if (current == null) return;
@@ -136,6 +137,7 @@ class PlaylistsController extends GetxController {
       coverLocalPath: coverLocalPath?.trim().isEmpty == true
           ? null
           : coverLocalPath,
+      coverCleared: coverCleared ?? current.coverCleared,
       updatedAt: DateTime.now().millisecondsSinceEpoch,
     );
     await _store.upsert(updated);

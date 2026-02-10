@@ -14,29 +14,40 @@ import '../../home/controller/home_controller.dart';
 import '../../playlists/controller/playlists_controller.dart';
 import '../../playlists/domain/playlist.dart';
 import '../../sources/controller/sources_controller.dart';
+import '../../sources/domain/source_theme_topic.dart';
 
-enum EditEntityType { media, artist, playlist }
+enum EditEntityType { media, artist, playlist, topic }
 
 class EditEntityArgs {
   final EditEntityType type;
   final MediaItem? media;
   final ArtistGroup? artist;
   final Playlist? playlist;
+  final SourceThemeTopic? topic;
 
   const EditEntityArgs.media(this.media)
       : type = EditEntityType.media,
         artist = null,
-        playlist = null;
+        playlist = null,
+        topic = null;
 
   const EditEntityArgs.artist(this.artist)
       : type = EditEntityType.artist,
         media = null,
-        playlist = null;
+        playlist = null,
+        topic = null;
 
   const EditEntityArgs.playlist(this.playlist)
       : type = EditEntityType.playlist,
         media = null,
-        artist = null;
+        artist = null,
+        topic = null;
+
+  const EditEntityArgs.topic(this.topic)
+      : type = EditEntityType.topic,
+        media = null,
+        artist = null,
+        playlist = null;
 }
 
 class EditEntityController extends GetxController {
@@ -44,6 +55,7 @@ class EditEntityController extends GetxController {
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
   final ArtistsController _artists = Get.find<ArtistsController>();
   final PlaylistsController _playlists = Get.find<PlaylistsController>();
+  final SourcesController _sources = Get.find<SourcesController>();
 
   Future<String?> cacheRemoteToLocal({
     required String id,
@@ -252,12 +264,51 @@ class EditEntityController extends GetxController {
 
     if (thumbTouched) {
       final local = localThumbPath?.trim() ?? '';
+      final cleared = local.isEmpty;
       await _playlists.updateCover(
         playlist.id,
         coverUrl: null,
         coverLocalPath: local.isNotEmpty ? local : null,
+        coverCleared: cleared,
       );
     }
+
+    return true;
+  }
+
+  Future<bool> saveTopic({
+    required SourceThemeTopic topic,
+    required String name,
+    required bool thumbTouched,
+    required String? localThumbPath,
+    required int? colorValue,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      Get.snackbar(
+        'Tematica',
+        'El nombre no puede estar vacio',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    String? coverUrl = topic.coverUrl;
+    String? coverLocal = topic.coverLocalPath;
+    if (thumbTouched) {
+      final local = localThumbPath?.trim() ?? '';
+      coverUrl = null;
+      coverLocal = local.isNotEmpty ? local : null;
+    }
+
+    await _sources.updateTopic(
+      topic.copyWith(
+        title: trimmed,
+        coverUrl: coverUrl?.trim().isEmpty == true ? null : coverUrl,
+        coverLocalPath: coverLocal?.trim().isEmpty == true ? null : coverLocal,
+        colorValue: colorValue,
+      ),
+    );
 
     return true;
   }

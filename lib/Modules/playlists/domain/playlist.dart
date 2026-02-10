@@ -7,6 +7,7 @@ class Playlist {
     required this.updatedAt,
     this.coverUrl,
     this.coverLocalPath,
+    this.coverCleared = false,
   });
 
   final String id;
@@ -16,6 +17,7 @@ class Playlist {
   final int updatedAt;
   final String? coverUrl;
   final String? coverLocalPath;
+  final bool coverCleared;
 
   Playlist copyWith({
     String? id,
@@ -25,6 +27,7 @@ class Playlist {
     int? updatedAt,
     String? coverUrl,
     String? coverLocalPath,
+    bool? coverCleared,
   }) {
     return Playlist(
       id: id ?? this.id,
@@ -34,6 +37,7 @@ class Playlist {
       updatedAt: updatedAt ?? this.updatedAt,
       coverUrl: coverUrl ?? this.coverUrl,
       coverLocalPath: coverLocalPath ?? this.coverLocalPath,
+      coverCleared: coverCleared ?? this.coverCleared,
     );
   }
 
@@ -47,6 +51,7 @@ class Playlist {
       updatedAt: (json['updatedAt'] as int?) ?? 0,
       coverUrl: (json['coverUrl'] as String?)?.trim(),
       coverLocalPath: (json['coverLocalPath'] as String?)?.trim(),
+      coverCleared: (json['coverCleared'] as bool?) ?? false,
     );
   }
 
@@ -58,5 +63,6 @@ class Playlist {
         'updatedAt': updatedAt,
         'coverUrl': coverUrl,
         'coverLocalPath': coverLocalPath,
+        'coverCleared': coverCleared,
       };
 }

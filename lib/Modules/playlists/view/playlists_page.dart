@@ -279,13 +279,18 @@ class PlaylistsPage extends GetView<PlaylistsController> {
   ) async {
     final theme = Theme.of(context);
     final items = controller.resolvePlaylistItems(playlist);
-    final thumb = playlist.coverLocalPath?.trim().isNotEmpty == true
-        ? playlist.coverLocalPath
+    final localPath = playlist.coverLocalPath?.trim();
+    final localExists =
+        localPath != null && localPath.isNotEmpty && File(localPath).existsSync();
+    final thumb = localExists
+        ? localPath
         : (playlist.coverUrl?.trim().isNotEmpty == true
               ? playlist.coverUrl
-              : items.isNotEmpty
-              ? items.first.effectiveThumbnail
-              : null);
+              : (playlist.coverCleared
+                    ? null
+                    : (items.isNotEmpty
+                          ? items.first.effectiveThumbnail
+                          : null)));
 
     ImageProvider? provider;
     if (thumb != null && thumb.isNotEmpty) {
@@ -601,10 +606,12 @@ class PlaylistsPage extends GetView<PlaylistsController> {
 
     final url = urlCtrl.text.trim();
     final hasLocal = localPath?.trim().isNotEmpty == true;
+    final cleared = !hasLocal && url.isEmpty;
     await controller.updateCover(
       playlist.id,
       coverUrl: hasLocal ? null : (url.isNotEmpty ? url : null),
       coverLocalPath: hasLocal ? localPath : null,
+      coverCleared: cleared,
     );
     urlCtrl.dispose();
   }
@@ -791,13 +798,18 @@ class _PlaylistTile extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final items = resolveItems(playlist);
-    final thumb = playlist.coverLocalPath?.trim().isNotEmpty == true
-        ? playlist.coverLocalPath
+    final localPath = playlist.coverLocalPath?.trim();
+    final localExists =
+        localPath != null && localPath.isNotEmpty && File(localPath).existsSync();
+    final thumb = localExists
+        ? localPath
         : (playlist.coverUrl?.trim().isNotEmpty == true
               ? playlist.coverUrl
-              : items.isNotEmpty
-              ? items.first.effectiveThumbnail
-              : null);
+              : (playlist.coverCleared
+                    ? null
+                    : (items.isNotEmpty
+                          ? items.first.effectiveThumbnail
+                          : null)));
 
     ImageProvider? provider;
     if (thumb != null && thumb.isNotEmpty) {

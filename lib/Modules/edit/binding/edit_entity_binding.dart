@@ -7,6 +7,11 @@ import '../../artists/controller/artists_controller.dart';
 import '../../artists/data/artist_store.dart';
 import '../../playlists/controller/playlists_controller.dart';
 import '../../playlists/data/playlist_store.dart';
+import '../../sources/controller/sources_controller.dart';
+import '../../sources/data/source_theme_pill_store.dart';
+import '../../sources/data/source_theme_topic_store.dart';
+import '../../sources/data/source_theme_topic_playlist_store.dart';
+import '../../playlists/data/playlist_store.dart';
 import '../controller/edit_entity_controller.dart';
 
 class EditEntityBinding extends Bindings {
@@ -24,14 +29,29 @@ class EditEntityBinding extends Bindings {
     if (!Get.isRegistered<ArtistStore>()) {
       Get.put(ArtistStore(Get.find<GetStorage>()), permanent: true);
     }
-    if (!Get.isRegistered<PlaylistStore>()) {
-      Get.put(PlaylistStore(Get.find<GetStorage>()), permanent: true);
-    }
     if (!Get.isRegistered<ArtistsController>()) {
       Get.put(ArtistsController());
     }
     if (!Get.isRegistered<PlaylistsController>()) {
       Get.put(PlaylistsController());
+    }
+    if (!Get.isRegistered<SourceThemePillStore>()) {
+      Get.put(SourceThemePillStore(Get.find<GetStorage>()), permanent: true);
+    }
+    if (!Get.isRegistered<SourceThemeTopicStore>()) {
+      Get.put(SourceThemeTopicStore(Get.find<GetStorage>()), permanent: true);
+    }
+    if (!Get.isRegistered<SourceThemeTopicPlaylistStore>()) {
+      Get.put(
+        SourceThemeTopicPlaylistStore(Get.find<GetStorage>()),
+        permanent: true,
+      );
+    }
+    if (!Get.isRegistered<PlaylistStore>()) {
+      Get.put(PlaylistStore(Get.find<GetStorage>()), permanent: true);
+    }
+    if (!Get.isRegistered<SourcesController>()) {
+      Get.put(SourcesController());
     }
 
     Get.lazyPut<EditEntityController>(() => EditEntityController());
