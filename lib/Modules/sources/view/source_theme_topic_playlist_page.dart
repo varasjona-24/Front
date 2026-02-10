@@ -9,7 +9,9 @@ import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
+import '../../../app/routes/app_routes.dart';
 import '../../home/controller/home_controller.dart';
+import '../../edit/controller/edit_entity_controller.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
@@ -594,172 +596,9 @@ class _SourceThemeTopicPlaylistPageState
   // ✏️ EDIT PLAYLIST DIALOG (UI)
   // ============================
   Future<void> _openEditPlaylist(SourceThemeTopicPlaylist playlist) async {
-    String name = playlist.name;
-    String? coverUrl = playlist.coverUrl;
-    String? coverLocal = playlist.coverLocalPath;
-    int? colorValue = playlist.colorValue;
-
-    Color draftColor = colorValue != null
-        ? Color(colorValue!)
-        : Theme.of(context).colorScheme.primary;
-
-    final controller = TextEditingController(text: name);
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Editar lista'),
-          content: StatefulBuilder(
-            builder: (ctx2, setState) {
-              Future<void> pickWebCover() async {
-                final picked = await showDialog<String>(
-                  context: ctx2,
-                  barrierDismissible: true,
-                  builder: (_) => ImageSearchDialog(
-                    initialQuery: name,
-                    onDownloadImage: (url) async {
-                      if (url.trim().isEmpty) return null;
-                      return await _repo.cacheThumbnailForItem(
-                        itemId: playlist.id,
-                        thumbnailUrl: url.trim(),
-                      );
-                    },
-                  ),
-                );
-
-                final cleaned = (picked ?? '').trim();
-                if (cleaned.isEmpty) return;
-
-                // Preview inmediato
-                setState(() {
-                  coverUrl = cleaned;
-                  coverLocal = null;
-                });
-              }
-
-              Future<void> pickLocalCover() async {
-                final res = await FilePicker.platform.pickFiles(
-                  type: FileType.custom,
-                  allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp'],
-                );
-                final file = (res != null && res.files.isNotEmpty)
-                    ? res.files.first
-                    : null;
-                final path = file?.path?.trim();
-                if (path == null || path.isEmpty) return;
-
-                setState(() {
-                  coverLocal = path;
-                  coverUrl = null;
-                });
-              }
-
-              void clearCover() {
-                setState(() {
-                  coverUrl = null;
-                  coverLocal = null;
-                });
-              }
-
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    onChanged: (v) => name = v,
-                    decoration: const InputDecoration(hintText: 'Nombre'),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    readOnly: true,
-                    onTap: pickWebCover,
-                    decoration: const InputDecoration(
-                      hintText: 'Imagen web seleccionada',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SourceColorPickerField(
-                    color: colorValue != null ? Color(colorValue!) : draftColor,
-                    onChanged: (c) => setState(() {
-                      draftColor = c;
-                      colorValue = c.value;
-                    }),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: pickLocalCover,
-                          icon: const Icon(Icons.folder_open_rounded),
-                          label: const Text('Elegir imagen'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton.icon(
-                        onPressed: pickWebCover,
-                        icon: const Icon(Icons.public_rounded),
-                        label: const Text('Buscar'),
-                      ),
-                      const SizedBox(width: 8),
-                      OutlinedButton(
-                        onPressed: clearCover,
-                        child: const Text('Quitar'),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                Navigator.of(ctx).pop();
-
-                final trimmedName = name.trim();
-                final cleanedUrl = coverUrl?.trim();
-                final useUrl = (cleanedUrl != null && cleanedUrl.isNotEmpty);
-
-                // Persistencia real: si es web, cachea aquí
-                String? finalLocal = coverLocal?.trim();
-                String? finalUrl = useUrl ? cleanedUrl : null;
-
-                if (useUrl) {
-                  final cached = await _repo.cacheThumbnailForItem(
-                    itemId: playlist.id,
-                    thumbnailUrl: cleanedUrl!,
-                  );
-                  final cachedPath = cached?.trim();
-                  if (cachedPath != null && cachedPath.isNotEmpty) {
-                    finalLocal = cachedPath;
-                  }
-                }
-
-                await _sources.updateTopicPlaylist(
-                  playlist.copyWith(
-                    name: trimmedName,
-                    coverUrl: finalUrl,
-                    coverLocalPath:
-                        (finalLocal != null && finalLocal.isNotEmpty)
-                        ? finalLocal
-                        : null,
-                    colorValue: colorValue,
-                  ),
-                );
-              },
-              child: const Text('Guardar'),
-            ),
-          ],
-        );
-      },
+    await Get.toNamed(
+      AppRoutes.editEntity,
+      arguments: EditEntityArgs.topicPlaylist(playlist),
     );
-
-    controller.dispose();
   }
 }

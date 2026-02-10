@@ -15,8 +15,9 @@ import '../../playlists/controller/playlists_controller.dart';
 import '../../playlists/domain/playlist.dart';
 import '../../sources/controller/sources_controller.dart';
 import '../../sources/domain/source_theme_topic.dart';
+import '../../sources/domain/source_theme_topic_playlist.dart';
 
-enum EditEntityType { media, artist, playlist, topic }
+enum EditEntityType { media, artist, playlist, topic, topicPlaylist }
 
 class EditEntityArgs {
   final EditEntityType type;
@@ -24,30 +25,42 @@ class EditEntityArgs {
   final ArtistGroup? artist;
   final Playlist? playlist;
   final SourceThemeTopic? topic;
+  final SourceThemeTopicPlaylist? topicPlaylist;
 
   const EditEntityArgs.media(this.media)
       : type = EditEntityType.media,
         artist = null,
         playlist = null,
-        topic = null;
+        topic = null,
+        topicPlaylist = null;
 
   const EditEntityArgs.artist(this.artist)
       : type = EditEntityType.artist,
         media = null,
         playlist = null,
-        topic = null;
+        topic = null,
+        topicPlaylist = null;
 
   const EditEntityArgs.playlist(this.playlist)
       : type = EditEntityType.playlist,
         media = null,
         artist = null,
-        topic = null;
+        topic = null,
+        topicPlaylist = null;
 
   const EditEntityArgs.topic(this.topic)
       : type = EditEntityType.topic,
         media = null,
         artist = null,
-        playlist = null;
+        playlist = null,
+        topicPlaylist = null;
+
+  const EditEntityArgs.topicPlaylist(this.topicPlaylist)
+      : type = EditEntityType.topicPlaylist,
+        media = null,
+        artist = null,
+        playlist = null,
+        topic = null;
 }
 
 class EditEntityController extends GetxController {
@@ -305,6 +318,43 @@ class EditEntityController extends GetxController {
     await _sources.updateTopic(
       topic.copyWith(
         title: trimmed,
+        coverUrl: coverUrl?.trim().isEmpty == true ? null : coverUrl,
+        coverLocalPath: coverLocal?.trim().isEmpty == true ? null : coverLocal,
+        colorValue: colorValue,
+      ),
+    );
+
+    return true;
+  }
+
+  Future<bool> saveTopicPlaylist({
+    required SourceThemeTopicPlaylist playlist,
+    required String name,
+    required bool thumbTouched,
+    required String? localThumbPath,
+    required int? colorValue,
+  }) async {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      Get.snackbar(
+        'Lista',
+        'El nombre no puede estar vacio',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    String? coverUrl = playlist.coverUrl;
+    String? coverLocal = playlist.coverLocalPath;
+    if (thumbTouched) {
+      final local = localThumbPath?.trim() ?? '';
+      coverUrl = null;
+      coverLocal = local.isNotEmpty ? local : null;
+    }
+
+    await _sources.updateTopicPlaylist(
+      playlist.copyWith(
+        name: trimmed,
         coverUrl: coverUrl?.trim().isEmpty == true ? null : coverUrl,
         coverLocalPath: coverLocal?.trim().isEmpty == true ? null : coverLocal,
         colorValue: colorValue,

@@ -10,6 +10,7 @@ import '../../../app/controllers/navigation_controller.dart';
 import '../../artists/controller/artists_controller.dart';
 import '../../playlists/domain/playlist.dart';
 import '../../sources/domain/source_theme_topic.dart';
+import '../../sources/domain/source_theme_topic_playlist.dart';
 import '../../sources/ui/source_color_picker_field.dart';
 import '../controller/edit_entity_controller.dart';
 import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
@@ -40,6 +41,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
   ArtistGroup? get _artist => _args.artist;
   Playlist? get _playlist => _args.playlist;
   SourceThemeTopic? get _topic => _args.topic;
+  SourceThemeTopicPlaylist? get _topicPlaylist => _args.topicPlaylist;
 
   @override
   void initState() {
@@ -84,7 +86,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         _remoteThumbUrl = playlist.coverUrl;
         _thumbCleared = playlist.coverCleared;
         _colorValue = null;
-      } else {
+      } else if (_args.type == EditEntityType.topic) {
         final topic = _topic!;
         _titleCtrl = TextEditingController(text: topic.title);
         _subtitleCtrl = TextEditingController(text: '');
@@ -93,6 +95,15 @@ class _EditEntityPageState extends State<EditEntityPage> {
         _localThumbPath = topic.coverLocalPath;
         _remoteThumbUrl = topic.coverUrl;
         _colorValue = topic.colorValue;
+      } else {
+        final pl = _topicPlaylist!;
+        _titleCtrl = TextEditingController(text: pl.name);
+        _subtitleCtrl = TextEditingController(text: '');
+        _durationCtrl = TextEditingController(text: '');
+        _thumbCtrl = TextEditingController(text: pl.coverUrl ?? '');
+        _localThumbPath = pl.coverLocalPath;
+        _remoteThumbUrl = pl.coverUrl;
+        _colorValue = pl.colorValue;
       }
     }
   }
@@ -115,18 +126,21 @@ class _EditEntityPageState extends State<EditEntityPage> {
     if (_args.type == EditEntityType.media) return _media!.id;
     if (_args.type == EditEntityType.artist) return _artist!.key;
     if (_args.type == EditEntityType.playlist) return _playlist!.id;
-    return _topic!.id;
+    if (_args.type == EditEntityType.topic) return _topic!.id;
+    return _topicPlaylist!.id;
   }
 
   String _entityTitle() {
     if (_args.type == EditEntityType.media) return 'Editar metadatos';
     if (_args.type == EditEntityType.artist) return 'Editar artista';
     if (_args.type == EditEntityType.playlist) return 'Editar playlist';
-    return 'Editar temática';
+    if (_args.type == EditEntityType.topic) return 'Editar temática';
+    return 'Editar lista';
   }
 
   bool get _isMedia => _args.type == EditEntityType.media;
   bool get _isTopic => _args.type == EditEntityType.topic;
+  bool get _isTopicPlaylist => _args.type == EditEntityType.topicPlaylist;
 
   Future<void> _pickLocalThumbnail() async {
     final res = await FilePicker.platform.pickFiles(
@@ -281,13 +295,21 @@ class _EditEntityPageState extends State<EditEntityPage> {
                     thumbTouched: _thumbTouched,
                     localThumbPath: _localThumbPath,
                   )
-                : await _controller.saveTopic(
-                    topic: _topic!,
-                    name: _titleCtrl.text,
-                    thumbTouched: _thumbTouched,
-                    localThumbPath: _localThumbPath,
-                    colorValue: _colorValue,
-                  )));
+                : (_args.type == EditEntityType.topic
+                    ? await _controller.saveTopic(
+                        topic: _topic!,
+                        name: _titleCtrl.text,
+                        thumbTouched: _thumbTouched,
+                        localThumbPath: _localThumbPath,
+                        colorValue: _colorValue,
+                      )
+                    : await _controller.saveTopicPlaylist(
+                        playlist: _topicPlaylist!,
+                        name: _titleCtrl.text,
+                        thumbTouched: _thumbTouched,
+                        localThumbPath: _localThumbPath,
+                        colorValue: _colorValue,
+                      ))));
 
     if (ok && mounted) {
       Get.back(result: true);
@@ -469,7 +491,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
             ),
             const SizedBox(height: 12),
             Text(
-              _isTopic ? 'Portada y color' : 'Portada',
+              (_isTopic || _isTopicPlaylist) ? 'Portada y color' : 'Portada',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -534,7 +556,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
                         label: const Text('Borrar portada actual'),
                       ),
                     ),
-                    if (_isTopic) ...[
+                    if (_isTopic || _isTopicPlaylist) ...[
                       const SizedBox(height: 12),
                       SourceColorPickerField(
                         color: _colorValue != null
