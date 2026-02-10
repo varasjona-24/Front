@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
+import 'package:image_cropper/image_cropper.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../app/models/media_item.dart';
 import '../../sources/domain/source_origin.dart';
@@ -108,10 +111,11 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     // ----------------------------
     final remoteThumb = _thumbCtrl.text.trim();
     final pickedLocalThumb = _localThumbPath?.trim() ?? '';
+    final hasLocal = pickedLocalThumb.isNotEmpty;
 
     // Si hay URL, la cacheamos a un archivo local antes de guardar
     String? cachedLocalFromRemote;
-    if (remoteThumb.isNotEmpty) {
+    if (!hasLocal && remoteThumb.isNotEmpty) {
       try {
         cachedLocalFromRemote = await _repo.cacheThumbnailForItem(
           itemId: widget.item.id,
@@ -126,7 +130,9 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     // - Si hay remote y cache funcionó -> usa cache
     // - Si hay remote pero cache falló -> queda vacío (y dependerá de internet)
     // - Si no hay remote -> usa el local escogido por file picker
-    final effectiveLocal = remoteThumb.isNotEmpty
+    final effectiveLocal = hasLocal
+        ? pickedLocalThumb
+        : remoteThumb.isNotEmpty
         ? ((cachedLocalFromRemote?.trim().isNotEmpty == true)
               ? cachedLocalFromRemote!.trim()
               : '')
@@ -144,11 +150,12 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
 
       // Si no cambió, null para no re-escribir
       // Si cambió:
+      // - con local -> limpia remote
       // - con remote -> guarda remote
-      // - sin remote -> guarda ''
+      // - sin nada -> guarda ''
       thumbnail: !thumbChanged
           ? null
-          : (remoteThumb.isNotEmpty ? remoteThumb : ''),
+          : (hasLocal ? '' : (remoteThumb.isNotEmpty ? remoteThumb : '')),
 
       // Si no cambió, null
       // Si cambió:
@@ -257,10 +264,26 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     final path = file?.path;
     if (path == null || path.trim().isEmpty) return;
 
+    final prevLocal = _localThumbPath;
+    final cropped = await _cropToSquare(path);
+    if (cropped == null || cropped.trim().isEmpty) return;
+
+    final persisted = await _persistCroppedThumb(cropped);
+    if (!mounted || persisted == null || persisted.trim().isEmpty) return;
+
     setState(() {
-      _localThumbPath = path;
+      _localThumbPath = persisted;
       _thumbCtrl.text = '';
     });
+
+    if (prevLocal != null &&
+        prevLocal.trim().isNotEmpty &&
+        prevLocal.trim() != persisted.trim()) {
+      try {
+        final f = File(prevLocal.trim());
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
   }
 
   Future<void> _searchWebThumbnail() async {
@@ -276,14 +299,75 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
     final cleaned = (pickedUrl ?? '').trim();
     if (!mounted || cleaned.isEmpty) return;
 
-    // PREVIEW inmediato (sin cachear aún)
+    final prevLocal = _localThumbPath;
+    // 1) cachea remoto a archivo local base
+    String? baseLocal;
+    try {
+      baseLocal = await _repo.cacheThumbnailForItem(
+        itemId: '${widget.item.id}-raw',
+        thumbnailUrl: cleaned,
+      );
+    } catch (_) {
+      baseLocal = null;
+    }
+    if (!mounted || baseLocal == null || baseLocal.trim().isEmpty) return;
+
+    // 2) recorta 1:1
+    final cropped = await _cropToSquare(baseLocal);
+    if (!mounted || cropped == null || cropped.trim().isEmpty) {
+      try {
+        await File(baseLocal).delete();
+      } catch (_) {}
+      return;
+    }
+
+    // 3) persiste y limpia URL (solo local)
+    final persisted = await _persistCroppedThumb(cropped);
+    if (!mounted || persisted == null || persisted.trim().isEmpty) return;
+
     setState(() {
-      _thumbCtrl.text = cleaned;
-      _localThumbPath = null;
+      _thumbCtrl.text = '';
+      _localThumbPath = persisted;
     });
+
+    if (baseLocal != persisted) {
+      try {
+        await File(baseLocal).delete();
+      } catch (_) {}
+    }
+
+    if (prevLocal != null &&
+        prevLocal.trim().isNotEmpty &&
+        prevLocal.trim() != persisted.trim()) {
+      try {
+        final f = File(prevLocal.trim());
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
   }
 
   void _clearThumbnail() {
+    setState(() {
+      _localThumbPath = null;
+      _thumbCtrl.text = '';
+    });
+  }
+
+  Future<void> _deleteCurrentThumbnail() async {
+    final paths = <String>{
+      if (_localThumbPath != null) _localThumbPath!.trim(),
+      if (widget.item.thumbnailLocalPath != null)
+        widget.item.thumbnailLocalPath!.trim(),
+    }..removeWhere((e) => e.isEmpty);
+
+    for (final pth in paths) {
+      try {
+        final f = File(pth);
+        if (await f.exists()) await f.delete();
+      } catch (_) {}
+    }
+
+    if (!mounted) return;
     setState(() {
       _localThumbPath = null;
       _thumbCtrl.text = '';
@@ -486,6 +570,15 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: _deleteCurrentThumbnail,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: const Text('Borrar portada actual'),
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     TextField(
                       controller: _durationCtrl,
@@ -510,5 +603,59 @@ class _EditMediaMetadataPageState extends State<EditMediaMetadataPage> {
         ),
       ),
     );
+  }
+
+  // ============================
+  // ✂️ CROP HELPERS
+  // ============================
+  Future<String?> _cropToSquare(String sourcePath) async {
+    try {
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: sourcePath,
+        aspectRatio: const CropAspectRatio(ratioX: 1, ratioY: 1),
+        compressFormat: ImageCompressFormat.jpg,
+        compressQuality: 92,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Recortar',
+            lockAspectRatio: true,
+            hideBottomControls: true,
+          ),
+          IOSUiSettings(
+            title: 'Recortar',
+            aspectRatioLockEnabled: true,
+          ),
+        ],
+      );
+      return cropped?.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _persistCroppedThumb(String croppedPath) async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final coversDir = Directory(p.join(appDir.path, 'downloads', 'covers'));
+      if (!await coversDir.exists()) {
+        await coversDir.create(recursive: true);
+      }
+
+      final targetPath = p.join(coversDir.path, '${widget.item.id}-crop.jpg');
+      final src = File(croppedPath);
+      if (!await src.exists()) return null;
+
+      final out = await src.copy(targetPath);
+
+      if (croppedPath != targetPath) {
+        try {
+          await src.delete();
+        } catch (_) {}
+      }
+
+      return out.path;
+    } catch (_) {
+      return null;
+    }
   }
 }
