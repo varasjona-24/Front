@@ -11,7 +11,7 @@ import '../../sources/controller/sources_controller.dart';
 import '../../sources/data/source_theme_pill_store.dart';
 import '../../sources/data/source_theme_topic_store.dart';
 import '../../sources/data/source_theme_topic_playlist_store.dart';
-import '../../playlists/data/playlist_store.dart';
+
 import '../controller/edit_entity_controller.dart';
 
 class EditEntityBinding extends Bindings {

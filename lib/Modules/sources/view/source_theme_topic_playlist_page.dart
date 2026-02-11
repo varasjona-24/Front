@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:get/get.dart';
 
 import '../../../app/controllers/media_actions_controller.dart';
-import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
-import '../../../app/ui/widgets/dialogs/image_search_dialog.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../home/controller/home_controller.dart';
 import '../../edit/controller/edit_entity_controller.dart';
@@ -16,7 +13,6 @@ import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic_playlist.dart';
-import '../ui/source_color_picker_field.dart';
 import '../ui/source_playlist_card.dart';
 import '../../../app/utils/format_bytes.dart';
 
@@ -47,7 +43,6 @@ class _SourceThemeTopicPlaylistPageState
   // ============================
   final SourcesController _sources = Get.find<SourcesController>();
   final MediaActionsController _actions = Get.find<MediaActionsController>();
-  final MediaRepository _repo = Get.find<MediaRepository>();
 
   String? _playlistSizeLabel;
 

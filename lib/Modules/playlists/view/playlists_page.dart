@@ -17,7 +17,7 @@ import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/models/media_item.dart';
-import '../../../app/routes/app_routes.dart';
+
 import '../../edit/controller/edit_entity_controller.dart';
 
 import '../../home/controller/home_controller.dart';
@@ -260,7 +260,9 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     final items = controller.resolvePlaylistItems(playlist);
     final localPath = playlist.coverLocalPath?.trim();
     final localExists =
-        localPath != null && localPath.isNotEmpty && File(localPath).existsSync();
+        localPath != null &&
+        localPath.isNotEmpty &&
+        File(localPath).existsSync();
     final thumb = localExists
         ? localPath
         : (playlist.coverUrl?.trim().isNotEmpty == true
@@ -631,10 +633,7 @@ class PlaylistsPage extends GetView<PlaylistsController> {
             lockAspectRatio: true,
             hideBottomControls: true,
           ),
-          IOSUiSettings(
-            title: 'Recortar',
-            aspectRatioLockEnabled: true,
-          ),
+          IOSUiSettings(title: 'Recortar', aspectRatioLockEnabled: true),
         ],
       );
       return cropped?.path;
@@ -779,7 +778,9 @@ class _PlaylistTile extends StatelessWidget {
     final items = resolveItems(playlist);
     final localPath = playlist.coverLocalPath?.trim();
     final localExists =
-        localPath != null && localPath.isNotEmpty && File(localPath).existsSync();
+        localPath != null &&
+        localPath.isNotEmpty &&
+        File(localPath).existsSync();
     final thumb = localExists
         ? localPath
         : (playlist.coverUrl?.trim().isNotEmpty == true
