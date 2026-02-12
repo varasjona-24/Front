@@ -139,6 +139,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
   }
 
   bool get _isMedia => _args.type == EditEntityType.media;
+  bool get _isArtist => _args.type == EditEntityType.artist;
   bool get _isTopic => _args.type == EditEntityType.topic;
   bool get _isTopicPlaylist => _args.type == EditEntityType.topicPlaylist;
 
@@ -362,6 +363,117 @@ class _EditEntityPageState extends State<EditEntityPage> {
     } catch (_) {}
   }
 
+  MediaVariant? _preferredVariant(MediaItem item) {
+    return item.localAudioVariant ??
+        item.localVideoVariant ??
+        (item.variants.isNotEmpty ? item.variants.first : null);
+  }
+
+  String _kindLabel(MediaVariant? variant) {
+    if (variant == null) return 'Desconocido';
+    return variant.kind == MediaVariantKind.video ? 'Video' : 'Audio';
+  }
+
+  String _formatLabel(MediaVariant? variant) {
+    final fmt = variant?.format.trim() ?? '';
+    return fmt.isEmpty ? 'N/A' : fmt.toUpperCase();
+  }
+
+  String _sizeMbLabel(MediaVariant? variant) {
+    final bytes = variant?.size;
+    if (bytes == null || bytes <= 0) return 'N/A';
+    final mb = bytes / (1024 * 1024);
+    final decimals = mb >= 100 ? 0 : (mb >= 10 ? 1 : 2);
+    return '${mb.toStringAsFixed(decimals)} MB';
+  }
+
+  String _originLabel(MediaItem item) {
+    final key = item.origin.key.trim();
+    if (key.isEmpty) return 'Desconocido';
+    if (key.toLowerCase() == 'local') return 'Device';
+    return key;
+  }
+
+  String _mediaDetailsLine1(MediaItem item) {
+    final variant = _preferredVariant(item);
+    final size = _sizeMbLabel(variant);
+    final fmt = _formatLabel(variant);
+    return '$size - $fmt';
+  }
+
+  Widget _artistSongsSection(ThemeData theme) {
+    final songs = _artist?.items ?? const <MediaItem>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Canciones del artista',
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Card(
+          elevation: 0,
+          color: theme.colorScheme.surfaceContainer,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: songs.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'No hay canciones vinculadas a este artista.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : Column(
+                  children: [
+                    for (int i = 0; i < songs.length; i++) ...[
+                      _artistSongTile(theme, songs[i]),
+                      if (i != songs.length - 1)
+                        Divider(
+                          height: 1,
+                          color: theme.colorScheme.outlineVariant,
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _artistSongTile(ThemeData theme, MediaItem item) {
+    final variant = _preferredVariant(item);
+    final kind = _kindLabel(variant);
+    final fmt = _formatLabel(variant);
+    final size = _sizeMbLabel(variant);
+
+    return ListTile(
+      dense: true,
+      leading: Icon(
+        variant?.kind == MediaVariantKind.video
+            ? Icons.videocam_rounded
+            : Icons.music_note_rounded,
+      ),
+      title: Text(
+        item.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '$kind · $fmt · $size',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.bodySmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -429,6 +541,24 @@ class _EditEntityPageState extends State<EditEntityPage> {
                               _subtitleCtrl.text.isEmpty
                                   ? _media!.displaySubtitle
                                   : _subtitleCtrl.text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _mediaDetailsLine1(_media!),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _originLabel(_media!),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -598,6 +728,10 @@ class _EditEntityPageState extends State<EditEntityPage> {
                   ),
                 ),
               ),
+            ],
+            if (_isArtist) ...[
+              const SizedBox(height: 12),
+              _artistSongsSection(theme),
             ],
           ],
         ),
