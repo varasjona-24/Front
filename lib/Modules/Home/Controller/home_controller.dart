@@ -22,6 +22,9 @@ class HomeController extends GetxController {
   final RxList<MediaItem> favorites = <MediaItem>[].obs;
   final RxList<MediaItem> mostPlayed = <MediaItem>[].obs;
   final RxList<MediaItem> featured = <MediaItem>[].obs;
+  final RxList<MediaItem> fullRecentlyPlayed = <MediaItem>[].obs;
+  final RxList<MediaItem> fullFavorites = <MediaItem>[].obs;
+  final RxList<MediaItem> fullMostPlayed = <MediaItem>[].obs;
   final RxList<MediaItem> fullLatestDownloads = <MediaItem>[].obs;
   final RxList<MediaItem> fullFeatured = <MediaItem>[].obs;
 
@@ -61,6 +64,7 @@ class HomeController extends GetxController {
         (a, b) =>
             (b.lastPlayedAt ?? 0).compareTo(a.lastPlayedAt ?? 0),
       );
+    fullRecentlyPlayed.assignAll(recentAll);
     recentlyPlayed.assignAll(recentAll.take(10));
 
     final downloadsAll = filtered
@@ -74,12 +78,14 @@ class HomeController extends GetxController {
     latestDownloads.assignAll(downloadsAll.take(10));
 
     final favoritesAll = filtered.where((e) => e.isFavorite).toList();
+    fullFavorites.assignAll(favoritesAll);
     favorites.assignAll(favoritesAll.take(10));
 
     final mostAll = filtered
         .where((e) => e.playCount > 0)
         .toList()
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
+    fullMostPlayed.assignAll(mostAll);
     mostPlayed.assignAll(mostAll.take(12));
 
     fullFeatured.assignAll(

@@ -97,12 +97,12 @@ class HomePage extends GetView<HomeController> {
                                     onHeaderTap: () => Get.to(
                                       () => SectionListPage(
                                         title: 'Mis favoritos',
-                                        items: controller.favorites,
+                                        items: controller.fullFavorites,
                                         onItemTap: (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
-                                              controller.favorites,
+                                              controller.fullFavorites,
                                             ),
                                         onItemLongPress: (item, _) =>
                                             actions.showItemActions(
@@ -114,12 +114,17 @@ class HomePage extends GetView<HomeController> {
                                             .openMedia(queue.first, 0, queue),
                                       ),
                                     ),
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.favorites,
-                                        ),
+                                    onItemTap: (item, index) {
+                                      final fullQueue = controller.fullFavorites;
+                                      final fullIndex = fullQueue.indexWhere(
+                                        (e) => e.id == item.id,
+                                      );
+                                      controller.openMedia(
+                                        item,
+                                        fullIndex < 0 ? 0 : fullIndex,
+                                        fullQueue,
+                                      );
+                                    },
                                     onItemLongPress: (item, _) {
                                       actions.showItemActions(
                                         context,
@@ -138,12 +143,12 @@ class HomePage extends GetView<HomeController> {
                                     onTap: () => Get.to(
                                       () => SectionListPage(
                                         title: 'Más reproducido',
-                                        items: controller.mostPlayed,
+                                        items: controller.fullMostPlayed,
                                         onItemTap: (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
-                                              controller.mostPlayed,
+                                              controller.fullMostPlayed,
                                             ),
                                         onItemLongPress: (item, _) =>
                                             actions.showItemActions(
@@ -159,12 +164,17 @@ class HomePage extends GetView<HomeController> {
                                   const SizedBox(height: 10),
                                   _MostPlayedRow(
                                     items: controller.mostPlayed,
-                                    onTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.mostPlayed,
-                                        ),
+                                    onTap: (item, index) {
+                                      final fullQueue = controller.fullMostPlayed;
+                                      final fullIndex = fullQueue.indexWhere(
+                                        (e) => e.id == item.id,
+                                      );
+                                      controller.openMedia(
+                                        item,
+                                        fullIndex < 0 ? 0 : fullIndex,
+                                        fullQueue,
+                                      );
+                                    },
                                     onLongPress: (item, _) {
                                       actions.showItemActions(
                                         context,
@@ -183,12 +193,18 @@ class HomePage extends GetView<HomeController> {
                                     items: controller.recentlyPlayed,
                                     onHeaderTap: () =>
                                         Get.toNamed(AppRoutes.history),
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.recentlyPlayed,
-                                        ),
+                                    onItemTap: (item, index) {
+                                      final fullQueue =
+                                          controller.fullRecentlyPlayed;
+                                      final fullIndex = fullQueue.indexWhere(
+                                        (e) => e.id == item.id,
+                                      );
+                                      controller.openMedia(
+                                        item,
+                                        fullIndex < 0 ? 0 : fullIndex,
+                                        fullQueue,
+                                      );
+                                    },
                                     onItemLongPress: (item, _) {
                                       actions.showItemActions(
                                         context,
