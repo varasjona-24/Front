@@ -154,11 +154,8 @@ class DownloadsPill extends GetView<DownloadsController> {
   // ============================
   /// 📁 Descargar desde dispositivo local
   Future<void> _pickLocalFiles(BuildContext context) async {
-    await controller.pickLocalFilesForImport();
-    if (controller.localFilesForImport.isNotEmpty) {
-      if (context.mounted) {
-        _showImportDialog(context);
-      }
+    if (context.mounted) {
+      _showImportDialog(context);
     }
   }
 
@@ -168,76 +165,218 @@ class DownloadsPill extends GetView<DownloadsController> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
-        return AlertDialog(
-          title: const Text('📱 Archivos del dispositivo'),
-          content: Obx(() {
-            final list = controller.localFilesForImport;
+        final theme = Theme.of(ctx);
+        final scheme = theme.colorScheme;
+        final screenMaxHeight = MediaQuery.of(ctx).size.height * 0.72;
 
-            if (list.isEmpty) {
-              return const Text('No hay archivos seleccionados.');
-            }
+        return Obx(() {
+          final count = controller.localFilesForImport.length;
+          final visibleRows = (count <= 0 ? 1 : count).clamp(1, 6);
+          final desiredHeight = 300.0 + (visibleRows * 56.0);
+          final dialogHeight = desiredHeight.clamp(320.0, screenMaxHeight);
 
-            return SizedBox(
-              width: double.maxFinite,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: list.length,
-                itemBuilder: (ctx2, i) {
-                  final item = list[i];
-                  final v = item.variants.first;
-                  final isVideo = v.kind == MediaVariantKind.video;
-
-                  return ListTile(
-                    leading: Icon(
-                      isVideo
-                          ? Icons.videocam_rounded
-                          : Icons.music_note_rounded,
-                    ),
-                    title: Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(
-                      v.fileName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    trailing: Obx(
-                      () => controller.importing.value
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : IconButton(
-                              icon: const Icon(Icons.save_alt_rounded),
-                              tooltip: 'Importar',
-                              onPressed: () => _importItem(context, item, i),
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: SizedBox(
+              width: 520,
+              height: dialogHeight,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: scheme.primary.withOpacity(0.14),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(
+                            Icons.folder_open_rounded,
+                            color: scheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Archivos del dispositivo',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
                             ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Cerrar',
+                          onPressed: () {
+                            controller.clearLocalFilesForImport();
+                            Navigator.of(ctx).pop();
+                          },
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
                     ),
-                  );
-                },
+                    const SizedBox(height: 8),
+                    Text(
+                      'Selecciona qué archivos quieres importar a la biblioteca.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          await controller.pickLocalFilesForImport();
+                        },
+                        icon: const Icon(Icons.folder_open_rounded),
+                        label: const Text('Seleccionar archivos'),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${controller.localFilesForImport.length} seleccionados',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Expanded(
+                      child: Obx(() {
+                        final list = controller.localFilesForImport;
+                        if (list.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'No hay archivos seleccionados.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          itemCount: list.length,
+                          separatorBuilder: (_, __) =>
+                              Divider(color: scheme.outlineVariant, height: 1),
+                          itemBuilder: (ctx2, i) {
+                            final item = list[i];
+                            final v = item.variants.first;
+                            final isVideo = v.kind == MediaVariantKind.video;
+
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 2,
+                                vertical: 4,
+                              ),
+                              leading: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: scheme.primary.withOpacity(0.12),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  isVideo
+                                      ? Icons.videocam_rounded
+                                      : Icons.music_note_rounded,
+                                  color: scheme.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                v.fileName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                              trailing: Obx(
+                                () => controller.importing.value
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : IconButton(
+                                        icon: const Icon(
+                                          Icons.download_done_rounded,
+                                        ),
+                                        tooltip: 'Importar',
+                                        onPressed: () =>
+                                            _importItem(context, item, i),
+                                      ),
+                              ),
+                            );
+                          },
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () {
+                                controller.clearLocalFilesForImport();
+                                Navigator.of(ctx).pop();
+                              },
+                              child: const Text('Cancelar'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                controller.clearLocalFilesForImport();
+                              },
+                              icon: const Icon(Icons.cleaning_services_rounded),
+                              label: const Text('Limpiar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            );
-          }),
-          actions: [
-            TextButton(
-              onPressed: () {
-                controller.clearLocalFilesForImport();
-                Navigator.of(ctx).pop();
-              },
-              child: const Text('Cerrar'),
             ),
-            FilledButton.tonal(
-              onPressed: () {
-                controller.clearLocalFilesForImport();
-                Navigator.of(ctx).pop();
-              },
-              child: const Text('Limpiar'),
-            ),
-          ],
-        );
+          );
+        });
       },
     );
   }
