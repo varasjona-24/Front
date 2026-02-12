@@ -80,16 +80,24 @@ class DownloadsPill extends GetView<DownloadsController> {
               child: OutlinedButton.icon(
                 onPressed: () async {
                   final size = MediaQuery.of(context).size;
+                  final scheme = Theme.of(context).colorScheme;
                   await showDialog<void>(
                     context: context,
                     barrierDismissible: true,
                     builder: (ctx) {
                       return Dialog(
-                        insetPadding: const EdgeInsets.all(16),
-                        backgroundColor: Colors.transparent,
+                        insetPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 20,
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(22),
+                        ),
+                        backgroundColor: scheme.surface,
                         child: SizedBox(
                           width: size.width * 0.9,
-                          height: size.height * 0.65,
+                          height: size.height * 0.54,
                           child: const ImportsWebViewPage(),
                         ),
                       );
