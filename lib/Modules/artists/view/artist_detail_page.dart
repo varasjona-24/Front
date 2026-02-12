@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../../../app/routes/app_routes.dart';
 import '../controller/artists_controller.dart';
@@ -21,6 +22,7 @@ class ArtistDetailPage extends GetView<ArtistsController> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final home = Get.find<HomeController>();
+    final actions = Get.find<MediaActionsController>();
 
     return Obx(() {
       ArtistGroup? artist;
@@ -128,6 +130,11 @@ class ArtistDetailPage extends GetView<ArtistsController> {
                       i,
                       resolved.items,
                     ),
+                    onMore: () => actions.showItemActions(
+                      context,
+                      resolved.items[i],
+                      onChanged: controller.load,
+                    ),
                   ),
               ],
             ),
@@ -142,10 +149,12 @@ class _SongTile extends StatelessWidget {
   const _SongTile({
     required this.item,
     required this.onPlay,
+    required this.onMore,
   });
 
   final MediaItem item;
   final VoidCallback onPlay;
+  final VoidCallback onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -191,8 +200,8 @@ class _SongTile extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         trailing: IconButton(
-          icon: const Icon(Icons.play_arrow_rounded),
-          onPressed: onPlay,
+          icon: const Icon(Icons.more_vert),
+          onPressed: onMore,
         ),
         onTap: onPlay,
       ),

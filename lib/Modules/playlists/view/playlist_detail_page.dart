@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
@@ -30,6 +31,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final actions = Get.find<MediaActionsController>();
 
     return Obx(() {
       final smart = isSmart ? controller.getSmartById(playlistId) : null;
@@ -90,11 +92,12 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
                 else
                   ...items.asMap().entries.map(
                     (entry) => _trackTile(
+                      context,
                       theme,
                       entry.value,
                       entry.key,
                       items,
-                      isSmart ? null : playlist,
+                      actions,
                     ),
                   ),
               ],
@@ -197,11 +200,12 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
   }
 
   Widget _trackTile(
+    BuildContext context,
     ThemeData theme,
     MediaItem item,
     int index,
     List<MediaItem> queue,
-    Playlist? playlist,
+    MediaActionsController actions,
   ) {
     final scheme = theme.colorScheme;
     final thumb = item.effectiveThumbnail;
@@ -231,12 +235,14 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: playlist == null
-          ? null
-          : IconButton(
-              icon: const Icon(Icons.more_vert),
-              onPressed: () => _removeFromPlaylist(item, playlist),
-            ),
+      trailing: IconButton(
+        icon: const Icon(Icons.more_vert),
+        onPressed: () => actions.showItemActions(
+          context,
+          item,
+          onChanged: controller.load,
+        ),
+      ),
     );
   }
 
@@ -380,7 +386,4 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
     );
   }
 
-  Future<void> _removeFromPlaylist(MediaItem item, Playlist playlist) async {
-    await controller.removeItemFromPlaylist(playlist.id, item);
-  }
 }
