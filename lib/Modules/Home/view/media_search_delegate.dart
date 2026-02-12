@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../../app/models/media_item.dart';
@@ -7,6 +9,7 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
   MediaSearchDelegate(this.controller);
 
   final HomeController controller;
+  bool _didUnfocusOnOpen = false;
 
   @override
   ThemeData appBarTheme(BuildContext context) {
@@ -44,26 +47,58 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
 
   @override
   Widget buildSuggestions(BuildContext context) {
+    _dismissKeyboardOnFirstOpen(context);
     if (query.trim().isEmpty) {
       return _buildSuggestions(context);
     }
     return _buildResultsList(context);
   }
 
+  void _dismissKeyboardOnFirstOpen(BuildContext context) {
+    if (_didUnfocusOnOpen) return;
+    _didUnfocusOnOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (context.mounted) {
+        FocusScope.of(context).unfocus();
+      }
+    });
+  }
+
   Widget _buildSuggestions(BuildContext context) {
-    final recent = controller.recentlyPlayed;
-    if (recent.isEmpty) {
+    final all = _allModeItems();
+    if (all.isEmpty) {
       return _emptyState(context, 'Empieza a escribir para buscar.');
     }
 
-    return ListView.separated(
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: recent.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final item = recent[index];
-        return _resultTile(context, item, recent, index);
-      },
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            'Todos',
+            style: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...List.generate(all.length, (index) {
+          final item = all[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _resultTile(context, item, all, index),
+          );
+        }),
+      ],
     );
   }
 
@@ -76,7 +111,7 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: list.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final item = list[index];
         return _resultTile(context, item, list, index);
@@ -100,27 +135,99 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
     }).toList();
   }
 
+  List<MediaItem> _allModeItems() {
+    final isAudioMode = controller.mode.value == HomeMode.audio;
+    final items = controller.allItems.where((item) {
+      return isAudioMode ? item.hasAudioLocal : item.hasVideoLocal;
+    }).toList();
+
+    items.sort((a, b) => _importedAt(b).compareTo(_importedAt(a)));
+    return items;
+  }
+
+  int _importedAt(MediaItem item) {
+    if (item.variants.isEmpty) return 0;
+    return item.variants
+        .map((v) => v.createdAt)
+        .fold<int>(0, (maxValue, value) => value > maxValue ? value : maxValue);
+  }
+
   Widget _resultTile(
     BuildContext context,
     MediaItem item,
     List<MediaItem> list,
     int index,
   ) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isVideo = item.hasVideoLocal || item.localVideoVariant != null;
     final icon = isVideo ? Icons.videocam_rounded : Icons.music_note_rounded;
+    final thumb = item.effectiveThumbnail?.trim() ?? '';
+    final hasThumb = thumb.isNotEmpty;
+    final imageProvider = hasThumb
+        ? (thumb.startsWith('http')
+              ? NetworkImage(thumb)
+              : FileImage(File(thumb)) as ImageProvider)
+        : null;
 
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(
-        item.displaySubtitle,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+    return Material(
+      color: scheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: () {
+          close(context, item);
+          controller.openMedia(item, index, list);
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  color: scheme.surfaceContainerHighest,
+                  child: imageProvider != null
+                      ? Image(image: imageProvider, fit: BoxFit.cover)
+                      : Icon(icon, color: scheme.onSurfaceVariant),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.displaySubtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.more_vert_rounded,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
       ),
-      onTap: () {
-        close(context, item);
-        controller.openMedia(item, index, list);
-      },
     );
   }
 

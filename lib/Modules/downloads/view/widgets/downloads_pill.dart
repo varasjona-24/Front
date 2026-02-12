@@ -22,7 +22,7 @@ class DownloadsPill extends GetView<DownloadsController> {
     return Card(
       elevation: 0,
       color: scheme.surfaceContainer,
-      margin: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
@@ -61,8 +61,7 @@ class DownloadsPill extends GetView<DownloadsController> {
                     context: context,
                     icon: Icons.link_rounded,
                     title: 'Importar desde URL',
-                    subtitle: 'Pega un enlace y descárgalo',
-                    highlighted: true,
+                    subtitle: 'Comparte o pega un link e importarlo',
                     onTap: () =>
                         DownloadsPill.showImportUrlDialog(context, controller),
                   ),
@@ -70,7 +69,7 @@ class DownloadsPill extends GetView<DownloadsController> {
                   _importActionTile(
                     context: context,
                     icon: Icons.folder_open_rounded,
-                    title: 'Desde dispositivo local',
+                    title: 'Importar desde archivo local',
                     subtitle: 'Selecciona archivos de tu almacenamiento',
                     onTap: () => _pickLocalFiles(context),
                   ),
@@ -79,7 +78,7 @@ class DownloadsPill extends GetView<DownloadsController> {
                     context: context,
                     icon: Icons.public_rounded,
                     title: 'Buscador web',
-                    subtitle: 'Navega y comparte enlaces para importar',
+                    subtitle: 'Pega un enlace para abrir el navegador ',
                     onTap: () async {
                       final size = MediaQuery.of(context).size;
                       final scheme = Theme.of(context).colorScheme;
@@ -168,10 +167,7 @@ class DownloadsPill extends GetView<DownloadsController> {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -199,10 +195,7 @@ class DownloadsPill extends GetView<DownloadsController> {
       );
 
       if (result != null) {
-        await controller.downloadFromUrl(
-          url: result.url,
-          kind: result.kind,
-        );
+        await controller.downloadFromUrl(url: result.url, kind: result.kind);
       }
     } finally {
       if (clearSharedOnClose) {

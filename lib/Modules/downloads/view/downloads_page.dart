@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -333,29 +331,6 @@ class _DownloadTile extends StatefulWidget {
 }
 
 class _DownloadTileState extends State<_DownloadTile> {
-  Timer? _holdTimer;
-  bool _fired = false;
-
-  @override
-  void dispose() {
-    _holdTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startHold() {
-    _holdTimer?.cancel();
-    _fired = false;
-    _holdTimer = Timer(const Duration(seconds: 2), () {
-      _fired = true;
-      widget.onHold(widget.item);
-    });
-  }
-
-  void _cancelHold() {
-    if (_fired) return;
-    _holdTimer?.cancel();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -368,37 +343,27 @@ class _DownloadTileState extends State<_DownloadTile> {
 
     final subtitle = widget.item.displaySubtitle;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _startHold(),
-      onTapUp: (_) => _cancelHold(),
-      onTapCancel: _cancelHold,
-      child: Card(
-        elevation: 0,
-        color: theme.colorScheme.surfaceContainer,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: ListTile(
-          leading: Icon(icon),
-          title: Text(
-            widget.item.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          subtitle: Text(
-            subtitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: Wrap(
-            spacing: 4,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.play_arrow_rounded),
-                tooltip: 'Reproducir',
-                onPressed: () => widget.onPlay(widget.item),
-              ),
-            ],
-          ),
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.surfaceContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: ListTile(
+        onTap: () => widget.onPlay(widget.item),
+        leading: Icon(icon),
+        title: Text(
+          widget.item.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Text(
+          subtitle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.more_vert_rounded),
+          tooltip: 'Más opciones',
+          onPressed: () => widget.onHold(widget.item),
         ),
       ),
     );
