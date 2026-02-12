@@ -20,7 +20,7 @@ class SettingsView extends GetView<SettingsController> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('⚙️ Configuración'),
+        title: const Text(' Configuración'),
         centerTitle: true,
         elevation: 0,
         backgroundColor: barColor,

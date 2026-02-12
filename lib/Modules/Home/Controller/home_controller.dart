@@ -1,13 +1,12 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
-import '../view/media_search_delegate.dart';
+import '../view/app_songs_search_page.dart';
 
 enum HomeMode { audio, video }
 
@@ -150,12 +149,7 @@ class HomeController extends GetxController {
   }
 
   void onSearch() {
-    final ctx = Get.context;
-    if (ctx == null) return;
-    showSearch(
-      context: ctx,
-      delegate: MediaSearchDelegate(this),
-    );
+    Get.to(() => const AppSongsSearchPage());
   }
 
   void openMedia(MediaItem item, int index, List<MediaItem> list) {

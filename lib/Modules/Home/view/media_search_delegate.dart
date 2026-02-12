@@ -1,14 +1,17 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
+import '../../../app/controllers/media_actions_controller.dart';
 import '../controller/home_controller.dart';
 
 class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
   MediaSearchDelegate(this.controller);
 
   final HomeController controller;
+  final MediaActionsController _actions = Get.find<MediaActionsController>();
   bool _didUnfocusOnOpen = false;
 
   @override
@@ -219,10 +222,17 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.more_vert_rounded,
+              IconButton(
+                icon: const Icon(Icons.more_vert_rounded),
+                tooltip: 'Más opciones',
                 color: scheme.onSurfaceVariant,
+                onPressed: () {
+                  _actions.showItemActions(
+                    context,
+                    item,
+                    onChanged: controller.loadHome,
+                  );
+                },
               ),
             ],
           ),
