@@ -132,14 +132,17 @@ class _HistoryGroupSection extends StatelessWidget {
           ),
         ),
         ...items.map((item) {
-          return _HistoryItemTile(
-            item: item,
-            time: timeBuilder(item),
-            onTap: () => onTap(item),
-            onLongPress: () => onLongPress(item),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: _HistoryItemTile(
+              item: item,
+              time: timeBuilder(item),
+              onTap: () => onTap(item),
+              onLongPress: () => onLongPress(item),
+            ),
           );
         }),
-        const SizedBox(height: 12),
+        const SizedBox(height: 14),
       ],
     );
   }
