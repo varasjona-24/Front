@@ -347,6 +347,31 @@ class DownloadsPill extends GetView<DownloadsController> {
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
+                      child: Obx(
+                        () => FilledButton.icon(
+                          onPressed: controller.importing.value
+                              ? null
+                              : () => _importAllItems(context),
+                          icon: controller.importing.value
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.playlist_add_check_rounded),
+                          label: Text(
+                            controller.importing.value
+                                ? 'Importando...'
+                                : 'Importar todos',
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
                       child: Row(
                         children: [
                           Expanded(
@@ -395,6 +420,40 @@ class DownloadsPill extends GetView<DownloadsController> {
         snackPosition: SnackPosition.BOTTOM,
       );
     }
+  }
+
+  Future<void> _importAllItems(BuildContext context) async {
+    final items = controller.localFilesForImport.toList();
+    if (items.isEmpty) {
+      Get.snackbar(
+        'Imports',
+        'No hay archivos seleccionados para importar.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    int success = 0;
+    for (final item in items) {
+      final result = await controller.importLocalFileToApp(item);
+      if (result != null) success++;
+    }
+
+    if (!context.mounted) return;
+
+    final failed = items.length - success;
+    if (success > 0) {
+      controller.clearLocalFilesForImport();
+      Navigator.of(context).pop();
+    }
+
+    Get.snackbar(
+      'Imports',
+      failed == 0
+          ? 'Se importaron $success archivo(s).'
+          : 'Importados: $success · Fallidos: $failed',
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 }
 
