@@ -5,14 +5,16 @@ import 'package:get/get.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../../../app/models/media_item.dart';
+import '../../../app/controllers/media_actions_controller.dart';
+import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 
 import '../../../app/routes/app_routes.dart';
 import '../../home/controller/home_controller.dart';
 import '../../player/audio/view/audio_player_page.dart';
-import '../../settings/controller/settings_controller.dart';
 import '../../edit/controller/edit_entity_controller.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
@@ -47,8 +49,8 @@ class SourceLibraryPage extends StatefulWidget {
 }
 
 class _SourceLibraryPageState extends State<SourceLibraryPage> {
-  final SettingsController _settings = Get.find<SettingsController>();
   final SourcesController _sources = Get.find<SourcesController>();
+  final MediaActionsController _actions = Get.find<MediaActionsController>();
 
   // ============================
   // 📚 DATA
@@ -101,7 +103,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
         backgroundColor: Colors.transparent,
         extendBody: true,
         appBar: AppTopBar(
-          title: Text(widget.title),
+          title: widget.onlyOffline
+              ? ListenfyLogo(size: 28, color: scheme.primary)
+              : Text(widget.title),
           onToggleMode: widget.forceKind == null ? home.toggleMode : null,
           mode: mode == HomeMode.audio
               ? AppMediaMode.audio
@@ -148,6 +152,12 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (widget.onlyOffline) ...[
+                                _offlineHeader(theme),
+                                const SizedBox(height: 10),
+                                _offlineSummary(theme, modeList.length, mode),
+                                const SizedBox(height: AppSpacing.md),
+                              ],
                               if (themeMeta != null &&
                                   themeMeta.onlyOffline != true) ...[
                                 _topicHeader(themeMeta),
@@ -227,133 +237,111 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
   Widget _itemTile(MediaItem item, List<MediaItem> queue) {
     final v =
         item.localAudioVariant ?? item.localVideoVariant ?? item.variants.first;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final thumb = item.effectiveThumbnail ?? '';
+    final hasThumb = thumb.isNotEmpty;
+    final imageProvider = hasThumb
+        ? (thumb.startsWith('http')
+              ? NetworkImage(thumb)
+              : FileImage(File(thumb)) as ImageProvider)
+        : null;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        contentPadding: EdgeInsets.zero,
-        leading: Icon(
-          v.kind == MediaVariantKind.video
-              ? Icons.videocam_rounded
-              : Icons.music_note_rounded,
+      padding: EdgeInsets.only(bottom: widget.onlyOffline ? 12 : 8),
+      child: Card(
+        elevation: 0,
+        color: widget.onlyOffline ? scheme.surfaceContainer : Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(widget.onlyOffline ? 18 : 12),
         ),
-        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(
-          item.subtitle.isNotEmpty ? item.subtitle : item.origin.key,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Wrap(
-          spacing: 6,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.play_arrow_rounded),
-              onPressed: () {
-                final idx = queue.indexWhere((e) => e.id == item.id);
-                final safeIdx = idx == -1 ? 0 : idx;
-
-                Get.to(
-                  () => const AudioPlayerPage(),
-                  arguments: {
-                    'queue': queue,
-                    'index': safeIdx,
-                    'playableUrl': item.playableUrl, // ✅ FIX LINK
-                  },
-                );
-              },
+        child: ListTile(
+          contentPadding: widget.onlyOffline
+              ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4)
+              : EdgeInsets.zero,
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: 44,
+              height: 44,
+              color: scheme.surfaceContainerHighest,
+              child: imageProvider != null
+                  ? Image(image: imageProvider, fit: BoxFit.cover)
+                  : Icon(
+                      v.kind == MediaVariantKind.video
+                          ? Icons.videocam_rounded
+                          : Icons.music_note_rounded,
+                      color: scheme.onSurfaceVariant,
+                    ),
             ),
-            IconButton(
-              icon: const Icon(Icons.cloud_download_rounded),
-              tooltip: 'Descargar',
-              onPressed: () async {
-                final hasAudio = item.variants.any(
-                  (v) => v.kind == MediaVariantKind.audio,
-                );
-                final hasVideo = item.variants.any(
-                  (v) => v.kind == MediaVariantKind.video,
-                );
+          ),
+          title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+          subtitle: Text(
+            item.subtitle.isNotEmpty ? item.subtitle : item.origin.key,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing: Wrap(
+            spacing: 6,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.play_arrow_rounded),
+                onPressed: () {
+                  final idx = queue.indexWhere((e) => e.id == item.id);
+                  final safeIdx = idx == -1 ? 0 : idx;
 
-                final options = <String>[];
-                if (hasAudio) options.addAll(['mp3', 'm4a']);
-                if (hasVideo) options.addAll(['mp4']);
-
-                if (options.isEmpty) {
-                  Get.snackbar(
-                    'Download',
-                    'No hay formatos disponibles para descargar',
-                    snackPosition: SnackPosition.BOTTOM,
+                  Get.to(
+                    () => const AudioPlayerPage(),
+                    arguments: {
+                      'queue': queue,
+                      'index': safeIdx,
+                      'playableUrl': item.playableUrl, // ✅ FIX LINK
+                    },
                   );
-                  return;
-                }
-
-                final choice = await showModalBottomSheet<String>(
-                  context: Get.context!,
-                  builder: (ctx) {
-                    return SafeArea(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          for (final fmt in options)
-                            ListTile(
-                              leading: const Icon(Icons.file_download_outlined),
-                              title: Text(fmt.toUpperCase()),
-                              onTap: () => Navigator.of(ctx).pop(fmt),
-                            ),
-                          ListTile(
-                            leading: const Icon(Icons.close),
-                            title: const Text('Cancelar'),
-                            onTap: () => Navigator.of(ctx).pop(),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-
-                if (choice == null) return;
-
-                final kind = hasAudio && ['mp3', 'm4a'].contains(choice)
-                    ? 'audio'
-                    : 'video';
-                final mediaId = item.publicId.isNotEmpty
-                    ? item.publicId
-                    : item.id;
-
-                Get.dialog(
-                  const Center(child: CircularProgressIndicator()),
-                  barrierDismissible: false,
-                );
-
-                final ok = await _sources.requestAndFetchMedia(
-                  mediaId: mediaId,
-                  url: null,
-                  kind: kind,
-                  format: choice,
-                  quality: _settings.downloadQuality.value,
-                );
-
-                if (Get.isDialogOpen ?? false) Get.back();
-
-                if (ok) {
-                  Get.snackbar(
-                    'Download',
-                    'Descarga guardada en downloads ✅',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.green,
+                },
+              ),
+              IconButton(
+                icon: const Icon(Icons.more_vert_rounded),
+                tooltip: 'Acciones',
+                onPressed: () async {
+                  await _actions.showItemActions(
+                    context,
+                    item,
+                    onChanged: () async {
+                      await _sources.refreshAll();
+                      if (mounted) setState(() {});
+                    },
                   );
-                } else {
-                  Get.snackbar(
-                    'Download',
-                    'Falló la descarga',
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.orange,
-                  );
-                }
-              },
-            ),
-          ],
+                },
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _offlineHeader(ThemeData theme) {
+    return Text(
+      'Biblioteca offline',
+      style: theme.textTheme.headlineSmall?.copyWith(
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+
+  Widget _offlineSummary(ThemeData theme, int total, HomeMode mode) {
+    final label = mode == HomeMode.audio ? 'audio' : 'video';
+    return Row(
+      children: [
+        Text(
+          '$total elementos de $label',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 
