@@ -209,6 +209,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                       currentIndex: 4,
                       onTap: (index) {
                         switch (index) {
+                          case 0:
+                            home.enterHome();
+                            break;
                           case 1:
                             home.goToPlaylists();
                             break;

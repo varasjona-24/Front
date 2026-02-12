@@ -207,12 +207,12 @@ class HomePage extends GetView<HomeController> {
                                     onTap: () => Get.to(
                                       () => SectionListPage(
                                         title: 'Destacado',
-                                        items: controller.featured,
+                                        items: controller.fullFeatured,
                                         onItemTap: (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
-                                              controller.featured,
+                                              controller.fullFeatured,
                                             ),
                                         onItemLongPress: (item, _) =>
                                             actions.showItemActions(
@@ -229,12 +229,17 @@ class HomePage extends GetView<HomeController> {
                                   const SizedBox(height: 10),
                                   _FeaturedList(
                                     items: controller.featured,
-                                    onTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.featured,
-                                        ),
+                                    onTap: (item, index) {
+                                      final fullQueue = controller.fullFeatured;
+                                      final fullIndex = fullQueue.indexWhere(
+                                        (e) => e.id == item.id,
+                                      );
+                                      controller.openMedia(
+                                        item,
+                                        fullIndex < 0 ? 0 : fullIndex,
+                                        fullQueue,
+                                      );
+                                    },
                                     onLongPress: (item, _) =>
                                         actions.showItemActions(
                                           context,
@@ -253,12 +258,12 @@ class HomePage extends GetView<HomeController> {
                                     onHeaderTap: () => Get.to(
                                       () => SectionListPage(
                                         title: 'Últimos imports',
-                                        items: controller.latestDownloads,
+                                        items: controller.fullLatestDownloads,
                                         onItemTap: (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
-                                              controller.latestDownloads,
+                                              controller.fullLatestDownloads,
                                             ),
                                         onItemLongPress: (item, _) =>
                                             actions.showItemActions(
@@ -270,12 +275,18 @@ class HomePage extends GetView<HomeController> {
                                             .openMedia(queue.first, 0, queue),
                                       ),
                                     ),
-                                    onItemTap: (item, index) =>
-                                        controller.openMedia(
-                                          item,
-                                          index,
-                                          controller.latestDownloads,
-                                        ),
+                                    onItemTap: (item, index) {
+                                      final fullQueue =
+                                          controller.fullLatestDownloads;
+                                      final fullIndex = fullQueue.indexWhere(
+                                        (e) => e.id == item.id,
+                                      );
+                                      controller.openMedia(
+                                        item,
+                                        fullIndex < 0 ? 0 : fullIndex,
+                                        fullQueue,
+                                      );
+                                    },
                                     onItemLongPress: (item, _) {
                                       actions.showItemActions(
                                         context,
