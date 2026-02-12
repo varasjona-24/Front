@@ -41,77 +41,139 @@ class DownloadsPill extends GetView<DownloadsController> {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-
-            // 🔗 Importar Online
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () =>
-                    DownloadsPill.showImportUrlDialog(context, controller),
-                icon: const Icon(Icons.link_rounded),
-                label: const Text('🌐 Importar desde URL'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: scheme.primary,
-                  foregroundColor: scheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+            const SizedBox(height: 6),
+            Text(
+              'Importa desde enlace, archivos locales o navegador web.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 12),
-
-            // 📱 Descargar desde Dispositivo
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => _pickLocalFiles(context),
-                icon: const Icon(Icons.folder_open_rounded),
-                label: const Text('📱 Desde dispositivo local'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: scheme.outlineVariant),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            // 🌐 WebView limpio
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  final size = MediaQuery.of(context).size;
-                  final scheme = Theme.of(context).colorScheme;
-                  await showDialog<void>(
+              child: Column(
+                children: [
+                  _importActionTile(
                     context: context,
-                    barrierDismissible: true,
-                    builder: (ctx) {
-                      return Dialog(
-                        insetPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 20,
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(22),
-                        ),
-                        backgroundColor: scheme.surface,
-                        child: SizedBox(
-                          width: size.width * 0.9,
-                          height: size.height * 0.54,
-                          child: const ImportsWebViewPage(),
-                        ),
+                    icon: Icons.link_rounded,
+                    title: 'Importar desde URL',
+                    subtitle: 'Pega un enlace y descárgalo',
+                    highlighted: true,
+                    onTap: () =>
+                        DownloadsPill.showImportUrlDialog(context, controller),
+                  ),
+                  Divider(height: 1, color: scheme.outlineVariant),
+                  _importActionTile(
+                    context: context,
+                    icon: Icons.folder_open_rounded,
+                    title: 'Desde dispositivo local',
+                    subtitle: 'Selecciona archivos de tu almacenamiento',
+                    onTap: () => _pickLocalFiles(context),
+                  ),
+                  Divider(height: 1, color: scheme.outlineVariant),
+                  _importActionTile(
+                    context: context,
+                    icon: Icons.public_rounded,
+                    title: 'Buscador web',
+                    subtitle: 'Navega y comparte enlaces para importar',
+                    onTap: () async {
+                      final size = MediaQuery.of(context).size;
+                      final scheme = Theme.of(context).colorScheme;
+                      await showDialog<void>(
+                        context: context,
+                        barrierDismissible: true,
+                        builder: (ctx) {
+                          return Dialog(
+                            insetPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 20,
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                            ),
+                            backgroundColor: scheme.surface,
+                            child: SizedBox(
+                              width: size.width * 0.9,
+                              height: size.height * 0.54,
+                              child: const ImportsWebViewPage(),
+                            ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-                icon: const Icon(Icons.public_rounded),
-                label: const Text('🧭 Buscador web'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
+                  ),
+                ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _importActionTile({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool highlighted = false,
+  }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final bg = highlighted
+        ? scheme.primary.withOpacity(0.1)
+        : Colors.transparent;
+
+    return Material(
+      color: bg,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: scheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: scheme.onSurfaceVariant,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -170,11 +232,6 @@ class DownloadsPill extends GetView<DownloadsController> {
         final screenMaxHeight = MediaQuery.of(ctx).size.height * 0.72;
 
         return Obx(() {
-          final count = controller.localFilesForImport.length;
-          final visibleRows = (count <= 0 ? 1 : count).clamp(1, 6);
-          final desiredHeight = 300.0 + (visibleRows * 56.0);
-          final dialogHeight = desiredHeight.clamp(320.0, screenMaxHeight);
-
           return Dialog(
             insetPadding: const EdgeInsets.symmetric(
               horizontal: 20,
@@ -185,11 +242,11 @@ class DownloadsPill extends GetView<DownloadsController> {
             ),
             child: SizedBox(
               width: 520,
-              height: dialogHeight,
+              height: screenMaxHeight,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
+                  mainAxisSize: MainAxisSize.max,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
