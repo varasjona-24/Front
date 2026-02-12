@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../controller/downloads_controller.dart';
@@ -284,64 +285,142 @@ class _ImportUrlDialogState extends State<_ImportUrlDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('🌐 Importar desde URL'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 🔗 URL
-            TextField(
-              controller: _urlCtrl,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'URL',
-                hintText: 'https://www.youtube.com/watch?v=...',
-                prefixIcon: Icon(Icons.link_rounded),
-              ),
-            ),
-            const SizedBox(height: 18),
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
-            // 📁 Tipo
-            DropdownButtonFormField<String>(
-              value: _kind,
-              items: const [
-                DropdownMenuItem(value: 'audio', child: Text('Audio')),
-                DropdownMenuItem(value: 'video', child: Text('Video')),
-              ],
-              onChanged: (v) {
-                if (v == null) return;
-                setState(() => _kind = v);
-              },
-              decoration: const InputDecoration(
-                labelText: 'Tipo',
-                prefixIcon: Icon(Icons.file_present_rounded),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(Icons.link_rounded, color: scheme.primary),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Importar desde URL',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Cerrar',
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
               ),
-            ),
-            const Divider(height: 24),
-          ],
+              const SizedBox(height: 8),
+              Text(
+                'Pega el enlace y elige el tipo de archivo a importar.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _urlCtrl,
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(context),
+                decoration: InputDecoration(
+                  labelText: 'URL',
+                  hintText: 'https://www.youtube.com/watch?v=...',
+                  prefixIcon: const Icon(Icons.link_rounded),
+                  suffixIcon: IconButton(
+                    tooltip: 'Pegar',
+                    icon: const Icon(Icons.content_paste_rounded),
+                    onPressed: () async {
+                      final data = await Clipboard.getData('text/plain');
+                      final text = data?.text?.trim() ?? '';
+                      if (text.isEmpty) return;
+                      _urlCtrl.text = text;
+                      _urlCtrl.selection = TextSelection.fromPosition(
+                        TextPosition(offset: _urlCtrl.text.length),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text(
+                'Tipo de importación',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Audio'),
+                      selected: _kind == 'audio',
+                      onSelected: (_) => setState(() => _kind = 'audio'),
+                      avatar: const Icon(Icons.music_note_rounded, size: 18),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Text('Video'),
+                      selected: _kind == 'video',
+                      onSelected: (_) => setState(() => _kind = 'video'),
+                      avatar: const Icon(Icons.videocam_rounded, size: 18),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _submit(context),
+                      icon: const Icon(Icons.download_rounded),
+                      label: const Text('Importar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: () {
-            final url = _urlCtrl.text.trim();
-            if (url.isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Por favor ingresa una URL')),
-              );
-              return;
-            }
-            Navigator.of(context).pop(_ImportUrlResult(url: url, kind: _kind));
-          },
-          child: const Text('Descargar'),
-        ),
-      ],
     );
+  }
+
+  void _submit(BuildContext context) {
+    final url = _urlCtrl.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor ingresa una URL')),
+      );
+      return;
+    }
+    Navigator.of(context).pop(_ImportUrlResult(url: url, kind: _kind));
   }
 }
