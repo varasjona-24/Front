@@ -313,13 +313,14 @@ class AudioService extends GetxService {
     bool autoPlay = true,
     List<MediaItem>? queue,
     int? queueIndex, // (peluches 🧸: por ahora no se usa directamente)
+    bool forceReload = false,
   }) async {
     if (!variant.isValid) {
       throw Exception('No existe archivo para reproducir (variant inválido).');
     }
 
     final sameTrack = isSameTrack(item, variant);
-    if (sameTrack && hasSourceLoaded) {
+    if (!forceReload && sameTrack && hasSourceLoaded) {
       if (!_player.playing) await _player.play();
       return;
     }

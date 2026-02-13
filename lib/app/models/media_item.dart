@@ -134,16 +134,11 @@ class MediaItem {
     return null;
   }
 
-  /// Subtitle legible en UI: usa subtitle -> origin -> fileName
+  /// Subtitle legible en UI: usa subtitle; si no existe, vacío
   String get displaySubtitle {
     final s = subtitle.trim();
     if (s.isNotEmpty) return s;
-
-    if (origin != SourceOrigin.generic) return origin.key;
-
-    final v = localAudioVariant ?? localVideoVariant ?? variants.firstOrNull;
-    final name = v?.fileName.trim() ?? '';
-    return name;
+    return '';
   }
 
   // ============================

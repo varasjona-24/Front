@@ -141,6 +141,7 @@ class AudioPlayerController extends GetxController {
       });
       if (serviceIdx < 0) return;
 
+      _resetShuffleBookkeeping();
       queue.assignAll(serviceQueue);
       currentIndex.value = serviceIdx;
     });
@@ -215,6 +216,7 @@ class AudioPlayerController extends GetxController {
         return false;
       }
 
+      _resetShuffleBookkeeping();
       queue.assignAll(incoming);
 
       final idx = (rawIndex is int) ? rawIndex : 0;
@@ -252,6 +254,7 @@ class AudioPlayerController extends GetxController {
     if (_lastArgsSignature == signature) return;
     _lastArgsSignature = signature;
 
+    _resetShuffleBookkeeping();
     queue.assignAll(incoming);
     currentIndex.value = safeIndex;
     _hydratedFromStorage = true;
@@ -319,6 +322,7 @@ class AudioPlayerController extends GetxController {
         .toList();
     if (items.isEmpty) return;
 
+    _resetShuffleBookkeeping();
     queue.assignAll(items);
     final idx = _storage.read(_queueIndexKey);
     if (idx is int && idx >= 0 && idx < queue.length) {
@@ -679,6 +683,7 @@ class AudioPlayerController extends GetxController {
     } else {
       _restoreOriginalOrder();
     }
+    await _rebuildPlaybackQueuePreservingState();
     _persistShuffleState();
   }
 
@@ -744,6 +749,37 @@ class AudioPlayerController extends GetxController {
     }
     _shuffleApplied = false;
     _persistQueue();
+  }
+
+  void _resetShuffleBookkeeping() {
+    _shuffleApplied = false;
+    _originalQueueOrder.clear();
+  }
+
+  Future<void> _rebuildPlaybackQueuePreservingState() async {
+    final item = currentItemOrNull;
+    final variant = currentAudioVariant;
+    if (item == null || variant == null) return;
+
+    final shouldResume = audioService.isPlaying.value;
+    final currentPos = position.value;
+
+    try {
+      await audioService.play(
+        item,
+        variant,
+        autoPlay: shouldResume,
+        queue: queue.toList(),
+        queueIndex: currentIndex.value,
+        forceReload: true,
+      );
+
+      if (currentPos > Duration.zero) {
+        await audioService.seek(currentPos);
+      }
+    } catch (_) {
+      // No interrumpimos la UI si falla el rebuild de la cola.
+    }
   }
 
   Future<void> _playCurrent() async {

@@ -279,11 +279,13 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
             ),
           ),
           title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text(
-            item.subtitle.isNotEmpty ? item.subtitle : item.origin.key,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+          subtitle: item.subtitle.trim().isEmpty
+              ? null
+              : Text(
+                  item.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
           trailing: Wrap(
             spacing: 6,
             children: [
