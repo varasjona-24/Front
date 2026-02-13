@@ -41,9 +41,13 @@ class VideoPlayerController extends GetxController {
   void onInit() {
     super.onInit();
 
-    final safeIndex = initialIndex.clamp(0, queue.length - 1).toInt();
-    currentIndex.value = safeIndex;
-    _persistQueue();
+    if (queue.isEmpty) {
+      currentIndex.value = 0;
+    } else {
+      final safeIndex = initialIndex.clamp(0, queue.length - 1).toInt();
+      currentIndex.value = safeIndex;
+      _persistQueue();
+    }
 
     debounce<Duration>(
       position,

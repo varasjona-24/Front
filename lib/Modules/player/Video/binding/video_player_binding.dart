@@ -10,15 +10,34 @@ class VideoPlayerBinding extends Bindings {
     final args = (Get.arguments as Map?) ?? const {};
 
     final rawQueue = args['queue'];
-    final queue = (rawQueue is List)
+    var queue = (rawQueue is List)
         ? rawQueue.whereType<MediaItem>().toList()
         : <MediaItem>[];
 
-    final index = (args['index'] is int) ? args['index'] as int : 0;
+    var index = (args['index'] is int) ? args['index'] as int : 0;
 
     // Asegurar que VideoService está disponible
     if (!Get.isRegistered<VideoService>()) {
       Get.put<VideoService>(VideoService(), permanent: true);
+    }
+
+    // Si llegamos sin argumentos (ej: mini player), reutilizar cola/sesión actual.
+    if (queue.isEmpty) {
+      if (Get.isRegistered<VideoPlayerController>()) {
+        final existing = Get.find<VideoPlayerController>();
+        if (existing.queue.isNotEmpty) {
+          queue = List<MediaItem>.from(existing.queue);
+          index = existing.currentIndex.value;
+        }
+      }
+
+      if (queue.isEmpty) {
+        final current = Get.find<VideoService>().currentItem.value;
+        if (current != null) {
+          queue = [current];
+          index = 0;
+        }
+      }
     }
 
     if (Get.isRegistered<VideoPlayerController>()) {
