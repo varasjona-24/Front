@@ -238,99 +238,107 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Widget _buildControls(ThemeData theme, dynamic item) {
-    return Column(
-      children: [
-        if (!_isFullscreen)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: Get.back,
-                ),
-                Expanded(
-                  child: Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleSmall,
+    return IconTheme(
+      data: const IconThemeData(color: Colors.white),
+      child: Column(
+        children: [
+          if (!_isFullscreen)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: Get.back,
                   ),
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Ver cola',
+                    icon: const Icon(Icons.playlist_play),
+                    onPressed: () => Get.to(() => const VideoQueuePage()),
+                  ),
+                ],
+              ),
+            ),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Column(
+              children: [
+                _buildProgress(theme, item),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.skip_previous),
+                      onPressed: controller.previous,
+                    ),
+                    const SizedBox(width: 12),
+                    Obx(() {
+                      final playing = controller.isPlaying.value;
+                      return ElevatedButton(
+                        onPressed: controller.togglePlay,
+                        style: ElevatedButton.styleFrom(
+                          shape: const CircleBorder(),
+                          padding: EdgeInsets.zero,
+                          backgroundColor:
+                              theme.colorScheme.primary.withOpacity(0.25),
+                          elevation: 0,
+                        ),
+                        child: Icon(
+                          playing ? Icons.pause : Icons.play_arrow,
+                          size: 30,
+                          color: Colors.white,
+                        ),
+                      );
+                    }),
+                    const SizedBox(width: 12),
+                    IconButton(
+                      icon: const Icon(Icons.skip_next),
+                      onPressed: controller.next,
+                    ),
+                  ],
                 ),
-                IconButton(
-                  tooltip: 'Ver cola',
-                  icon: const Icon(Icons.playlist_play),
-                  onPressed: () => Get.to(() => const VideoQueuePage()),
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _openSpeedPicker,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.speed),
+                      label: Obx(() => Text(
+                            '${controller.videoService.speed.value.toStringAsFixed(1)}x',
+                          )),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        _isFullscreen
+                            ? Icons.fullscreen_exit_rounded
+                            : Icons.fullscreen_rounded,
+                      ),
+                      onPressed: _toggleFullscreen,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-        const Spacer(),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            children: [
-              _buildProgress(theme, item),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.skip_previous),
-                    onPressed: controller.previous,
-                  ),
-                  const SizedBox(width: 12),
-                  Obx(() {
-                    final playing = controller.isPlaying.value;
-                    return ElevatedButton(
-                      onPressed: controller.togglePlay,
-                      style: ElevatedButton.styleFrom(
-                        shape: const CircleBorder(),
-                        padding: EdgeInsets.zero,
-                        backgroundColor:
-                            theme.colorScheme.primary.withOpacity(0.25),
-                        elevation: 0,
-                      ),
-                      child: Icon(
-                        playing ? Icons.pause : Icons.play_arrow,
-                        size: 30,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    );
-                  }),
-                  const SizedBox(width: 12),
-                  IconButton(
-                    icon: const Icon(Icons.skip_next),
-                    onPressed: controller.next,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  TextButton.icon(
-                    onPressed: _openSpeedPicker,
-                    icon: const Icon(Icons.speed),
-                    label: Obx(() => Text(
-                          '${controller.videoService.speed.value.toStringAsFixed(1)}x',
-                        )),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      _isFullscreen
-                          ? Icons.fullscreen_exit_rounded
-                          : Icons.fullscreen_rounded,
-                    ),
-                    onPressed: _toggleFullscreen,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
