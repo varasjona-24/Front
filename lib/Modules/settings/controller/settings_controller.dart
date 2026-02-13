@@ -100,7 +100,7 @@ class SettingsController extends GetxController {
   /// 📂 Cargar configuración guardada
   void _loadSettings() {
     final saved = _storage.read('selectedPalette') ?? 'green';
-    const valid = ['red', 'green', 'blue', 'yellow', 'gray'];
+    const valid = ['red', 'green', 'blue', 'yellow', 'gray', 'purple'];
     selectedPalette.value = valid.contains(saved) ? saved : 'green';
     brightness.value = (_storage.read('brightness') == 'light')
         ? Brightness.light

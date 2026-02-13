@@ -265,7 +265,24 @@ class AudioPlayerController extends GetxController {
       _applyShuffleOrder();
     }
 
-    _ensurePlayingCurrent();
+    // Si llega la misma pista desde otra cola/pantalla, forzamos recarga para
+    // reiniciar el flujo visual como una apertura "nueva".
+    var forceReload = false;
+    final loadedItem = audioService.currentItem.value;
+    final loadedVariant = audioService.currentVariant.value;
+    final selectedItem = currentItemOrNull;
+    final selectedVariant = currentAudioVariant;
+    if (loadedItem != null &&
+        loadedVariant != null &&
+        selectedItem != null &&
+        selectedVariant != null) {
+      forceReload =
+          loadedItem.id == selectedItem.id &&
+          loadedVariant.kind == selectedVariant.kind &&
+          loadedVariant.format == selectedVariant.format;
+    }
+
+    _ensurePlayingCurrent(forceReload: forceReload);
   }
 
   @override
@@ -480,13 +497,14 @@ class AudioPlayerController extends GetxController {
   // PLAYBACK
   // ===========================================================================
 
-  Future<void> _ensurePlayingCurrent() async {
+  Future<void> _ensurePlayingCurrent({bool forceReload = false}) async {
     final item = currentItemOrNull;
     final variant = currentAudioVariant;
     if (item == null || variant == null) return;
 
     // Si la fuente cargada es la misma pista
-    if (audioService.hasSourceLoaded &&
+    if (!forceReload &&
+        audioService.hasSourceLoaded &&
         audioService.isSameTrack(item, variant)) {
       if (!audioService.isPlaying.value) {
         await audioService.resume();
@@ -495,7 +513,7 @@ class AudioPlayerController extends GetxController {
     }
 
     try {
-      await _playItem(item, variant);
+      await _playItem(item, variant, forceReload: forceReload);
     } catch (e) {
       // Evita propagar interrupciones transitorias en arranque/race conditions.
       final msg = e.toString().toLowerCase();
@@ -518,12 +536,23 @@ class AudioPlayerController extends GetxController {
     await audioService.toggle();
   }
 
-  Future<void> _playItem(MediaItem item, MediaVariant variant) async {
+  Future<void> _playItem(
+    MediaItem item,
+    MediaVariant variant, {
+    bool forceReload = false,
+  }) async {
     await _enqueuePlayback(() async {
       _touchActivity();
-      // ✅ reset visual inmediato
-      position.value = Duration.zero;
-      duration.value = Duration.zero;
+      final isSameLoadedTrack =
+          audioService.hasSourceLoaded &&
+          audioService.isSameTrack(item, variant) &&
+          !forceReload;
+
+      // Solo reseteamos la barra cuando realmente se cambia/reconstruye la fuente.
+      if (!isSameLoadedTrack) {
+        position.value = Duration.zero;
+        duration.value = Duration.zero;
+      }
 
       // ✅ Validar que tenemos una variante reproducible
       if (!variant.isValid) {
@@ -541,6 +570,7 @@ class AudioPlayerController extends GetxController {
           autoPlay: !needsPrompt,
           queue: queue.toList(),
           queueIndex: currentIndex.value,
+          forceReload: forceReload,
         );
         if (resume != null) {
           final shouldResume = await _shouldResume(item, resume);
@@ -688,12 +718,20 @@ class AudioPlayerController extends GetxController {
     final next = !isShuffling.value;
     isShuffling.value = next;
 
+    // Al desactivar shuffle, pausamos inmediatamente para evitar reanudaciones
+    // durante el rebuild de cola.
+    if (!next) {
+      await audioService.pause();
+    }
+
     if (next) {
       _applyShuffleOrder();
     } else {
       _restoreOriginalOrder();
+      // Al apagar shuffle evitamos rebuild del player para que no se relance
+      // el ciclo de carga/reproducción.
+      await audioService.pause();
     }
-    await _rebuildPlaybackQueuePreservingState();
     _persistShuffleState();
   }
 
@@ -764,38 +802,6 @@ class AudioPlayerController extends GetxController {
   void _resetShuffleBookkeeping() {
     _shuffleApplied = false;
     _originalQueueOrder.clear();
-  }
-
-  Future<void> _rebuildPlaybackQueuePreservingState() async {
-    final item = currentItemOrNull;
-    final variant = currentAudioVariant;
-    if (item == null || variant == null) return;
-
-    final shouldResume = audioService.isPlaying.value;
-    final currentPos = audioService.player.position;
-
-    await _enqueuePlayback(() async {
-      try {
-        await audioService.play(
-          item,
-          variant,
-          autoPlay: false,
-          queue: queue.toList(),
-          queueIndex: currentIndex.value,
-          forceReload: true,
-        );
-
-        if (currentPos > Duration.zero) {
-          await audioService.seek(currentPos);
-        }
-
-        if (shouldResume) {
-          await audioService.resume();
-        }
-      } catch (_) {
-        // No interrumpimos la UI si falla el rebuild de la cola.
-      }
-    });
   }
 
   Future<void> _playCurrent() async {

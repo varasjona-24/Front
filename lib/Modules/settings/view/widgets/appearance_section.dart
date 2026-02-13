@@ -136,6 +136,12 @@ class AppearanceSection extends GetView<SettingsController> {
                               selected: selected == 'gray',
                               onTap: () => controller.setPalette('gray'),
                             ),
+                            PaletteTile(
+                              label: 'Morado',
+                              color: const Color(0xFF6A4FA3),
+                              selected: selected == 'purple',
+                              onTap: () => controller.setPalette('purple'),
+                            ),
                           ],
                         ),
                       ),

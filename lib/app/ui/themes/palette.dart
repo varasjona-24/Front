@@ -31,6 +31,12 @@ const grayPalette = AppPalette(
   accent: Color(0xFFA3A3A3), // Plata
   neutral: Color(0xFFD0D0D0), // Gris claro
 );
+const purplePalette = AppPalette(
+  primary: Color(0xFF6A4FA3), // Morado principal
+  secondary: Color(0xFF8C77C7), // Lavanda profunda
+  accent: Color(0xFFB39DDB), // Lila suave
+  neutral: Color(0xFFD9D0EE), // Niebla violeta
+);
 
 const palettes = {
   'red': terracotaPalette,
@@ -38,4 +44,5 @@ const palettes = {
   'blue': bluePalette,
   'yellow': sunsetPalette,
   'gray': grayPalette,
+  'purple': purplePalette,
 };
