@@ -762,13 +762,13 @@ class AudioPlayerController extends GetxController {
     if (item == null || variant == null) return;
 
     final shouldResume = audioService.isPlaying.value;
-    final currentPos = position.value;
+    final currentPos = audioService.player.position;
 
     try {
       await audioService.play(
         item,
         variant,
-        autoPlay: shouldResume,
+        autoPlay: false,
         queue: queue.toList(),
         queueIndex: currentIndex.value,
         forceReload: true,
@@ -776,6 +776,10 @@ class AudioPlayerController extends GetxController {
 
       if (currentPos > Duration.zero) {
         await audioService.seek(currentPos);
+      }
+
+      if (shouldResume) {
+        await audioService.resume();
       }
     } catch (_) {
       // No interrumpimos la UI si falla el rebuild de la cola.
