@@ -306,6 +306,41 @@ class DownloadsController extends GetxController {
     }
   }
 
+  Future<bool> _canDownloadWithCurrentDataPolicy() async {
+    final usage = (_storage.read('dataUsage') ?? 'all').toString();
+    if (usage != 'wifi_only') return true;
+
+    try {
+      final interfaces = await NetworkInterface.list(
+        includeLoopback: false,
+        includeLinkLocal: false,
+      );
+
+      final hasWifi = interfaces.any((iface) {
+        final name = iface.name.toLowerCase();
+        // Android: wlan0 / wifi, Desktop: en0 / en1 / eth
+        return name.contains('wlan') ||
+            name.contains('wifi') ||
+            name == 'en0' ||
+            name == 'en1' ||
+            name.startsWith('eth');
+      });
+
+      if (hasWifi) return true;
+
+      Get.snackbar(
+        'Descargas bloqueadas',
+        'Tienes activado "Solo Wi-Fi". Conéctate a una red Wi-Fi para descargar.',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Colors.orange,
+      );
+      return false;
+    } catch (_) {
+      // Si no se puede verificar red, no bloqueamos para evitar falsos positivos.
+      return true;
+    }
+  }
+
   // ============================
   // ⬇️ DESCARGAR DESDE URL
   // ============================
@@ -324,6 +359,9 @@ class DownloadsController extends GetxController {
       );
       return;
     }
+
+    final allowedByPolicy = await _canDownloadWithCurrentDataPolicy();
+    if (!allowedByPolicy) return;
 
     final format = kind == 'video' ? 'mp4' : 'mp3';
     final resolvedQuality = (quality ?? _storage.read('downloadQuality') ?? 'high')
