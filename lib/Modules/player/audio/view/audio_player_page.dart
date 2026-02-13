@@ -9,15 +9,28 @@ import '../widgets/progress_bar.dart';
 import '../../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../../app/services/spatial_audio_service.dart';
 
-class AudioPlayerPage extends GetView<AudioPlayerController> {
+class AudioPlayerPage extends StatefulWidget {
   const AudioPlayerPage({super.key});
+
+  @override
+  State<AudioPlayerPage> createState() => _AudioPlayerPageState();
+}
+
+class _AudioPlayerPageState extends State<AudioPlayerPage> {
+  late final AudioPlayerController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.find<AudioPlayerController>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.applyRouteArgs(Get.arguments);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.applyRouteArgs(Get.arguments);
-    });
 
     return Scaffold(
       backgroundColor: Colors.transparent,
