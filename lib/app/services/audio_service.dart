@@ -312,7 +312,7 @@ class AudioService extends GetxService {
     MediaVariant variant, {
     bool autoPlay = true,
     List<MediaItem>? queue,
-    int? queueIndex, // (peluches 🧸: por ahora no se usa directamente)
+    int? queueIndex,
     bool forceReload = false,
   }) async {
     if (!variant.isValid) {
@@ -362,7 +362,12 @@ class AudioService extends GetxService {
 
         // peluches 🧸: cola
         if (queue != null && queue.isNotEmpty) {
-          final built = _buildQueueSources(queue, item, variant);
+          final built = _buildQueueSources(
+            queue,
+            item,
+            variant,
+            queueIndex: queueIndex,
+          );
           _queueItems = built.items;
           _queueVariants = built.variants;
           _syncQueueToHandler();
@@ -462,7 +467,12 @@ class AudioService extends GetxService {
 
     try {
       if (queue != null && queue.isNotEmpty) {
-        final built = _buildQueueSources(queue, item, variant);
+        final built = _buildQueueSources(
+          queue,
+          item,
+          variant,
+          queueIndex: queueIndex,
+        );
         _queueItems = built.items;
         _queueVariants = built.variants;
         _syncQueueToHandler();
@@ -548,13 +558,19 @@ class AudioService extends GetxService {
     List<MediaItem> queue,
     MediaItem currentItem,
     MediaVariant currentVariant,
+    {
+      int? queueIndex,
+    }
   ) {
     final sources = <AudioSource>[];
     final items = <MediaItem>[];
     final variants = <MediaVariant>[];
     var startIndex = 0;
-
-    for (final item in queue) {
+    final hasExplicitQueueIndex =
+        queueIndex != null && queueIndex >= 0 && queueIndex < queue.length;
+    var explicitStartFound = false;
+    for (var i = 0; i < queue.length; i++) {
+      final item = queue[i];
       final v = item.id == currentItem.id
           ? currentVariant
           : (_pickAudioVariant(item) ?? currentVariant);
@@ -572,10 +588,17 @@ class AudioService extends GetxService {
       items.add(item);
       variants.add(v);
 
-      // peluches 🧸: detecta el índice inicial (por id o publicId)
-      if (item.id == currentItem.id ||
-          (currentItem.publicId.trim().isNotEmpty &&
-              item.publicId.trim() == currentItem.publicId.trim())) {
+      if (hasExplicitQueueIndex && i == queueIndex) {
+        startIndex = items.length - 1;
+        explicitStartFound = true;
+        continue;
+      }
+
+      // fallback por id/publicId cuando no hay índice explícito utilizable
+      if (!explicitStartFound &&
+          (item.id == currentItem.id ||
+              (currentItem.publicId.trim().isNotEmpty &&
+                  item.publicId.trim() == currentItem.publicId.trim()))) {
         startIndex = items.length - 1;
       }
     }

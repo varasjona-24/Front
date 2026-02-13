@@ -47,6 +47,7 @@ class AudioPlayerController extends GetxController {
   bool _handlingCompleted = false;
   bool _hydratedFromStorage = false;
   String? _lastArgsSignature;
+  Future<void>? _activePlaybackTask;
 
   static const _queueKey = 'audio_queue_items';
   static const _queueIndexKey = 'audio_queue_index';
@@ -154,7 +155,7 @@ class AudioPlayerController extends GetxController {
       time: const Duration(seconds: 2),
     );
 
-    _ensurePlayingCurrent();
+    _ensurePlayingCurrent().catchError((_) {});
   }
 
   Future<void> _cleanup8dVariants() async {
@@ -493,7 +494,14 @@ class AudioPlayerController extends GetxController {
       return;
     }
 
-    await _playItem(item, variant);
+    try {
+      await _playItem(item, variant);
+    } catch (e) {
+      // Evita propagar interrupciones transitorias en arranque/race conditions.
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('loading interrupted')) return;
+      rethrow;
+    }
   }
 
   Future<void> togglePlay() async {
@@ -511,53 +519,55 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> _playItem(MediaItem item, MediaVariant variant) async {
-    _touchActivity();
-    // ✅ reset visual inmediato
-    position.value = Duration.zero;
-    duration.value = Duration.zero;
-
-    // ✅ Validar que tenemos una variante reproducible
-    if (!variant.isValid) {
-      print('❌ Cannot play: variant is not valid');
-      throw Exception('Variante no válida para reproducción');
-    }
-
-    try {
-      print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
-      final resume = _getResumePosition(item);
-      final needsPrompt = resume != null;
-      await audioService.play(
-        item,
-        variant,
-        autoPlay: !needsPrompt,
-        queue: queue.toList(),
-        queueIndex: currentIndex.value,
-      );
-      if (resume != null) {
-        final shouldResume = await _shouldResume(item, resume);
-        if (!shouldResume) {
-          final key = item.publicId.isNotEmpty ? item.publicId : item.id;
-          _clearResumeForKey(key);
-          await audioService.seek(Duration.zero);
-        } else {
-          final d = await audioService.durationStream
-              .firstWhere((d) => d != null && d > Duration.zero)
-              .timeout(const Duration(seconds: 2));
-          final dur = d ?? Duration.zero;
-          if (resume < dur - const Duration(seconds: 2)) {
-            await audioService.seek(resume);
-          }
-        }
-        await audioService.resume();
-        _touchActivity();
-      }
-      await _trackPlay(item);
-    } catch (e) {
-      print('❌ Error in _playItem: $e');
+    await _enqueuePlayback(() async {
+      _touchActivity();
+      // ✅ reset visual inmediato
       position.value = Duration.zero;
       duration.value = Duration.zero;
-      rethrow;
-    }
+
+      // ✅ Validar que tenemos una variante reproducible
+      if (!variant.isValid) {
+        print('❌ Cannot play: variant is not valid');
+        throw Exception('Variante no válida para reproducción');
+      }
+
+      try {
+        print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
+        final resume = _getResumePosition(item);
+        final needsPrompt = resume != null;
+        await audioService.play(
+          item,
+          variant,
+          autoPlay: !needsPrompt,
+          queue: queue.toList(),
+          queueIndex: currentIndex.value,
+        );
+        if (resume != null) {
+          final shouldResume = await _shouldResume(item, resume);
+          if (!shouldResume) {
+            final key = item.publicId.isNotEmpty ? item.publicId : item.id;
+            _clearResumeForKey(key);
+            await audioService.seek(Duration.zero);
+          } else {
+            final d = await audioService.durationStream
+                .firstWhere((d) => d != null && d > Duration.zero)
+                .timeout(const Duration(seconds: 2));
+            final dur = d ?? Duration.zero;
+            if (resume < dur - const Duration(seconds: 2)) {
+              await audioService.seek(resume);
+            }
+          }
+          await audioService.resume();
+          _touchActivity();
+        }
+        await _trackPlay(item);
+      } catch (e) {
+        print('❌ Error in _playItem: $e');
+        position.value = Duration.zero;
+        duration.value = Duration.zero;
+        rethrow;
+      }
+    });
   }
 
   Future<void> _trackPlay(MediaItem item) async {
@@ -764,26 +774,28 @@ class AudioPlayerController extends GetxController {
     final shouldResume = audioService.isPlaying.value;
     final currentPos = audioService.player.position;
 
-    try {
-      await audioService.play(
-        item,
-        variant,
-        autoPlay: false,
-        queue: queue.toList(),
-        queueIndex: currentIndex.value,
-        forceReload: true,
-      );
+    await _enqueuePlayback(() async {
+      try {
+        await audioService.play(
+          item,
+          variant,
+          autoPlay: false,
+          queue: queue.toList(),
+          queueIndex: currentIndex.value,
+          forceReload: true,
+        );
 
-      if (currentPos > Duration.zero) {
-        await audioService.seek(currentPos);
-      }
+        if (currentPos > Duration.zero) {
+          await audioService.seek(currentPos);
+        }
 
-      if (shouldResume) {
-        await audioService.resume();
+        if (shouldResume) {
+          await audioService.resume();
+        }
+      } catch (_) {
+        // No interrumpimos la UI si falla el rebuild de la cola.
       }
-    } catch (_) {
-      // No interrumpimos la UI si falla el rebuild de la cola.
-    }
+    });
   }
 
   Future<void> _playCurrent() async {
@@ -827,6 +839,28 @@ class AudioPlayerController extends GetxController {
   Future<void> seek(Duration value) async {
     _touchActivity();
     await audioService.seek(value);
+  }
+
+  Future<void> _enqueuePlayback(Future<void> Function() action) async {
+    final previous = _activePlaybackTask;
+
+    final task = () async {
+      if (previous != null) {
+        try {
+          await previous;
+        } catch (_) {}
+      }
+      await action();
+    }();
+
+    _activePlaybackTask = task;
+    try {
+      await task;
+    } finally {
+      if (identical(_activePlaybackTask, task)) {
+        _activePlaybackTask = null;
+      }
+    }
   }
 
   void _touchActivity() {
