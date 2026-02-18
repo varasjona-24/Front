@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart' as aud;
@@ -33,7 +34,10 @@ class AudioService extends GetxService {
   dynamic _handler;
   List<MediaItem> _queueItems = <MediaItem>[];
   List<MediaVariant> _queueVariants = <MediaVariant>[];
+  List<MediaItem> _linearItems = <MediaItem>[];
+  List<MediaVariant> _linearVariants = <MediaVariant>[];
   int _activeIndex = 0;
+  bool _shuffleEnabled = false;
 
   bool get eqSupported => false;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
@@ -161,9 +165,21 @@ class AudioService extends GetxService {
         queueIndex: queueIndex,
       );
 
-      _queueItems = built.items;
-      _queueVariants = built.variants;
-      _activeIndex = built.index;
+      _linearItems = List<MediaItem>.from(built.items);
+      _linearVariants = List<MediaVariant>.from(built.variants);
+
+      if (_shuffleEnabled && _linearItems.length > 1) {
+        final shuffled = _buildShuffledIndices(
+          _linearItems.length,
+          startAt: built.index,
+        );
+        _assignActiveQueueFromIndices(shuffled);
+        _activeIndex = 0;
+      } else {
+        _queueItems = List<MediaItem>.from(_linearItems);
+        _queueVariants = List<MediaVariant>.from(_linearVariants);
+        _activeIndex = built.index;
+      }
 
       final sources = <AudioSource>[];
       for (var i = 0; i < _queueItems.length; i++) {
@@ -242,6 +258,8 @@ class AudioService extends GetxService {
     currentVariant.value = null;
     _queueItems = <MediaItem>[];
     _queueVariants = <MediaVariant>[];
+    _linearItems = <MediaItem>[];
+    _linearVariants = <MediaVariant>[];
     _activeIndex = 0;
     _keepLastItem = false;
     _notifyHandler();
@@ -285,7 +303,60 @@ class AudioService extends GetxService {
 
   Future<void> setLoopOff() => _player.setLoopMode(LoopMode.off);
   Future<void> setLoopOne() => _player.setLoopMode(LoopMode.one);
-  Future<void> setShuffle(bool enabled) async {}
+  Future<void> setShuffle(bool enabled) async {
+    if (_shuffleEnabled == enabled) return;
+    _shuffleEnabled = enabled;
+
+    if (_linearItems.isEmpty || _linearVariants.isEmpty || !hasSourceLoaded) {
+      return;
+    }
+
+    final playing = _player.playing;
+    final pos = _player.position;
+    final current = currentItem.value;
+    final currentV = currentVariant.value;
+
+    final linearIndex = _findLinearIndex(current, currentV);
+    if (_shuffleEnabled && _linearItems.length > 1) {
+      final shuffled = _buildShuffledIndices(
+        _linearItems.length,
+        startAt: linearIndex,
+      );
+      _assignActiveQueueFromIndices(shuffled);
+      _activeIndex = 0;
+    } else {
+      _queueItems = List<MediaItem>.from(_linearItems);
+      _queueVariants = List<MediaVariant>.from(_linearVariants);
+      _activeIndex = linearIndex.clamp(0, _queueItems.length - 1);
+    }
+
+    final sources = <AudioSource>[];
+    for (var i = 0; i < _queueItems.length; i++) {
+      sources.add(
+        AudioSource.uri(_resolvePlayableUri(_queueItems[i], _queueVariants[i])),
+      );
+    }
+
+    await _player.setAudioSources(
+      sources,
+      initialIndex: _activeIndex,
+      initialPosition: pos,
+    );
+
+    if (_queueItems.isNotEmpty) {
+      currentItem.value = _queueItems[_activeIndex];
+      currentVariant.value = _queueVariants[_activeIndex];
+      _persistLastItem(_queueItems[_activeIndex], _queueVariants[_activeIndex]);
+      _keepLastItem = true;
+    }
+
+    if (playing) {
+      await _player.play();
+    } else {
+      await _player.pause();
+    }
+    _notifyHandler();
+  }
 
   Future<AndroidEqualizerParameters?> getEqParameters() async => null;
   Future<void> setEqEnabled(bool enabled) async {}
@@ -420,6 +491,35 @@ class AudioService extends GetxService {
     final ap = a.publicId.trim();
     final bp = b.publicId.trim();
     return ap.isNotEmpty && bp.isNotEmpty && ap == bp;
+  }
+
+  int _findLinearIndex(MediaItem? item, MediaVariant? variant) {
+    if (item == null || variant == null || _linearItems.isEmpty) return 0;
+    for (var i = 0; i < _linearItems.length; i++) {
+      final it = _linearItems[i];
+      final v = _linearVariants[i];
+      if (it.id == item.id && v.kind == variant.kind && v.format == variant.format) {
+        return i;
+      }
+      final pid = item.publicId.trim();
+      if (pid.isNotEmpty && it.publicId.trim() == pid) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  List<int> _buildShuffledIndices(int length, {required int startAt}) {
+    final out = List<int>.generate(length, (i) => i);
+    out.remove(startAt);
+    out.shuffle(Random());
+    out.insert(0, startAt);
+    return out;
+  }
+
+  void _assignActiveQueueFromIndices(List<int> indices) {
+    _queueItems = indices.map((i) => _linearItems[i]).toList();
+    _queueVariants = indices.map((i) => _linearVariants[i]).toList();
   }
 }
 

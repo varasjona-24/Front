@@ -244,6 +244,7 @@ class AudioPlayerController extends GetxController {
   Future<void> toggleShuffle() async {
     isShuffling.value = !isShuffling.value;
     await audioService.setShuffle(isShuffling.value);
+    _syncFromService();
   }
 
   Future<void> toggleRepeatOnce() async {
