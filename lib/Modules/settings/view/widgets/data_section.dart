@@ -49,47 +49,6 @@ class DataSection extends GetView<SettingsController> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Download quality
-                Obx(() {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Row(
-                        children: [
-                          Expanded(
-                            child: SectionHeader(
-                              title: 'Calidad de descarga',
-                              subtitle:
-                                  'Equilibra tamaño de archivo y calidad.',
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        controller.getQualityDescription(null),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      ChoiceChipRow(
-                        options: const [
-                          ChoiceOption(value: 'low', label: 'Baja'),
-                          ChoiceOption(value: 'medium', label: 'Media'),
-                          ChoiceOption(value: 'high', label: 'Alta'),
-                        ],
-                        selectedValue: controller.downloadQuality.value,
-                        onSelected: (v) => controller.setDownloadQuality(v),
-                      ),
-                    ],
-                  );
-                }),
-
-                const SizedBox(height: 12),
-                Divider(color: theme.dividerColor.withOpacity(.12)),
-                const SizedBox(height: 12),
-
                 // Data usage
                 Obx(() {
                   return Column(

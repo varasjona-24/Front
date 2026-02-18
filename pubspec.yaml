@@ -56,6 +56,7 @@ dependencies:
   webview_flutter: ^4.8.0
   receive_sharing_intent: ^1.4.5
   flutter_custom_tabs: ^2.4.0
+  just_audio_background: ^0.0.1-beta.17
 
 dev_dependencies:
   flutter_test:
