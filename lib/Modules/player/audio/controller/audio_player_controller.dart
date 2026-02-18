@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
+import '../../../../app/data/local/local_library_store.dart';
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
 import '../../../../app/services/spatial_audio_service.dart';
@@ -13,6 +14,7 @@ enum RepeatMode { off, once, loop }
 class AudioPlayerController extends GetxController {
   final AudioService audioService;
   final SpatialAudioService _spatial = Get.find<SpatialAudioService>();
+  final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
   final GetStorage _storage = GetStorage();
   static const _repeatModeKey = 'audio_repeat_mode';
 
@@ -74,7 +76,7 @@ class AudioPlayerController extends GetxController {
         .clamp(0, items.length - 1)
         .toInt();
 
-    _playCurrent(forceReload: true);
+    _playCurrent(forceReload: true, countAsPlay: true);
   }
 
   List<MediaItem> _extractItems(dynamic rawQueue) {
@@ -97,7 +99,10 @@ class AudioPlayerController extends GetxController {
     return null;
   }
 
-  Future<void> _playCurrent({bool forceReload = false}) async {
+  Future<void> _playCurrent({
+    bool forceReload = false,
+    bool countAsPlay = false,
+  }) async {
     final item = currentItemOrNull;
     if (item == null) return;
     final variant = _resolveAudioVariant(item);
@@ -113,6 +118,9 @@ class AudioPlayerController extends GetxController {
     );
 
     _syncFromService();
+    if (countAsPlay) {
+      await _trackPlay(item);
+    }
   }
 
   Future<void> togglePlay() async {
@@ -121,7 +129,7 @@ class AudioPlayerController extends GetxController {
     if (item == null || variant == null) return;
 
     if (!audioService.hasSourceLoaded || !audioService.isSameTrack(item, variant)) {
-      await _playCurrent(forceReload: true);
+      await _playCurrent(forceReload: true, countAsPlay: true);
       return;
     }
 
@@ -131,14 +139,27 @@ class AudioPlayerController extends GetxController {
   Future<void> playAt(int index) async {
     if (index < 0 || index >= queue.length) return;
     currentIndex.value = index;
-    await _playCurrent(forceReload: true);
+    if (audioService.hasSourceLoaded && _sameQueue(queue, audioService.queueItems)) {
+      await audioService.jumpToQueueIndex(index);
+      _syncFromService();
+      final item = currentItemOrNull;
+      if (item != null) await _trackPlay(item);
+      return;
+    }
+    await _playCurrent(forceReload: true, countAsPlay: true);
   }
 
   Future<void> next() async {
     if (queue.isEmpty) return;
+    final before = currentIndex.value;
     final fallback = currentIndex.value + 1;
     await audioService.next();
     _syncFromService();
+    if (currentIndex.value != before) {
+      final item = currentItemOrNull;
+      if (item != null) await _trackPlay(item);
+      return;
+    }
     if (audioService.currentQueueIndex == currentIndex.value &&
         fallback >= 0 &&
         fallback < queue.length) {
@@ -148,9 +169,15 @@ class AudioPlayerController extends GetxController {
 
   Future<void> previous() async {
     if (queue.isEmpty) return;
+    final before = currentIndex.value;
     final fallback = currentIndex.value - 1;
     await audioService.previous();
     _syncFromService();
+    if (currentIndex.value != before) {
+      final item = currentItemOrNull;
+      if (item != null) await _trackPlay(item);
+      return;
+    }
     if (audioService.currentQueueIndex == currentIndex.value &&
         fallback >= 0 &&
         fallback < queue.length) {
@@ -194,7 +221,7 @@ class AudioPlayerController extends GetxController {
 
     final wasPlaying = audioService.isPlaying.value;
     final pos = position.value;
-    await _playCurrent(forceReload: true);
+    await _playCurrent(forceReload: true, countAsPlay: false);
     if (pos > Duration.zero) {
       await audioService.seek(pos);
     }
@@ -235,6 +262,17 @@ class AudioPlayerController extends GetxController {
       return ap.isNotEmpty && bp.isNotEmpty && ap == bp;
     });
     if (idx >= 0) currentIndex.value = idx;
+  }
+
+  bool _sameQueue(List<MediaItem> a, List<MediaItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id == b[i].id) continue;
+      final ap = a[i].publicId.trim();
+      final bp = b[i].publicId.trim();
+      if (ap.isEmpty || bp.isEmpty || ap != bp) return false;
+    }
+    return true;
   }
 
   Future<void> setSpatialMode(SpatialAudioMode mode) async {
@@ -281,6 +319,30 @@ class AudioPlayerController extends GetxController {
     final idx = presets.indexWhere((e) => e == current);
     final next = presets[(idx + 1) % presets.length];
     await audioService.setSpeed(next);
+  }
+
+  Future<void> _trackPlay(MediaItem item) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final all = await _store.readAll();
+
+    MediaItem updated = item.copyWith(
+      playCount: item.playCount + 1,
+      lastPlayedAt: now,
+    );
+
+    for (final existing in all) {
+      if (existing.id == item.id ||
+          (item.publicId.trim().isNotEmpty &&
+              existing.publicId.trim() == item.publicId.trim())) {
+        updated = existing.copyWith(
+          playCount: existing.playCount + 1,
+          lastPlayedAt: now,
+        );
+        break;
+      }
+    }
+
+    await _store.upsert(updated);
   }
 
   void _restoreRepeatMode() {

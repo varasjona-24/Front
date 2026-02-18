@@ -155,6 +155,24 @@ class AudioService extends GetxService {
     int? queueIndex,
     bool forceReload = false,
   }) async {
+    final incomingQueue = queue;
+    if (hasSourceLoaded &&
+        _queueItems.isNotEmpty &&
+        incomingQueue != null &&
+        incomingQueue.isNotEmpty &&
+        _sameQueueById(incomingQueue, _queueItems)) {
+      final target = (queueIndex ?? 0).clamp(0, _queueItems.length - 1).toInt();
+      final wasPlaying = _player.playing;
+      await _player.seek(Duration.zero, index: target);
+      _activeIndex = target;
+      if (autoPlay || wasPlaying) {
+        await _player.play();
+      } else {
+        await _player.pause();
+      }
+      return;
+    }
+
     if (!forceReload &&
         isSameTrack(item, variant) &&
         hasSourceLoaded &&
@@ -297,6 +315,19 @@ class AudioService extends GetxService {
     await _player.seek(Duration.zero, index: target);
     _activeIndex = target;
     if (wasPlaying) await _player.play();
+  }
+
+  Future<void> jumpToQueueIndex(int index) async {
+    if (_queueItems.isEmpty) return;
+    if (index < 0 || index >= _queueItems.length) return;
+    final wasPlaying = _player.playing;
+    await _player.seek(Duration.zero, index: index);
+    _activeIndex = index;
+    if (wasPlaying) {
+      await _player.play();
+    } else {
+      await _player.pause();
+    }
   }
 
   Future<void> setSpeed(double value) async {
@@ -502,6 +533,17 @@ class AudioService extends GetxService {
     final ap = a.publicId.trim();
     final bp = b.publicId.trim();
     return ap.isNotEmpty && bp.isNotEmpty && ap == bp;
+  }
+
+  bool _sameQueueById(List<MediaItem> a, List<MediaItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id == b[i].id) continue;
+      final ap = a[i].publicId.trim();
+      final bp = b[i].publicId.trim();
+      if (ap.isEmpty || bp.isEmpty || ap != bp) return false;
+    }
+    return true;
   }
 
   int _findLinearIndex(MediaItem? item, MediaVariant? variant) {
