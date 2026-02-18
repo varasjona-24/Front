@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart' as aud;
@@ -52,6 +53,9 @@ class AudioService extends GetxService {
 
   List<MediaItem> _queueItems = <MediaItem>[];
   List<MediaVariant> _queueVariants = <MediaVariant>[];
+  List<MediaItem> _linearItems = <MediaItem>[];
+  List<MediaVariant> _linearVariants = <MediaVariant>[];
+  bool _shuffleEnabled = false;
 
   List<MediaItem> get queueItems => List<MediaItem>.from(_queueItems);
 
@@ -212,9 +216,56 @@ class AudioService extends GetxService {
   }
 
   Future<void> setShuffle(bool enabled) async {
-    if (!hasSourceLoaded) return;
-    await _player.setShuffleModeEnabled(enabled);
-    if (enabled) await _player.shuffle();
+    await _runExclusive(() async {
+      if (_shuffleEnabled == enabled) return;
+      _shuffleEnabled = enabled;
+
+      if (!hasSourceLoaded || _linearItems.isEmpty || _linearVariants.isEmpty) {
+        return;
+      }
+
+      final wasPlaying = _player.playing;
+      final currentPos = _player.position;
+      final linearIndex = _findLinearIndex(
+        _currentItem,
+        _currentVariant,
+      ).clamp(0, _linearItems.length - 1);
+
+      int nextIndex;
+      if (enabled) {
+        final indices = _buildShuffledIndices(
+          _linearItems.length,
+          startAt: linearIndex,
+        );
+        _assignActiveQueueFromIndices(indices);
+        nextIndex = 0;
+      } else {
+        _queueItems = List<MediaItem>.from(_linearItems);
+        _queueVariants = List<MediaVariant>.from(_linearVariants);
+        nextIndex = linearIndex;
+      }
+
+      await _player.stop();
+      await _player.setAudioSources(
+        _buildSources(_queueItems, _queueVariants),
+        initialIndex: nextIndex,
+        initialPosition: currentPos,
+      );
+
+      _currentItem = _queueItems[nextIndex];
+      _currentVariant = _queueVariants[nextIndex];
+      currentItem.value = _currentItem;
+      currentVariant.value = _currentVariant;
+
+      _syncQueueToHandler();
+      _updateWidget();
+
+      if (wasPlaying) {
+        await _player.play();
+      } else {
+        await _player.pause();
+      }
+    });
   }
 
   Future<void> next() async {
@@ -293,17 +344,32 @@ class AudioService extends GetxService {
           queueIndex: queueIndex,
         );
 
-        _queueItems = built.items;
-        _queueVariants = built.variants;
+        _linearItems = List<MediaItem>.from(built.items);
+        _linearVariants = List<MediaVariant>.from(built.variants);
+
+        final bool shuffleOn = _shuffleEnabled && _linearItems.length > 1;
+        int selected;
+
+        if (shuffleOn) {
+          final indices = _buildShuffledIndices(
+            _linearItems.length,
+            startAt: built.startIndex.clamp(0, _linearItems.length - 1),
+          );
+          _assignActiveQueueFromIndices(indices);
+          selected = 0;
+        } else {
+          _queueItems = List<MediaItem>.from(_linearItems);
+          _queueVariants = List<MediaVariant>.from(_linearVariants);
+          selected = built.startIndex;
+        }
 
         await _player.stop();
         await _player.setAudioSources(
-          built.sources,
-          initialIndex: built.startIndex,
+          _buildSources(_queueItems, _queueVariants),
+          initialIndex: selected,
           initialPosition: Duration.zero,
         );
 
-        final selected = built.startIndex;
         _currentItem = _queueItems[selected];
         _currentVariant = _queueVariants[selected];
 
@@ -350,8 +416,6 @@ class AudioService extends GetxService {
 
     final items = <MediaItem>[];
     final variants = <MediaVariant>[];
-    final sources = <AudioSource>[];
-
     int startIndex = 0;
     final useExplicitIndex =
         queueIndex != null && queueIndex >= 0 && queueIndex < input.length;
@@ -368,7 +432,6 @@ class AudioService extends GetxService {
 
       items.add(entry);
       variants.add(v);
-      sources.add(_audioSourceFor(entry, v));
 
       if (useExplicitIndex && i == queueIndex) {
         startIndex = items.length - 1;
@@ -384,7 +447,6 @@ class AudioService extends GetxService {
     if (items.isEmpty) {
       items.add(selectedItem);
       variants.add(selectedVariant);
-      sources.add(_audioSourceFor(selectedItem, selectedVariant));
       startIndex = 0;
     }
 
@@ -395,9 +457,48 @@ class AudioService extends GetxService {
     return _BuiltQueue(
       items: items,
       variants: variants,
-      sources: sources,
       startIndex: startIndex,
     );
+  }
+
+  List<AudioSource> _buildSources(
+    List<MediaItem> items,
+    List<MediaVariant> variants,
+  ) {
+    final out = <AudioSource>[];
+    for (var i = 0; i < items.length; i++) {
+      out.add(_audioSourceFor(items[i], variants[i]));
+    }
+    return out;
+  }
+
+  int _findLinearIndex(MediaItem? item, MediaVariant? variant) {
+    if (item == null || variant == null) return 0;
+    for (var i = 0; i < _linearItems.length; i++) {
+      final it = _linearItems[i];
+      final v = _linearVariants[i];
+      if (it.id == item.id && v.kind == variant.kind && v.format == variant.format) {
+        return i;
+      }
+      final pid = item.publicId.trim();
+      if (pid.isNotEmpty && it.publicId.trim() == pid) {
+        return i;
+      }
+    }
+    return 0;
+  }
+
+  List<int> _buildShuffledIndices(int length, {required int startAt}) {
+    final indices = List<int>.generate(length, (i) => i);
+    indices.remove(startAt);
+    indices.shuffle(Random());
+    indices.insert(0, startAt);
+    return indices;
+  }
+
+  void _assignActiveQueueFromIndices(List<int> indices) {
+    _queueItems = indices.map((i) => _linearItems[i]).toList();
+    _queueVariants = indices.map((i) => _linearVariants[i]).toList();
   }
 
   MediaVariant? _resolveVariantForQueueEntry({
@@ -463,6 +564,10 @@ class AudioService extends GetxService {
 
     _currentItem = null;
     _currentVariant = null;
+    _queueItems = <MediaItem>[];
+    _queueVariants = <MediaVariant>[];
+    _linearItems = <MediaItem>[];
+    _linearVariants = <MediaVariant>[];
     currentItem.value = null;
     currentVariant.value = null;
 
@@ -593,6 +698,10 @@ class AudioService extends GetxService {
 
     _currentItem = null;
     _currentVariant = null;
+    _queueItems = <MediaItem>[];
+    _queueVariants = <MediaVariant>[];
+    _linearItems = <MediaItem>[];
+    _linearVariants = <MediaVariant>[];
 
     currentItem.value = null;
     currentVariant.value = null;
@@ -721,13 +830,11 @@ class AudioService extends GetxService {
 class _BuiltQueue {
   final List<MediaItem> items;
   final List<MediaVariant> variants;
-  final List<AudioSource> sources;
   final int startIndex;
 
   const _BuiltQueue({
     required this.items,
     required this.variants,
-    required this.sources,
     required this.startIndex,
   });
 }
