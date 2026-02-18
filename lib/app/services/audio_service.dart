@@ -27,6 +27,9 @@ class AudioService extends GetxService {
   static const _lastItemKey = 'audio_last_item';
   static const _lastVariantKey = 'audio_last_variant';
 
+  // En algunos dispositivos (ej. ciertos Xiaomi/MIUI) el efecto nativo puede
+  // lanzar RuntimeException al crear Equalizer y tumbar el proceso.
+  // Se deja deshabilitado por estabilidad.
   final AndroidEqualizer? _equalizer;
   late final AudioPlayer _player;
 
@@ -91,14 +94,8 @@ class AudioService extends GetxService {
     }
   }
 
-  AudioService() : _equalizer = Platform.isAndroid ? AndroidEqualizer() : null {
-    if (Platform.isAndroid) {
-      _player = AudioPlayer(
-        audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer!]),
-      );
-    } else {
-      _player = AudioPlayer();
-    }
+  AudioService() : _equalizer = null {
+    _player = AudioPlayer();
   }
 
   aud.MediaItem buildBackgroundItem(MediaItem item) =>
