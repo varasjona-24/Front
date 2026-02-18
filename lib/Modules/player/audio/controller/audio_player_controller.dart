@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
@@ -12,6 +13,8 @@ enum RepeatMode { off, once, loop }
 class AudioPlayerController extends GetxController {
   final AudioService audioService;
   final SpatialAudioService _spatial = Get.find<SpatialAudioService>();
+  final GetStorage _storage = GetStorage();
+  static const _repeatModeKey = 'audio_repeat_mode';
 
   AudioPlayerController({required this.audioService});
 
@@ -34,6 +37,9 @@ class AudioPlayerController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+
+    isShuffling.value = audioService.shuffleEnabled;
+    _restoreRepeatMode();
 
     _posSub = audioService.positionStream.listen((v) => position.value = v);
     _durSub = audioService.durationStream.listen(
@@ -250,6 +256,7 @@ class AudioPlayerController extends GetxController {
   Future<void> toggleRepeatOnce() async {
     repeatMode.value =
         repeatMode.value == RepeatMode.once ? RepeatMode.off : RepeatMode.once;
+    _storage.write(_repeatModeKey, repeatMode.value.name);
     if (repeatMode.value == RepeatMode.once) {
       await audioService.setLoopOne();
     } else {
@@ -260,6 +267,7 @@ class AudioPlayerController extends GetxController {
   Future<void> toggleRepeatLoop() async {
     repeatMode.value =
         repeatMode.value == RepeatMode.loop ? RepeatMode.off : RepeatMode.loop;
+    _storage.write(_repeatModeKey, repeatMode.value.name);
     if (repeatMode.value == RepeatMode.loop) {
       await audioService.setLoopOne();
     } else {
@@ -273,5 +281,21 @@ class AudioPlayerController extends GetxController {
     final idx = presets.indexWhere((e) => e == current);
     final next = presets[(idx + 1) % presets.length];
     await audioService.setSpeed(next);
+  }
+
+  void _restoreRepeatMode() {
+    final raw = _storage.read<String>(_repeatModeKey);
+    if (raw == RepeatMode.once.name) {
+      repeatMode.value = RepeatMode.once;
+      audioService.setLoopOne();
+      return;
+    }
+    if (raw == RepeatMode.loop.name) {
+      repeatMode.value = RepeatMode.loop;
+      audioService.setLoopOne();
+      return;
+    }
+    repeatMode.value = RepeatMode.off;
+    audioService.setLoopOff();
   }
 }

@@ -18,6 +18,8 @@ class AudioService extends GetxService {
 
   static const _lastItemKey = 'audio_last_item';
   static const _lastVariantKey = 'audio_last_variant';
+  static const _shuffleEnabledKey = 'audio_shuffle_enabled';
+  static const _speedKey = 'audio_speed';
 
   final Rx<PlaybackState> state = PlaybackState.stopped.obs;
   final RxBool isPlaying = false.obs;
@@ -38,6 +40,7 @@ class AudioService extends GetxService {
   List<MediaVariant> _linearVariants = <MediaVariant>[];
   int _activeIndex = 0;
   bool _shuffleEnabled = false;
+  bool get shuffleEnabled => _shuffleEnabled;
 
   bool get eqSupported => false;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
@@ -64,6 +67,12 @@ class AudioService extends GetxService {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
 
+    _shuffleEnabled = _storage.read<bool>(_shuffleEnabledKey) ?? false;
+    final storedSpeed = _storage.read<double>(_speedKey);
+    if (storedSpeed != null && storedSpeed > 0) {
+      speed.value = storedSpeed;
+      await _player.setSpeed(storedSpeed);
+    }
     _restoreLastItem();
 
     _player.playerStateStream.listen((ps) {
@@ -292,6 +301,7 @@ class AudioService extends GetxService {
 
   Future<void> setSpeed(double value) async {
     speed.value = value;
+    _storage.write(_speedKey, value);
     await _player.setSpeed(value);
   }
 
@@ -306,6 +316,7 @@ class AudioService extends GetxService {
   Future<void> setShuffle(bool enabled) async {
     if (_shuffleEnabled == enabled) return;
     _shuffleEnabled = enabled;
+    _storage.write(_shuffleEnabledKey, enabled);
 
     if (_linearItems.isEmpty || _linearVariants.isEmpty || !hasSourceLoaded) {
       return;
