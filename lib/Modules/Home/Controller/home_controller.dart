@@ -169,12 +169,13 @@ class HomeController extends GetxController {
     Get.to(() => const AppSongsSearchPage());
   }
 
-  void openMedia(MediaItem item, int index, List<MediaItem> list) {
+  Future<void> openMedia(MediaItem item, int index, List<MediaItem> list) async {
     final route = mode.value == HomeMode.audio
         ? AppRoutes.audioPlayer
         : AppRoutes.videoPlayer;
 
-    Get.toNamed(route, arguments: {'queue': list, 'index': index});
+    await Get.toNamed(route, arguments: {'queue': list, 'index': index});
+    await loadHome();
   }
 
   Future<void> deleteLocalItem(MediaItem item) async {

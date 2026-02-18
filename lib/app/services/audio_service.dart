@@ -1,118 +1,56 @@
-import 'dart:async';
 import 'dart:io';
-import 'dart:math';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart' as aud;
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 
 import '../config/api_config.dart';
-import '../controllers/theme_controller.dart';
 import '../models/media_item.dart';
-import '../../Modules/settings/controller/settings_controller.dart';
 
 enum PlaybackState { stopped, loading, playing, paused }
 
 class AudioService extends GetxService {
-  static const MethodChannel _widgetChannel =
-      MethodChannel('listenfy/player_widget');
-
+  final AudioPlayer _player = AudioPlayer();
   final GetStorage _storage = GetStorage();
+
   static const _lastItemKey = 'audio_last_item';
   static const _lastVariantKey = 'audio_last_variant';
-
-  // En algunos dispositivos (ej. ciertos Xiaomi/MIUI) el efecto nativo puede
-  // lanzar RuntimeException al crear Equalizer y tumbar el proceso.
-  // Se deja deshabilitado por estabilidad.
-  final AndroidEqualizer? _equalizer;
-  late final AudioPlayer _player;
-
-  dynamic _handler;
-
-  bool _keepLastItem = false;
-  bool get keepLastItem => _keepLastItem;
-
-  bool get eqSupported => _equalizer != null;
-  AudioPlayer get player => _player;
 
   final Rx<PlaybackState> state = PlaybackState.stopped.obs;
   final RxBool isPlaying = false.obs;
   final RxBool isLoading = false.obs;
-
-  MediaItem? _currentItem;
-  MediaVariant? _currentVariant;
+  final RxDouble speed = 1.0.obs;
+  final RxDouble volume = 1.0.obs;
 
   final Rxn<MediaItem> currentItem = Rxn<MediaItem>();
   final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
 
-  StreamSubscription<PlayerState>? _playerStateSub;
-  StreamSubscription<int?>? _indexSub;
+  bool _keepLastItem = false;
+  bool get keepLastItem => _keepLastItem;
 
+  dynamic _handler;
   List<MediaItem> _queueItems = <MediaItem>[];
   List<MediaVariant> _queueVariants = <MediaVariant>[];
-  List<MediaItem> _linearItems = <MediaItem>[];
-  List<MediaVariant> _linearVariants = <MediaVariant>[];
-  bool _shuffleEnabled = false;
+  int _activeIndex = 0;
 
-  List<MediaItem> get queueItems => List<MediaItem>.from(_queueItems);
+  bool get eqSupported => false;
+  int? get androidAudioSessionId => _player.androidAudioSessionId;
+  Stream<int?> get androidAudioSessionIdStream =>
+      _player.androidAudioSessionIdStream;
 
-  int get currentQueueIndex {
-    final idx = _player.currentIndex;
-    if (idx == null || idx < 0 || idx >= _queueItems.length) return 0;
-    return idx;
-  }
-
-  MediaItem? queueItemAt(int index) {
-    if (index < 0 || index >= _queueItems.length) return null;
-    return _queueItems[index];
-  }
-
-  Future<void>? _op;
-
-  Future<void> _runExclusive(Future<void> Function() action) async {
-    final prev = _op;
-    final task = () async {
-      if (prev != null) {
-        try {
-          await prev;
-        } catch (_) {}
-      }
-      await action();
-    }();
-
-    _op = task;
-    try {
-      await task;
-    } finally {
-      if (identical(_op, task)) _op = null;
-    }
-  }
-
-  AudioService() : _equalizer = null {
-    _player = AudioPlayer();
-  }
-
-  aud.MediaItem buildBackgroundItem(MediaItem item) =>
-      _buildBackgroundItem(item);
-
-  void attachHandler(dynamic handler) {
-    _handler = handler;
-    _syncQueueToHandler();
-    _updateWidget();
-  }
+  Stream<Duration> get positionStream => _player.positionStream;
+  Stream<Duration?> get durationStream => _player.durationStream;
+  Stream<ProcessingState> get processingStateStream =>
+      _player.processingStateStream;
 
   bool get hasSourceLoaded => _player.processingState != ProcessingState.idle;
-
-  bool isSameTrack(MediaItem item, MediaVariant variant) {
-    return _currentItem?.id == item.id &&
-        _currentVariant?.kind == variant.kind &&
-        _currentVariant?.format == variant.format;
+  List<MediaItem> get queueItems => List<MediaItem>.from(_queueItems);
+  int get currentQueueIndex {
+    final idx = _player.currentIndex ?? _activeIndex;
+    if (idx < 0 || idx >= _queueItems.length) return 0;
+    return idx;
   }
 
   @override
@@ -122,19 +60,11 @@ class AudioService extends GetxService {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
 
-    if (Get.isRegistered<SettingsController>()) {
-      final settings = Get.find<SettingsController>();
-      await setVolume(settings.defaultVolume.value / 100);
-    }
-
     _restoreLastItem();
-    _updateWidget();
 
-    _playerStateSub = _player.playerStateStream.listen((ps) {
-      final proc = ps.processingState;
-      final loading =
-          proc == ProcessingState.loading || proc == ProcessingState.buffering;
-
+    _player.playerStateStream.listen((ps) {
+      final loading = ps.processingState == ProcessingState.loading ||
+          ps.processingState == ProcessingState.buffering;
       isLoading.value = loading;
       isPlaying.value = ps.playing;
 
@@ -142,63 +72,204 @@ class AudioService extends GetxService {
         state.value = PlaybackState.loading;
       } else if (ps.playing) {
         state.value = PlaybackState.playing;
-      } else if (proc == ProcessingState.ready) {
+      } else if (ps.processingState == ProcessingState.ready ||
+          ps.processingState == ProcessingState.completed) {
         state.value = PlaybackState.paused;
-      } else if (proc == ProcessingState.completed || proc == ProcessingState.idle) {
-        if (_keepLastItem && currentItem.value != null && !ps.playing) {
-          state.value = PlaybackState.paused;
-          isPlaying.value = false;
-        } else {
-          state.value = PlaybackState.stopped;
-          isPlaying.value = false;
-          currentItem.value = null;
-          currentVariant.value = null;
-        }
+      } else {
+        state.value = PlaybackState.stopped;
       }
 
-      _updateWidget();
+      _notifyHandler();
     });
 
-    _indexSub = _player.currentIndexStream.listen((idx) {
+    _player.currentIndexStream.listen((idx) {
       if (idx == null) return;
       if (idx < 0 || idx >= _queueItems.length) return;
       if (idx >= _queueVariants.length) return;
 
+      _activeIndex = idx;
       final item = _queueItems[idx];
       final variant = _queueVariants[idx];
-
-      _currentItem = item;
-      _currentVariant = variant;
-
       currentItem.value = item;
       currentVariant.value = variant;
-
       _persistLastItem(item, variant);
       _keepLastItem = true;
-      _syncQueueToHandler();
+      _notifyHandler();
     });
   }
 
-  Stream<Duration> get positionStream => _player.positionStream;
-  Stream<Duration?> get durationStream => _player.durationStream;
-  Stream<ProcessingState> get processingStateStream =>
-      _player.processingStateStream;
-  Stream<int?> get androidAudioSessionIdStream =>
-      _player.androidAudioSessionIdStream;
-  int? get androidAudioSessionId => _player.androidAudioSessionId;
-
-  final Rx<LoopMode> loopMode = LoopMode.off.obs;
-  final RxDouble speed = 1.0.obs;
-  final RxDouble volume = 1.0.obs;
-
-  Future<void> setLoopOff() async {
-    loopMode.value = LoopMode.off;
-    await _player.setLoopMode(LoopMode.off);
+  @override
+  void onClose() {
+    _player.dispose();
+    super.onClose();
   }
 
-  Future<void> setLoopOne() async {
-    loopMode.value = LoopMode.one;
-    await _player.setLoopMode(LoopMode.one);
+  void attachHandler(dynamic handler) {
+    _handler = handler;
+    _notifyHandler();
+  }
+
+  aud.MediaItem buildBackgroundItem(MediaItem item) {
+    final sec = item.effectiveDurationSeconds;
+    return aud.MediaItem(
+      id: item.id,
+      title: item.title,
+      artist: item.displaySubtitle.isEmpty ? null : item.displaySubtitle,
+      duration: (sec != null && sec > 0) ? Duration(seconds: sec) : null,
+      artUri: _resolveArtUri(item),
+    );
+  }
+
+  Uri? _resolveArtUri(MediaItem item) {
+    final local = item.thumbnailLocalPath?.trim();
+    if (local != null && local.isNotEmpty) return Uri.file(local);
+    final remote = item.thumbnail?.trim();
+    if (remote != null && remote.isNotEmpty) return Uri.tryParse(remote);
+    return null;
+  }
+
+  bool isSameTrack(MediaItem item, MediaVariant variant) {
+    return currentItem.value?.id == item.id &&
+        currentVariant.value?.kind == variant.kind &&
+        currentVariant.value?.format == variant.format;
+  }
+
+  Future<void> play(
+    MediaItem item,
+    MediaVariant variant, {
+    bool autoPlay = true,
+    List<MediaItem>? queue,
+    int? queueIndex,
+    bool forceReload = false,
+  }) async {
+    if (!forceReload &&
+        isSameTrack(item, variant) &&
+        hasSourceLoaded &&
+        _queueItems.isNotEmpty) {
+      if (autoPlay) await _player.play();
+      return;
+    }
+
+    isLoading.value = true;
+    state.value = PlaybackState.loading;
+
+    try {
+      final built = _buildQueue(
+        selectedItem: item,
+        selectedVariant: variant,
+        queue: queue,
+        queueIndex: queueIndex,
+      );
+
+      _queueItems = built.items;
+      _queueVariants = built.variants;
+      _activeIndex = built.index;
+
+      final sources = <AudioSource>[];
+      for (var i = 0; i < _queueItems.length; i++) {
+        sources.add(
+          AudioSource.uri(_resolvePlayableUri(_queueItems[i], _queueVariants[i])),
+        );
+      }
+      await _player.setAudioSources(sources, initialIndex: _activeIndex);
+
+      currentItem.value = _queueItems[_activeIndex];
+      currentVariant.value = _queueVariants[_activeIndex];
+      _persistLastItem(_queueItems[_activeIndex], _queueVariants[_activeIndex]);
+      _keepLastItem = true;
+      if (autoPlay) {
+        await _player.play();
+      } else {
+        await _player.pause();
+      }
+      _notifyHandler();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Uri _resolvePlayableUri(MediaItem item, MediaVariant variant) {
+    final local = variant.localPath?.trim();
+    if (local != null && local.isNotEmpty) {
+      final f = File(local);
+      if (!f.existsSync()) {
+        throw Exception('Archivo no encontrado: $local');
+      }
+      return Uri.file(local);
+    }
+
+    final fileName = variant.fileName.trim();
+    if (fileName.startsWith('http://') || fileName.startsWith('https://')) {
+      return Uri.parse(fileName);
+    }
+
+    if (item.playableUrl.trim().isNotEmpty) {
+      return Uri.parse(item.playableUrl.trim());
+    }
+
+    final kind = variant.kind == MediaVariantKind.video ? 'video' : 'audio';
+    final fileId = item.fileId.trim();
+    final format = variant.format.trim();
+    if (fileId.isEmpty || format.isEmpty) {
+      throw Exception('No hay URL remota disponible para reproducir.');
+    }
+    return Uri.parse('${ApiConfig.baseUrl}/api/v1/media/file/$fileId/$kind/$format');
+  }
+
+  Future<void> toggle() async {
+    if (_player.playing) {
+      await _player.pause();
+      return;
+    }
+    if (hasSourceLoaded) {
+      await _player.play();
+    }
+  }
+
+  Future<void> pause() => _player.pause();
+
+  Future<void> resume() async {
+    if (!hasSourceLoaded) return;
+    await _player.play();
+  }
+
+  Future<void> stop() async {
+    await _player.stop();
+    isPlaying.value = false;
+    isLoading.value = false;
+    state.value = PlaybackState.stopped;
+    currentItem.value = null;
+    currentVariant.value = null;
+    _queueItems = <MediaItem>[];
+    _queueVariants = <MediaVariant>[];
+    _activeIndex = 0;
+    _keepLastItem = false;
+    _notifyHandler();
+  }
+
+  Future<void> seek(Duration position) async {
+    if (!hasSourceLoaded) return;
+    await _player.seek(position);
+  }
+
+  Future<void> next() async {
+    if (_queueItems.isEmpty) return;
+    final target = currentQueueIndex + 1;
+    if (target < 0 || target >= _queueItems.length) return;
+    final wasPlaying = _player.playing;
+    await _player.seek(Duration.zero, index: target);
+    _activeIndex = target;
+    if (wasPlaying) await _player.play();
+  }
+
+  Future<void> previous() async {
+    if (_queueItems.isEmpty) return;
+    final target = currentQueueIndex - 1;
+    if (target < 0 || target >= _queueItems.length) return;
+    final wasPlaying = _player.playing;
+    await _player.seek(Duration.zero, index: target);
+    _activeIndex = target;
+    if (wasPlaying) await _player.play();
   }
 
   Future<void> setSpeed(double value) async {
@@ -212,571 +283,24 @@ class AudioService extends GetxService {
     await _player.setVolume(clamped);
   }
 
-  Future<void> setShuffle(bool enabled) async {
-    await _runExclusive(() async {
-      if (_shuffleEnabled == enabled) return;
-      _shuffleEnabled = enabled;
-
-      if (!hasSourceLoaded || _linearItems.isEmpty || _linearVariants.isEmpty) {
-        return;
-      }
-
-      final wasPlaying = _player.playing;
-      final currentPos = _player.position;
-      final linearIndex = _findLinearIndex(
-        _currentItem,
-        _currentVariant,
-      ).clamp(0, _linearItems.length - 1);
-
-      int nextIndex;
-      if (enabled) {
-        final indices = _buildShuffledIndices(
-          _linearItems.length,
-          startAt: linearIndex,
-        );
-        _assignActiveQueueFromIndices(indices);
-        nextIndex = 0;
-      } else {
-        _queueItems = List<MediaItem>.from(_linearItems);
-        _queueVariants = List<MediaVariant>.from(_linearVariants);
-        nextIndex = linearIndex;
-      }
-
-      await _player.stop();
-      await _player.setAudioSources(
-        _buildSources(_queueItems, _queueVariants),
-        initialIndex: nextIndex,
-        initialPosition: currentPos,
-      );
-
-      _currentItem = _queueItems[nextIndex];
-      _currentVariant = _queueVariants[nextIndex];
-      currentItem.value = _currentItem;
-      currentVariant.value = _currentVariant;
-
-      _syncQueueToHandler();
-      _updateWidget();
-
-      if (wasPlaying) {
-        await _player.play();
-      } else {
-        await _player.pause();
-      }
-    });
-  }
-
-  Future<void> next() async {
-    if (!hasSourceLoaded || !_player.hasNext) return;
-    await _player.seekToNext();
-  }
-
-  Future<void> previous() async {
-    if (!hasSourceLoaded || !_player.hasPrevious) return;
-    await _player.seekToPrevious();
-  }
-
-  Future<AndroidEqualizerParameters?> getEqParameters() async {
-    final eq = _equalizer;
-    if (eq == null) return null;
-    return eq.parameters;
-  }
-
-  Future<void> setEqEnabled(bool enabled) async {
-    final eq = _equalizer;
-    if (eq == null) return;
-    await eq.setEnabled(enabled);
-  }
-
-  Future<void> setEqBandGain(int index, double gain) async {
-    final eq = _equalizer;
-    if (eq == null) return;
-    final params = await eq.parameters;
-    if (index < 0 || index >= params.bands.length) return;
-    await params.bands[index].setGain(gain);
-  }
-
-  Future<void> seek(Duration position) async {
-    if (!hasSourceLoaded) return;
-    await _player.seek(position);
-  }
-
-  Future<void> replay() async {
-    if (!hasSourceLoaded) return;
-    await _player.seek(Duration.zero);
-    await _player.play();
-  }
-
-  Future<void> resume() async {
-    if (!hasSourceLoaded) return;
-    await _player.play();
-  }
-
-  Future<void> play(
-    MediaItem item,
-    MediaVariant variant, {
-    bool autoPlay = true,
-    List<MediaItem>? queue,
-    int? queueIndex,
-    bool forceReload = false,
-  }) async {
-    await _runExclusive(() async {
-      if (!variant.isValid) {
-        throw Exception('No existe archivo para reproducir (variant inválido).');
-      }
-
-      if (!forceReload && isSameTrack(item, variant) && hasSourceLoaded) {
-        if (autoPlay && !_player.playing) await _player.play();
-        return;
-      }
-
-      isLoading.value = true;
-      isPlaying.value = false;
-      state.value = PlaybackState.loading;
-
-      try {
-        final built = _buildPlaybackQueue(
-          explicitQueue: queue,
-          selectedItem: item,
-          selectedVariant: variant,
-          queueIndex: queueIndex,
-        );
-
-        _linearItems = List<MediaItem>.from(built.items);
-        _linearVariants = List<MediaVariant>.from(built.variants);
-
-        final bool shuffleOn = _shuffleEnabled && _linearItems.length > 1;
-        int selected;
-
-        if (shuffleOn) {
-          final indices = _buildShuffledIndices(
-            _linearItems.length,
-            startAt: built.startIndex.clamp(0, _linearItems.length - 1),
-          );
-          _assignActiveQueueFromIndices(indices);
-          selected = 0;
-        } else {
-          _queueItems = List<MediaItem>.from(_linearItems);
-          _queueVariants = List<MediaVariant>.from(_linearVariants);
-          selected = built.startIndex;
-        }
-
-        await _player.stop();
-        await _player.setAudioSources(
-          _buildSources(_queueItems, _queueVariants),
-          initialIndex: selected,
-          initialPosition: Duration.zero,
-        );
-
-        _currentItem = _queueItems[selected];
-        _currentVariant = _queueVariants[selected];
-
-        currentItem.value = _currentItem;
-        currentVariant.value = _currentVariant;
-
-        _persistLastItem(_currentItem!, _currentVariant!);
-        _keepLastItem = true;
-
-        await _player.setVolume(volume.value);
-        await _applyEqFromSettings();
-
-        _syncQueueToHandler();
-        _updateWidget();
-
-        if (autoPlay) {
-          await _player.play();
-        } else {
-          await _player.pause();
-          state.value = PlaybackState.paused;
-          isPlaying.value = false;
-        }
-      } on PlayerException catch (e) {
-        await _resetAfterPlaybackError();
-        throw Exception('Error al reproducir: ${e.message} (code: ${e.code})');
-      } catch (_) {
-        await _resetAfterPlaybackError();
-        rethrow;
-      } finally {
-        isLoading.value = false;
-      }
-    });
-  }
-
-  _BuiltQueue _buildPlaybackQueue({
-    required MediaItem selectedItem,
-    required MediaVariant selectedVariant,
-    List<MediaItem>? explicitQueue,
-    int? queueIndex,
-  }) {
-    final input = explicitQueue == null || explicitQueue.isEmpty
-        ? <MediaItem>[selectedItem]
-        : explicitQueue;
-
-    final items = <MediaItem>[];
-    final variants = <MediaVariant>[];
-    int startIndex = 0;
-    final useExplicitIndex =
-        queueIndex != null && queueIndex >= 0 && queueIndex < input.length;
-    var explicitMatched = false;
-
-    for (var i = 0; i < input.length; i++) {
-      final entry = input[i];
-      final v = _resolveVariantForQueueEntry(
-        queueEntry: entry,
-        selectedItem: selectedItem,
-        selectedVariant: selectedVariant,
-      );
-      if (v == null || !v.isValid) continue;
-
-      items.add(entry);
-      variants.add(v);
-
-      if (useExplicitIndex && i == queueIndex) {
-        startIndex = items.length - 1;
-        explicitMatched = true;
-        continue;
-      }
-
-      if (!explicitMatched && _sameItem(entry, selectedItem)) {
-        startIndex = items.length - 1;
-      }
-    }
-
-    if (items.isEmpty) {
-      items.add(selectedItem);
-      variants.add(selectedVariant);
-      startIndex = 0;
-    }
-
-    if (startIndex < 0 || startIndex >= items.length) {
-      startIndex = 0;
-    }
-
-    return _BuiltQueue(
-      items: items,
-      variants: variants,
-      startIndex: startIndex,
-    );
-  }
-
-  List<AudioSource> _buildSources(
-    List<MediaItem> items,
-    List<MediaVariant> variants,
-  ) {
-    final out = <AudioSource>[];
-    for (var i = 0; i < items.length; i++) {
-      out.add(_audioSourceFor(items[i], variants[i]));
-    }
-    return out;
-  }
-
-  int _findLinearIndex(MediaItem? item, MediaVariant? variant) {
-    if (item == null || variant == null) return 0;
-    for (var i = 0; i < _linearItems.length; i++) {
-      final it = _linearItems[i];
-      final v = _linearVariants[i];
-      if (it.id == item.id && v.kind == variant.kind && v.format == variant.format) {
-        return i;
-      }
-      final pid = item.publicId.trim();
-      if (pid.isNotEmpty && it.publicId.trim() == pid) {
-        return i;
-      }
-    }
-    return 0;
-  }
-
-  List<int> _buildShuffledIndices(int length, {required int startAt}) {
-    final indices = List<int>.generate(length, (i) => i);
-    indices.remove(startAt);
-    indices.shuffle(Random());
-    indices.insert(0, startAt);
-    return indices;
-  }
-
-  void _assignActiveQueueFromIndices(List<int> indices) {
-    _queueItems = indices.map((i) => _linearItems[i]).toList();
-    _queueVariants = indices.map((i) => _linearVariants[i]).toList();
-  }
-
-  MediaVariant? _resolveVariantForQueueEntry({
-    required MediaItem queueEntry,
-    required MediaItem selectedItem,
-    required MediaVariant selectedVariant,
-  }) {
-    if (_sameItem(queueEntry, selectedItem)) return selectedVariant;
-
-    for (final v in queueEntry.variants) {
-      final local = v.localPath?.trim();
-      if (v.kind == MediaVariantKind.audio &&
-          v.isValid &&
-          local != null &&
-          local.isNotEmpty) {
-        return v;
-      }
-    }
-
-    for (final v in queueEntry.variants) {
-      if (v.kind == MediaVariantKind.audio && v.isValid) return v;
-    }
-
-    return null;
-  }
-
-  bool _sameItem(MediaItem a, MediaItem b) {
-    if (a.id == b.id) return true;
-    final ap = a.publicId.trim();
-    final bp = b.publicId.trim();
-    return ap.isNotEmpty && bp.isNotEmpty && ap == bp;
-  }
-
-  AudioSource _audioSourceFor(MediaItem item, MediaVariant variant) {
-    final localPath = variant.localPath?.trim();
-    if (localPath != null && localPath.isNotEmpty) {
-      final file = File(localPath);
-      if (!file.existsSync()) {
-        throw Exception('Archivo local no encontrado: $localPath');
-      }
-      return AudioSource.uri(
-        Uri.file(localPath),
-        tag: _buildBackgroundItem(item),
-      );
-    }
-
-    final kind = variant.kind == MediaVariantKind.video ? 'video' : 'audio';
-    final fileId = item.fileId.trim();
-    final format = variant.format.trim();
-
-    if (fileId.isEmpty || format.isEmpty) {
-      throw Exception('Faltan datos para reproducción remota.');
-    }
-
-    final url = '${ApiConfig.baseUrl}/api/v1/media/file/$fileId/$kind/$format';
-    return AudioSource.uri(Uri.parse(url), tag: _buildBackgroundItem(item));
-  }
-
-  Future<void> _resetAfterPlaybackError() async {
-    try {
-      await _player.stop();
-    } catch (_) {}
-
-    _currentItem = null;
-    _currentVariant = null;
-    _queueItems = <MediaItem>[];
-    _queueVariants = <MediaVariant>[];
-    _linearItems = <MediaItem>[];
-    _linearVariants = <MediaVariant>[];
-    currentItem.value = null;
-    currentVariant.value = null;
-
-    isPlaying.value = false;
-    state.value = PlaybackState.stopped;
-  }
-
-  aud.MediaItem _buildBackgroundItem(MediaItem item) {
-    Uri? artUri;
-
-    final local = item.thumbnailLocalPath?.trim();
-    if (local != null && local.isNotEmpty) {
-      artUri = Uri.file(local);
-    } else {
-      final remote = item.thumbnail?.trim();
-      if (remote != null && remote.isNotEmpty) {
-        artUri = Uri.tryParse(remote);
-      }
-    }
-
-    final sec = item.effectiveDurationSeconds;
-    final duration = (sec != null && sec > 0) ? Duration(seconds: sec) : null;
-
-    String? subtitle = item.displaySubtitle.isNotEmpty
-        ? item.displaySubtitle
-        : null;
-
-    if (Get.isRegistered<SettingsController>()) {
-      final settings = Get.find<SettingsController>();
-      final remaining = settings.sleepRemaining.value;
-      if (settings.sleepTimerEnabled.value && remaining > Duration.zero) {
-        final tag = _formatRemaining(remaining);
-        subtitle = (subtitle == null || subtitle.isEmpty)
-            ? 'Temporizador $tag'
-            : '$subtitle\nTemporizador $tag';
-      }
-    }
-
-    return aud.MediaItem(
-      id: item.id,
-      title: item.title,
-      artist: subtitle,
-      duration: duration,
-      artUri: artUri,
-    );
-  }
-
-  String _formatRemaining(Duration value) {
-    final total = value.inSeconds;
-    final mm = (total ~/ 60).toString().padLeft(2, '0');
-    final ss = (total % 60).toString().padLeft(2, '0');
-    return '$mm:$ss';
-  }
-
-  void _syncQueueToHandler() {
-    final handler = _handler;
-    if (handler == null) return;
-
-    if (_queueItems.isNotEmpty) {
-      handler.updateQueue(_queueItems.map(_buildBackgroundItem).toList());
-    }
-    if (_currentItem != null) {
-      handler.updateMediaItem(_buildBackgroundItem(_currentItem!));
-    }
-
-    _updateWidget();
-  }
-
-  void refreshNotification() {
-    if (_currentItem == null) return;
-    _syncQueueToHandler();
-  }
+  Future<void> setLoopOff() => _player.setLoopMode(LoopMode.off);
+  Future<void> setLoopOne() => _player.setLoopMode(LoopMode.one);
+  Future<void> setShuffle(bool enabled) async {}
+
+  Future<AndroidEqualizerParameters?> getEqParameters() async => null;
+  Future<void> setEqEnabled(bool enabled) async {}
+  Future<void> setEqBandGain(int index, double gain) async {}
 
   Future<void> stopAndDismissNotification() async {
     await stop();
     final handler = _handler;
-    if (handler != null) {
-      try {
-        await handler.stop();
-      } catch (_) {}
-    }
-  }
-
-  Future<void> _applyEqFromSettings() async {
-    final eq = _equalizer;
-    if (eq == null) return;
-    if (!Get.isRegistered<SettingsController>()) return;
-
-    final settings = Get.find<SettingsController>();
+    if (handler == null) return;
     try {
-      await setEqEnabled(settings.eqEnabled.value);
-      if (settings.eqGains.isEmpty) return;
-
-      final params = await eq.parameters;
-      final bands = params.bands.length;
-      final gains = settings.eqGains;
-
-      for (var i = 0; i < bands && i < gains.length; i++) {
-        await params.bands[i].setGain(gains[i]);
-      }
+      await handler.stop();
     } catch (_) {}
   }
 
-  Future<void> toggle() async {
-    if (_player.playing) {
-      await _player.pause();
-      return;
-    }
-
-    if (hasSourceLoaded) {
-      await _player.play();
-      return;
-    }
-
-    if (_currentItem != null && _currentVariant != null) {
-      await play(_currentItem!, _currentVariant!, autoPlay: true);
-    }
-  }
-
-  Future<void> pause() => _player.pause();
-
-  Future<void> stop() async {
-    await _player.stop();
-
-    state.value = PlaybackState.stopped;
-    isPlaying.value = false;
-    isLoading.value = false;
-
-    _currentItem = null;
-    _currentVariant = null;
-    _queueItems = <MediaItem>[];
-    _queueVariants = <MediaVariant>[];
-    _linearItems = <MediaItem>[];
-    _linearVariants = <MediaVariant>[];
-
-    currentItem.value = null;
-    currentVariant.value = null;
-
-    _keepLastItem = false;
-    _updateWidget();
-  }
-
-  Future<void> _updateWidget() async {
-    if (!Platform.isAndroid) return;
-
-    final item = _currentItem;
-    String title = 'Listenfy';
-    String artist = '';
-    String artPath = '';
-
-    if (item != null) {
-      title = item.title;
-      artist = item.displaySubtitle;
-      artPath = await _resolveWidgetArtPath(item);
-    }
-
-    Color barColor = const Color(0xFF1E2633);
-    if (Get.isRegistered<ThemeController>()) {
-      final theme = Get.find<ThemeController>();
-      barColor = theme.palette.value.primary;
-    }
-
-    final logoColor =
-        barColor.computeLuminance() > 0.55 ? Colors.black : Colors.white;
-
-    try {
-      await _widgetChannel.invokeMethod('updateWidget', {
-        'title': title,
-        'artist': artist,
-        'artPath': artPath,
-        'playing': isPlaying.value,
-        'barColor': barColor.value,
-        'logoColor': logoColor.value,
-      });
-    } catch (_) {}
-  }
-
-  Future<String> _resolveWidgetArtPath(MediaItem item) async {
-    final local = item.thumbnailLocalPath?.trim();
-    if (local != null && local.isNotEmpty) {
-      final file = File(local);
-      if (await file.exists()) return file.path;
-    }
-
-    final remote = item.thumbnail?.trim();
-    if (remote == null || remote.isEmpty) return '';
-
-    final uri = Uri.tryParse(remote);
-    if (uri == null || (!uri.isScheme('http') && !uri.isScheme('https'))) {
-      return '';
-    }
-
-    try {
-      final dir = await getTemporaryDirectory();
-      final fileName = 'widget_thumb_${remote.hashCode}.img';
-      final file = File(p.join(dir.path, fileName));
-      if (await file.exists() && await file.length() > 0) {
-        return file.path;
-      }
-
-      final client = HttpClient();
-      final request = await client.getUrl(uri);
-      final response = await request.close();
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        await file.create(recursive: true);
-        await response.pipe(file.openWrite());
-        return file.path;
-      }
-    } catch (_) {}
-
-    return '';
-  }
+  void refreshNotification() => _notifyHandler();
 
   void clearLastItem() {
     _storage.remove(_lastItemKey);
@@ -794,44 +318,119 @@ class AudioService extends GetxService {
     if (rawItem == null) return;
 
     try {
-      final item = MediaItem.fromJson(Map<String, dynamic>.from(rawItem));
+      currentItem.value = MediaItem.fromJson(Map<String, dynamic>.from(rawItem));
       final rawVariant = _storage.read<Map>(_lastVariantKey);
-
-      MediaVariant? variant;
       if (rawVariant != null) {
-        variant = MediaVariant.fromJson(Map<String, dynamic>.from(rawVariant));
+        currentVariant.value = MediaVariant.fromJson(
+          Map<String, dynamic>.from(rawVariant),
+        );
       }
-
-      _currentItem = item;
-      _currentVariant = variant;
-
-      currentItem.value = item;
-      currentVariant.value = variant;
-
-      state.value = PlaybackState.paused;
-      isPlaying.value = false;
-
       _keepLastItem = true;
+      state.value = PlaybackState.paused;
     } catch (_) {}
   }
 
-  @override
-  void onClose() {
-    _playerStateSub?.cancel();
-    _indexSub?.cancel();
-    _player.dispose();
-    super.onClose();
+  void _notifyHandler() {
+    final handler = _handler;
+    if (handler == null) return;
+    final item = currentItem.value;
+    if (item != null) {
+      handler.updateMediaItem(buildBackgroundItem(item));
+      if (_queueItems.isNotEmpty) {
+        handler.updateQueue(_queueItems.map(buildBackgroundItem).toList());
+      } else {
+        handler.updateQueue([buildBackgroundItem(item)]);
+      }
+    }
+    handler.updatePlayback(
+      playing: isPlaying.value,
+      buffering: isLoading.value,
+      position: _player.position,
+      speed: speed.value,
+    );
+  }
+
+  _BuiltQueue _buildQueue({
+    required MediaItem selectedItem,
+    required MediaVariant selectedVariant,
+    required List<MediaItem>? queue,
+    required int? queueIndex,
+  }) {
+    if (!selectedVariant.isValid) {
+      throw Exception('Variante inválida para reproducir.');
+    }
+
+    final source = (queue == null || queue.isEmpty)
+        ? <MediaItem>[selectedItem]
+        : queue;
+
+    final outItems = <MediaItem>[];
+    final outVariants = <MediaVariant>[];
+    var start = 0;
+
+    final useExplicit = queueIndex != null &&
+        queueIndex >= 0 &&
+        queueIndex < source.length;
+
+    for (var i = 0; i < source.length; i++) {
+      final qItem = source[i];
+      final qVariant = _resolveQueueVariant(
+        queueItem: qItem,
+        selectedItem: selectedItem,
+        selectedVariant: selectedVariant,
+      );
+      if (qVariant == null) continue;
+
+      outItems.add(qItem);
+      outVariants.add(qVariant);
+
+      if (useExplicit && i == queueIndex) {
+        start = outItems.length - 1;
+      } else if (!useExplicit && _sameItem(qItem, selectedItem)) {
+        start = outItems.length - 1;
+      }
+    }
+
+    if (outItems.isEmpty) {
+      outItems.add(selectedItem);
+      outVariants.add(selectedVariant);
+      start = 0;
+    }
+
+    if (start < 0 || start >= outItems.length) start = 0;
+
+    return _BuiltQueue(items: outItems, variants: outVariants, index: start);
+  }
+
+  MediaVariant? _resolveQueueVariant({
+    required MediaItem queueItem,
+    required MediaItem selectedItem,
+    required MediaVariant selectedVariant,
+  }) {
+    if (_sameItem(queueItem, selectedItem)) return selectedVariant;
+
+    for (final v in queueItem.variants) {
+      if (v.kind == MediaVariantKind.audio && v.isValid) return v;
+    }
+    return null;
+  }
+
+  bool _sameItem(MediaItem a, MediaItem b) {
+    if (a.id == b.id) return true;
+    final ap = a.publicId.trim();
+    final bp = b.publicId.trim();
+    return ap.isNotEmpty && bp.isNotEmpty && ap == bp;
   }
 }
 
 class _BuiltQueue {
   final List<MediaItem> items;
   final List<MediaVariant> variants;
-  final int startIndex;
+  final int index;
 
   const _BuiltQueue({
     required this.items,
     required this.variants,
-    required this.startIndex,
+    required this.index,
   });
 }
