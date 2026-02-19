@@ -4,6 +4,11 @@ import 'audio_service.dart' as app;
 
 class AppAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   final app.AudioService _audio;
+  static const MediaControl closeControl = MediaControl(
+    androidIcon: 'drawable/ic_close',
+    label: 'Cerrar',
+    action: MediaAction.stop,
+  );
 
   AppAudioHandler(this._audio);
 
@@ -22,7 +27,7 @@ class AppAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
         controls: [
           MediaControl.skipToPrevious,
           if (playing) MediaControl.pause else MediaControl.play,
-          MediaControl.stop,
+          closeControl,
           MediaControl.skipToNext,
         ],
         systemActions: const {
