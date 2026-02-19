@@ -21,6 +21,11 @@ class AudioService extends GetxService {
   static const _shuffleEnabledKey = 'audio_shuffle_enabled';
   static const _speedKey = 'audio_speed';
   static const _crossfadeSecondsKey = 'audio_crossfade_seconds';
+  static const _sessionQueueItemsKey = 'audio_session_queue_items';
+  static const _sessionQueueVariantsKey = 'audio_session_queue_variants';
+  static const _sessionIndexKey = 'audio_session_index';
+  static const _sessionPositionMsKey = 'audio_session_position_ms';
+  static const _sessionWasPlayingKey = 'audio_session_was_playing';
 
   final Rx<PlaybackState> state = PlaybackState.stopped.obs;
   final RxBool isPlaying = false.obs;
@@ -43,6 +48,7 @@ class AudioService extends GetxService {
   int _activeIndex = 0;
   bool _shuffleEnabled = false;
   bool get shuffleEnabled => _shuffleEnabled;
+  DateTime _lastSessionPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   bool get eqSupported => false;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
@@ -97,6 +103,7 @@ class AudioService extends GetxService {
       }
 
       _notifyHandler();
+      _persistSessionSnapshot(throttle: true);
     });
 
     _player.currentIndexStream.listen((idx) {
@@ -112,11 +119,19 @@ class AudioService extends GetxService {
       _persistLastItem(item, variant);
       _keepLastItem = true;
       _notifyHandler();
+      _persistSessionSnapshot();
     });
+
+    _player.positionStream.listen((_) {
+      _persistSessionSnapshot(throttle: true);
+    });
+
+    await _restoreSessionIfAny();
   }
 
   @override
   void onClose() {
+    _persistSessionSnapshot();
     _player.dispose();
     super.onClose();
   }
@@ -286,12 +301,14 @@ class AudioService extends GetxService {
     _linearVariants = <MediaVariant>[];
     _activeIndex = 0;
     _keepLastItem = false;
+    _clearSessionSnapshot();
     _notifyHandler();
   }
 
   Future<void> seek(Duration position) async {
     if (!hasSourceLoaded) return;
     await _player.seek(position);
+    _persistSessionSnapshot();
   }
 
   Future<void> next({bool withTransition = false}) async {
@@ -326,6 +343,7 @@ class AudioService extends GetxService {
     speed.value = value;
     _storage.write(_speedKey, value);
     await _player.setSpeed(value);
+    _persistSessionSnapshot();
   }
 
   Future<void> setVolume(double value) async {
@@ -456,6 +474,7 @@ class AudioService extends GetxService {
     } else {
       await _player.pause();
     }
+    _persistSessionSnapshot();
     _notifyHandler();
   }
 
@@ -478,6 +497,7 @@ class AudioService extends GetxService {
     _storage.remove(_lastItemKey);
     _storage.remove(_lastVariantKey);
     _keepLastItem = false;
+    _clearSessionSnapshot();
   }
 
   void _persistLastItem(MediaItem item, MediaVariant variant) {
@@ -500,6 +520,113 @@ class AudioService extends GetxService {
       _keepLastItem = true;
       state.value = PlaybackState.paused;
     } catch (_) {}
+  }
+
+  Future<void> _restoreSessionIfAny() async {
+    final rawItems = _storage.read<List>(_sessionQueueItemsKey);
+    final rawVariants = _storage.read<List>(_sessionQueueVariantsKey);
+    if (rawItems == null || rawVariants == null) return;
+    if (rawItems.isEmpty || rawVariants.isEmpty) return;
+    if (rawItems.length != rawVariants.length) {
+      _clearSessionSnapshot();
+      return;
+    }
+
+    try {
+      final restoredItems = <MediaItem>[];
+      final restoredVariants = <MediaVariant>[];
+      for (var i = 0; i < rawItems.length; i++) {
+        final itemMap = rawItems[i];
+        final variantMap = rawVariants[i];
+        if (itemMap is! Map || variantMap is! Map) continue;
+
+        final item = MediaItem.fromJson(Map<String, dynamic>.from(itemMap));
+        final variant = MediaVariant.fromJson(
+          Map<String, dynamic>.from(variantMap),
+        );
+        if (!variant.isValid) continue;
+
+        restoredItems.add(item);
+        restoredVariants.add(variant);
+      }
+
+      if (restoredItems.isEmpty || restoredItems.length != restoredVariants.length) {
+        _clearSessionSnapshot();
+        return;
+      }
+
+      _queueItems = restoredItems;
+      _queueVariants = restoredVariants;
+      _linearItems = List<MediaItem>.from(restoredItems);
+      _linearVariants = List<MediaVariant>.from(restoredVariants);
+
+      final rawIndex = _storage.read<int>(_sessionIndexKey) ?? 0;
+      _activeIndex = rawIndex.clamp(0, _queueItems.length - 1).toInt();
+      final rawPositionMs = _storage.read<int>(_sessionPositionMsKey) ?? 0;
+      final initialPos = Duration(milliseconds: rawPositionMs.clamp(0, 86400000));
+      final wasPlaying = _storage.read<bool>(_sessionWasPlayingKey) ?? false;
+
+      final sources = <AudioSource>[];
+      for (var i = 0; i < _queueItems.length; i++) {
+        sources.add(
+          AudioSource.uri(_resolvePlayableUri(_queueItems[i], _queueVariants[i])),
+        );
+      }
+
+      await _player.setAudioSources(
+        sources,
+        initialIndex: _activeIndex,
+        initialPosition: initialPos,
+      );
+
+      currentItem.value = _queueItems[_activeIndex];
+      currentVariant.value = _queueVariants[_activeIndex];
+      _persistLastItem(_queueItems[_activeIndex], _queueVariants[_activeIndex]);
+      _keepLastItem = true;
+
+      if (wasPlaying) {
+        await _player.play();
+      } else {
+        await _player.pause();
+      }
+
+      _notifyHandler();
+    } catch (_) {
+      _clearSessionSnapshot();
+    }
+  }
+
+  void _persistSessionSnapshot({bool throttle = false}) {
+    if (_queueItems.isEmpty || _queueVariants.isEmpty) return;
+    if (_queueItems.length != _queueVariants.length) return;
+
+    if (throttle) {
+      final now = DateTime.now();
+      if (now.difference(_lastSessionPersistAt) < const Duration(seconds: 2)) {
+        return;
+      }
+      _lastSessionPersistAt = now;
+    }
+
+    _storage.write(
+      _sessionQueueItemsKey,
+      _queueItems.map((e) => e.toJson()).toList(growable: false),
+    );
+    _storage.write(
+      _sessionQueueVariantsKey,
+      _queueVariants.map((e) => e.toJson()).toList(growable: false),
+    );
+    _storage.write(_sessionIndexKey, currentQueueIndex);
+    _storage.write(_sessionPositionMsKey, _player.position.inMilliseconds);
+    _storage.write(_sessionWasPlayingKey, _player.playing);
+  }
+
+  void _clearSessionSnapshot() {
+    _storage.remove(_sessionQueueItemsKey);
+    _storage.remove(_sessionQueueVariantsKey);
+    _storage.remove(_sessionIndexKey);
+    _storage.remove(_sessionPositionMsKey);
+    _storage.remove(_sessionWasPlayingKey);
   }
 
   void _notifyHandler() {
