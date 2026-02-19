@@ -110,6 +110,27 @@ class AudioSection extends GetView<SettingsController> {
                 ),
 
                 const SizedBox(height: 8),
+                Obx(
+                  () => SectionBlock(
+                    title: 'Crossfade',
+                    subtitle:
+                        'Mezcla canciones al final/inicio de la transición.',
+                    trailing: ValuePill(
+                      text: controller.crossfadeSeconds.value == 0
+                          ? 'Off'
+                          : '${controller.crossfadeSeconds.value}s',
+                    ),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: const [0, 2, 4, 6].map((seconds) {
+                        return _CrossfadeChip(seconds: seconds);
+                      }).toList(),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 8),
                 Divider(color: theme.dividerColor.withOpacity(.12)),
                 const SizedBox(height: 8),
 
@@ -480,6 +501,22 @@ class AudioSection extends GetView<SettingsController> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CrossfadeChip extends GetView<SettingsController> {
+  final int seconds;
+
+  const _CrossfadeChip({required this.seconds});
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = controller.crossfadeSeconds.value == seconds;
+    return ChoiceChip(
+      label: Text(seconds == 0 ? 'Off' : '${seconds}s'),
+      selected: selected,
+      onSelected: (_) => controller.setCrossfadeSeconds(seconds),
     );
   }
 }

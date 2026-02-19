@@ -20,12 +20,14 @@ class AudioService extends GetxService {
   static const _lastVariantKey = 'audio_last_variant';
   static const _shuffleEnabledKey = 'audio_shuffle_enabled';
   static const _speedKey = 'audio_speed';
+  static const _crossfadeSecondsKey = 'audio_crossfade_seconds';
 
   final Rx<PlaybackState> state = PlaybackState.stopped.obs;
   final RxBool isPlaying = false.obs;
   final RxBool isLoading = false.obs;
   final RxDouble speed = 1.0.obs;
   final RxDouble volume = 1.0.obs;
+  final RxInt crossfadeSeconds = 0.obs;
 
   final Rxn<MediaItem> currentItem = Rxn<MediaItem>();
   final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
@@ -73,6 +75,8 @@ class AudioService extends GetxService {
       speed.value = storedSpeed;
       await _player.setSpeed(storedSpeed);
     }
+    final storedCrossfade = _storage.read<int>(_crossfadeSecondsKey) ?? 0;
+    crossfadeSeconds.value = storedCrossfade.clamp(0, 12);
     _restoreLastItem();
 
     _player.playerStateStream.listen((ps) {
@@ -162,14 +166,7 @@ class AudioService extends GetxService {
         incomingQueue.isNotEmpty &&
         _sameQueueById(incomingQueue, _queueItems)) {
       final target = (queueIndex ?? 0).clamp(0, _queueItems.length - 1).toInt();
-      final wasPlaying = _player.playing;
-      await _player.seek(Duration.zero, index: target);
-      _activeIndex = target;
-      if (autoPlay || wasPlaying) {
-        await _player.play();
-      } else {
-        await _player.pause();
-      }
+      await _transitionToIndex(target, autoPlay: autoPlay);
       return;
     }
 
@@ -297,37 +294,32 @@ class AudioService extends GetxService {
     await _player.seek(position);
   }
 
-  Future<void> next() async {
+  Future<void> next({bool withTransition = false}) async {
     if (_queueItems.isEmpty) return;
     final target = currentQueueIndex + 1;
     if (target < 0 || target >= _queueItems.length) return;
-    final wasPlaying = _player.playing;
-    await _player.seek(Duration.zero, index: target);
-    _activeIndex = target;
-    if (wasPlaying) await _player.play();
+    if (withTransition) {
+      await _transitionToIndex(target, autoPlay: true);
+      return;
+    }
+    await _seekToIndex(target, autoPlay: true);
   }
 
-  Future<void> previous() async {
+  Future<void> previous({bool withTransition = false}) async {
     if (_queueItems.isEmpty) return;
     final target = currentQueueIndex - 1;
     if (target < 0 || target >= _queueItems.length) return;
-    final wasPlaying = _player.playing;
-    await _player.seek(Duration.zero, index: target);
-    _activeIndex = target;
-    if (wasPlaying) await _player.play();
+    if (withTransition) {
+      await _transitionToIndex(target, autoPlay: true);
+      return;
+    }
+    await _seekToIndex(target, autoPlay: true);
   }
 
   Future<void> jumpToQueueIndex(int index) async {
     if (_queueItems.isEmpty) return;
     if (index < 0 || index >= _queueItems.length) return;
-    final wasPlaying = _player.playing;
-    await _player.seek(Duration.zero, index: index);
-    _activeIndex = index;
-    if (wasPlaying) {
-      await _player.play();
-    } else {
-      await _player.pause();
-    }
+    await _transitionToIndex(index, autoPlay: true);
   }
 
   Future<void> setSpeed(double value) async {
@@ -340,6 +332,73 @@ class AudioService extends GetxService {
     final clamped = value.clamp(0.0, 1.0);
     volume.value = clamped;
     await _player.setVolume(clamped);
+  }
+
+  Future<void> setCrossfadeSeconds(int seconds) async {
+    final safe = seconds.clamp(0, 12).toInt();
+    crossfadeSeconds.value = safe;
+    _storage.write(_crossfadeSecondsKey, safe);
+  }
+
+  Future<void> _transitionToIndex(
+    int target, {
+    required bool autoPlay,
+  }) async {
+    final wasPlaying = _player.playing;
+    final shouldFade = wasPlaying && crossfadeSeconds.value > 0;
+    if (shouldFade) {
+      await _fadeTo(
+        0.0,
+        Duration(milliseconds: (crossfadeSeconds.value * 500).clamp(120, 6000)),
+      );
+    }
+
+    await _player.seek(Duration.zero, index: target);
+    _activeIndex = target;
+
+    if (autoPlay || wasPlaying) {
+      await _player.play();
+    } else {
+      await _player.pause();
+    }
+
+    if (shouldFade) {
+      await _player.setVolume(0.0);
+      await _fadeTo(
+        volume.value,
+        Duration(milliseconds: (crossfadeSeconds.value * 500).clamp(120, 6000)),
+      );
+    }
+  }
+
+  Future<void> _seekToIndex(
+    int target, {
+    required bool autoPlay,
+  }) async {
+    final wasPlaying = _player.playing;
+    await _player.seek(Duration.zero, index: target);
+    _activeIndex = target;
+    if (autoPlay || wasPlaying) {
+      await _player.play();
+    } else {
+      await _player.pause();
+    }
+    await _player.setVolume(volume.value);
+  }
+
+  Future<void> _fadeTo(double target, Duration duration) async {
+    final start = _player.volume;
+    final steps = 12;
+    final diff = target - start;
+    if (diff.abs() < 0.001) return;
+    final stepMs = (duration.inMilliseconds / steps).round().clamp(8, 500);
+
+    for (var i = 1; i <= steps; i++) {
+      final t = i / steps;
+      final v = (start + diff * t).clamp(0.0, 1.0);
+      await _player.setVolume(v);
+      await Future.delayed(Duration(milliseconds: stepMs));
+    }
   }
 
   Future<void> setLoopOff() => _player.setLoopMode(LoopMode.off);

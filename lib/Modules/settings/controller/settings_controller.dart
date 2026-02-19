@@ -58,6 +58,7 @@ class SettingsController extends GetxController {
 
   // 🎵 Reproducción automática
   final RxBool autoPlayNext = true.obs;
+  final RxInt crossfadeSeconds = 0.obs;
 
   // 🌙 Sleep timer
   final RxBool sleepTimerEnabled = false.obs;
@@ -109,6 +110,7 @@ class SettingsController extends GetxController {
     downloadQuality.value = _storage.read('downloadQuality') ?? 'high';
     dataUsage.value = _storage.read('dataUsage') ?? 'all';
     autoPlayNext.value = _storage.read('autoPlayNext') ?? true;
+    crossfadeSeconds.value = _storage.read('audio_crossfade_seconds') ?? 0;
 
     ytdlpAdminToken.value = _storage.read('ytdlpAdminToken') ?? '';
     ytdlpAdminTokenController.text = ytdlpAdminToken.value;
@@ -148,6 +150,7 @@ class SettingsController extends GetxController {
     } catch (_) {}
 
     _applyVolumeToPlayers(defaultVolume.value);
+    _applyCrossfade();
     _initEqualizer();
   }
 
@@ -207,6 +210,15 @@ class SettingsController extends GetxController {
   void setAutoPlayNext(bool value) {
     autoPlayNext.value = value;
     _storage.write('autoPlayNext', value);
+  }
+
+  Future<void> setCrossfadeSeconds(int seconds) async {
+    final safe = seconds.clamp(0, 12).toInt();
+    crossfadeSeconds.value = safe;
+    _storage.write('audio_crossfade_seconds', safe);
+    if (Get.isRegistered<AudioService>()) {
+      await Get.find<AudioService>().setCrossfadeSeconds(safe);
+    }
   }
 
   // ==========================================================================
@@ -366,6 +378,11 @@ class SettingsController extends GetxController {
     }
   }
 
+  void _applyCrossfade() {
+    if (!Get.isRegistered<AudioService>()) return;
+    Get.find<AudioService>().setCrossfadeSeconds(crossfadeSeconds.value);
+  }
+
   Future<void> _initEqualizer() async {
     if (!Get.isRegistered<AudioService>()) return;
     final audio = Get.find<AudioService>();
@@ -481,6 +498,7 @@ class SettingsController extends GetxController {
     downloadQuality.value = 'high';
     dataUsage.value = 'all';
     autoPlayNext.value = true;
+    crossfadeSeconds.value = 0;
 
     await _storage.write('selectedPalette', selectedPalette.value);
     await _storage.write(
@@ -491,6 +509,7 @@ class SettingsController extends GetxController {
     await _storage.write('downloadQuality', downloadQuality.value);
     await _storage.write('dataUsage', dataUsage.value);
     await _storage.write('autoPlayNext', autoPlayNext.value);
+    await _storage.write('audio_crossfade_seconds', crossfadeSeconds.value);
 
     try {
       final themeCtrl = Get.find<ThemeController>();
@@ -562,6 +581,7 @@ class SettingsController extends GetxController {
         'autoPlayNext',
         'audio_shuffle_on',
         'audio_repeat_mode',
+        'audio_crossfade_seconds',
         'audio_queue_items',
         'audio_queue_index',
         'audio_resume_positions',

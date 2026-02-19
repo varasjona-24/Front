@@ -41,8 +41,8 @@ class AudioPlayerController extends GetxController {
   bool _countedCurrentSession = false;
   String _currentSessionTrackKey = '';
   bool _handlingCompleted = false;
-  bool _autoPauseHandledForTrack = false;
-  String _autoPauseTrackKey = '';
+  bool _endActionHandledForTrack = false;
+  String _endActionTrackKey = '';
 
   Rx<SpatialAudioMode> get spatialMode => _spatial.mode;
 
@@ -396,8 +396,8 @@ class AudioPlayerController extends GetxController {
   void _resetAutoPauseSession() {
     final item = audioService.currentItem.value;
     if (item == null) {
-      _autoPauseTrackKey = '';
-      _autoPauseHandledForTrack = false;
+      _endActionTrackKey = '';
+      _endActionHandledForTrack = false;
       return;
     }
 
@@ -405,14 +405,13 @@ class AudioPlayerController extends GetxController {
         ? item.publicId.trim()
         : item.id.trim();
 
-    if (_autoPauseTrackKey != key) {
-      _autoPauseTrackKey = key;
-      _autoPauseHandledForTrack = false;
+    if (_endActionTrackKey != key) {
+      _endActionTrackKey = key;
+      _endActionHandledForTrack = false;
     }
   }
 
   void _maybeApplyAutoPlayNextPolicy() {
-    if (_settings.autoPlayNext.value) return;
     if (!audioService.isPlaying.value) return;
 
     final item = audioService.currentItem.value;
@@ -421,17 +420,28 @@ class AudioPlayerController extends GetxController {
     final key = item.publicId.trim().isNotEmpty
         ? item.publicId.trim()
         : item.id.trim();
-    if (_autoPauseTrackKey != key) {
-      _autoPauseTrackKey = key;
-      _autoPauseHandledForTrack = false;
+    if (_endActionTrackKey != key) {
+      _endActionTrackKey = key;
+      _endActionHandledForTrack = false;
     }
 
-    if (_autoPauseHandledForTrack) return;
+    if (_endActionHandledForTrack) return;
     if (duration.value <= Duration.zero) return;
 
-    const stopMargin = Duration(milliseconds: 350);
-    if (position.value >= duration.value - stopMargin) {
-      _autoPauseHandledForTrack = true;
+    if (_settings.autoPlayNext.value) {
+      final secs = audioService.crossfadeSeconds.value;
+      if (secs <= 0) return;
+      final transitionMargin = Duration(seconds: secs.clamp(1, 12));
+      if (position.value >= duration.value - transitionMargin) {
+        _endActionHandledForTrack = true;
+        unawaited(audioService.next(withTransition: true));
+      }
+      return;
+    }
+
+    const pauseMargin = Duration(milliseconds: 350);
+    if (position.value >= duration.value - pauseMargin) {
+      _endActionHandledForTrack = true;
       unawaited(audioService.pause());
     }
   }
