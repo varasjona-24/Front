@@ -279,7 +279,6 @@ class _EditEntityPageState extends State<EditEntityPage> {
             item: _media!,
             title: _titleCtrl.text,
             subtitle: _subtitleCtrl.text,
-            durationText: _durationCtrl.text,
             thumbTouched: _thumbTouched,
             localThumbPath: _localThumbPath,
           )
@@ -721,9 +720,10 @@ class _EditEntityPageState extends State<EditEntityPage> {
                   padding: const EdgeInsets.all(16),
                   child: TextField(
                     controller: _durationCtrl,
-                    keyboardType: TextInputType.number,
+                    readOnly: true,
+                    enableInteractiveSelection: false,
                     decoration: const InputDecoration(
-                      labelText: 'Duracion en segundos (opcional)',
+                      labelText: 'Duracion detectada automaticamente (s)',
                       prefixIcon: Icon(Icons.timer_rounded),
                     ),
                   ),

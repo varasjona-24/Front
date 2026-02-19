@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -89,7 +90,7 @@ class DownloadsController extends GetxController {
                         : null,
                     minHeight: 6,
                     color: scheme.primary,
-                    backgroundColor: scheme.surfaceVariant,
+                    backgroundColor: scheme.surfaceContainerHighest,
                   ),
                 ],
               ),
@@ -480,6 +481,9 @@ class DownloadsController extends GetxController {
 
       final isVideo = const ['mp4', 'mkv', 'mov', 'webm'].contains(ext);
       final kind = isVideo ? MediaVariantKind.video : MediaVariantKind.audio;
+      final detectedDurationSeconds = kind == MediaVariantKind.audio
+          ? await _probeDurationSeconds(filePath)
+          : null;
 
       final id = await _buildStableId(filePath);
 
@@ -489,6 +493,7 @@ class DownloadsController extends GetxController {
         fileName: p.basename(filePath),
         localPath: filePath,
         createdAt: DateTime.now().millisecondsSinceEpoch,
+        durationSeconds: detectedDurationSeconds,
       );
 
       final item = MediaItem(
@@ -500,7 +505,7 @@ class DownloadsController extends GetxController {
         origin: SourceOrigin.device,
         thumbnail: null,
         variants: [variant],
-        durationSeconds: null,
+        durationSeconds: detectedDurationSeconds,
       );
 
       if (localFilesForImport.any((e) => e.id == item.id)) continue;
@@ -542,7 +547,10 @@ class DownloadsController extends GetxController {
         localPath: destPath,
         createdAt: v.createdAt,
         size: await destFile.length(),
-        durationSeconds: v.durationSeconds,
+        durationSeconds: v.durationSeconds ??
+            (v.kind == MediaVariantKind.audio
+                ? await _probeDurationSeconds(destPath)
+                : null),
       );
 
       final importedItem = MediaItem(
@@ -554,7 +562,8 @@ class DownloadsController extends GetxController {
         origin: item.origin,
         thumbnail: item.thumbnail,
         variants: [importedVariant],
-        durationSeconds: item.durationSeconds,
+        durationSeconds:
+            item.durationSeconds ?? importedVariant.durationSeconds,
       );
 
       await _store.upsert(importedItem);
@@ -596,5 +605,19 @@ class DownloadsController extends GetxController {
   String _sha1(String input) {
     final bytes = utf8.encode(input);
     return sha1.convert(bytes).toString();
+  }
+
+  Future<int?> _probeDurationSeconds(String filePath) async {
+    final player = AudioPlayer();
+    try {
+      await player.setFilePath(filePath);
+      final d = player.duration;
+      if (d == null || d <= Duration.zero) return null;
+      return d.inSeconds;
+    } catch (_) {
+      return null;
+    } finally {
+      await player.dispose();
+    }
   }
 }

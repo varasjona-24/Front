@@ -177,7 +177,6 @@ class EditEntityController extends GetxController {
     required MediaItem item,
     required String title,
     required String subtitle,
-    required String durationText,
     required bool thumbTouched,
     required String? localThumbPath,
   }) async {
@@ -189,21 +188,6 @@ class EditEntityController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
       );
       return false;
-    }
-
-    final rawDuration = durationText.trim();
-    int? durationSeconds;
-    if (rawDuration.isNotEmpty) {
-      final parsed = int.tryParse(rawDuration);
-      if (parsed == null || parsed < 0) {
-        Get.snackbar(
-          'Metadata',
-          'La duracion debe ser un numero valido',
-          snackPosition: SnackPosition.BOTTOM,
-        );
-        return false;
-      }
-      durationSeconds = parsed;
     }
 
     String? thumbRemoteUpdate;
@@ -224,7 +208,7 @@ class EditEntityController extends GetxController {
       subtitle: subtitle.trim(),
       thumbnail: thumbRemoteUpdate,
       thumbnailLocalPath: thumbLocalUpdate,
-      durationSeconds: durationSeconds ?? item.durationSeconds,
+      durationSeconds: item.durationSeconds,
     );
 
     await _store.upsert(updated);
