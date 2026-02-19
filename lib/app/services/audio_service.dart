@@ -26,6 +26,7 @@ class AudioService extends GetxService {
   static const _sessionIndexKey = 'audio_session_index';
   static const _sessionPositionMsKey = 'audio_session_position_ms';
   static const _sessionWasPlayingKey = 'audio_session_was_playing';
+  static const _resumePromptPendingKey = 'audio_resume_prompt_pending';
 
   final Rx<PlaybackState> state = PlaybackState.stopped.obs;
   final RxBool isPlaying = false.obs;
@@ -49,6 +50,10 @@ class AudioService extends GetxService {
   bool _shuffleEnabled = false;
   bool get shuffleEnabled => _shuffleEnabled;
   DateTime _lastSessionPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _nextHandlerStopShouldHardStop = false;
+
+  bool get resumePromptPending =>
+      _storage.read<bool>(_resumePromptPendingKey) ?? false;
 
   bool get eqSupported => false;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
@@ -308,6 +313,20 @@ class AudioService extends GetxService {
     _notifyHandler();
   }
 
+  Future<void> stopFromNotificationClose() async {
+    if (hasSourceLoaded) {
+      _persistSessionSnapshot();
+    }
+    _storage.write(_resumePromptPendingKey, true);
+
+    await _player.stop();
+    isPlaying.value = false;
+    isLoading.value = false;
+    state.value = PlaybackState.stopped;
+    _keepLastItem = currentItem.value != null;
+    _notifyHandler();
+  }
+
   Future<void> seek(Duration position) async {
     if (!hasSourceLoaded) return;
     await _player.seek(position);
@@ -490,8 +509,15 @@ class AudioService extends GetxService {
     final handler = _handler;
     if (handler == null) return;
     try {
+      _nextHandlerStopShouldHardStop = true;
       await handler.stop();
     } catch (_) {}
+  }
+
+  bool consumeNextHandlerStopShouldHardStop() {
+    final out = _nextHandlerStopShouldHardStop;
+    _nextHandlerStopShouldHardStop = false;
+    return out;
   }
 
   void refreshNotification() => _notifyHandler();
@@ -525,14 +551,14 @@ class AudioService extends GetxService {
     } catch (_) {}
   }
 
-  Future<void> _restoreSessionIfAny() async {
+  Future<bool> _restoreSessionIfAny({bool? autoPlayOverride}) async {
     final rawItems = _storage.read<List>(_sessionQueueItemsKey);
     final rawVariants = _storage.read<List>(_sessionQueueVariantsKey);
-    if (rawItems == null || rawVariants == null) return;
-    if (rawItems.isEmpty || rawVariants.isEmpty) return;
+    if (rawItems == null || rawVariants == null) return false;
+    if (rawItems.isEmpty || rawVariants.isEmpty) return false;
     if (rawItems.length != rawVariants.length) {
       _clearSessionSnapshot();
-      return;
+      return false;
     }
 
     try {
@@ -555,7 +581,7 @@ class AudioService extends GetxService {
 
       if (restoredItems.isEmpty || restoredItems.length != restoredVariants.length) {
         _clearSessionSnapshot();
-        return;
+        return false;
       }
 
       _queueItems = restoredItems;
@@ -587,15 +613,35 @@ class AudioService extends GetxService {
       _persistLastItem(_queueItems[_activeIndex], _queueVariants[_activeIndex]);
       _keepLastItem = true;
 
-      if (wasPlaying) {
+      final shouldAutoPlay = autoPlayOverride ?? wasPlaying;
+      if (shouldAutoPlay) {
         await _player.play();
       } else {
         await _player.pause();
       }
 
       _notifyHandler();
+      return true;
     } catch (_) {
       _clearSessionSnapshot();
+      return false;
+    }
+  }
+
+  Future<bool> restorePersistedSession({required bool autoPlay}) async {
+    final ok = await _restoreSessionIfAny(autoPlayOverride: autoPlay);
+    if (ok) {
+      _storage.write(_resumePromptPendingKey, false);
+    }
+    return ok;
+  }
+
+  Future<void> dismissResumePrompt({required bool discardSession}) async {
+    _storage.write(_resumePromptPendingKey, false);
+    if (discardSession) {
+      _clearSessionSnapshot();
+      clearLastItem();
+      await stop();
     }
   }
 

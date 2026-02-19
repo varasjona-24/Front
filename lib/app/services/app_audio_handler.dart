@@ -66,8 +66,14 @@ class AppAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   @override
   Future<void> stop() async {
-    await _audio.stop();
-    await super.stop();
+    if (_audio.consumeNextHandlerStopShouldHardStop()) {
+      await _audio.stop();
+      await super.stop();
+    } else {
+      await _audio.stopFromNotificationClose();
+      // No llamamos super.stop() aquí para que el servicio pueda volver
+      // a publicar notificación al reanudar desde la app.
+    }
   }
 
   @override

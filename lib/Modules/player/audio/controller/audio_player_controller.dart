@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
@@ -102,6 +103,11 @@ class AudioPlayerController extends GetxController {
   }
 
   void applyRouteArgs(dynamic args) {
+    if (audioService.resumePromptPending) {
+      unawaited(_handleResumePrompt(args));
+      return;
+    }
+
     if (args is! Map) return;
     final rawQueue = args['queue'];
     final rawIndex = args['index'];
@@ -115,6 +121,50 @@ class AudioPlayerController extends GetxController {
         .toInt();
 
     _playCurrent(forceReload: true);
+  }
+
+  Future<void> _handleResumePrompt(dynamic args) async {
+    final resume = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Continuar reproducción'),
+        content: const Text(
+          'Cerraste la notificación. ¿Deseas continuar desde donde se quedó?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Sí'),
+          ),
+        ],
+      ),
+      barrierDismissible: true,
+    );
+
+    if (resume == true) {
+      final ok = await audioService.restorePersistedSession(autoPlay: true);
+      if (ok) {
+        _syncFromService();
+        _resetCountSession();
+        _resetAutoPauseSession();
+        return;
+      }
+    }
+
+    await audioService.dismissResumePrompt(discardSession: true);
+
+    if (args is! Map) return;
+    final rawQueue = args['queue'];
+    final rawIndex = args['index'];
+    final items = _extractItems(rawQueue);
+    if (items.isEmpty) return;
+    queue.assignAll(items);
+    currentIndex.value = (rawIndex is int ? rawIndex : 0)
+        .clamp(0, items.length - 1)
+        .toInt();
   }
 
   List<MediaItem> _extractItems(dynamic rawQueue) {
