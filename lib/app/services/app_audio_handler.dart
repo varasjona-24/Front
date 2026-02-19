@@ -15,12 +15,15 @@ class AppAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   Future<void> updatePlayback({
     required bool playing,
     required bool buffering,
+    required bool hasSourceLoaded,
     required Duration position,
     required double speed,
   }) async {
     final processingState = buffering
         ? AudioProcessingState.buffering
-        : (playing ? AudioProcessingState.ready : AudioProcessingState.idle);
+        : (hasSourceLoaded
+              ? AudioProcessingState.ready
+              : AudioProcessingState.idle);
 
     playbackState.add(
       PlaybackState(

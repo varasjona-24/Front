@@ -650,6 +650,7 @@ class AudioService extends GetxService {
     handler.updatePlayback(
       playing: isPlaying.value,
       buffering: isLoading.value,
+      hasSourceLoaded: hasSourceLoaded,
       position: _player.position,
       speed: speed.value,
     );
