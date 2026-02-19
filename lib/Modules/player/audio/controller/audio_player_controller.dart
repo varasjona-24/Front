@@ -123,7 +123,7 @@ class AudioPlayerController extends GetxController {
     _playCurrent(forceReload: true);
   }
 
-  Future<void> _handleResumePrompt(dynamic args) async {
+  Future<bool> _handleResumePrompt(dynamic args) async {
     final resume = await Get.dialog<bool>(
       AlertDialog(
         title: const Text('Continuar reproducción'),
@@ -150,21 +150,22 @@ class AudioPlayerController extends GetxController {
         _syncFromService();
         _resetCountSession();
         _resetAutoPauseSession();
-        return;
+        return true;
       }
     }
 
     await audioService.dismissResumePrompt(discardSession: true);
 
-    if (args is! Map) return;
+    if (args is! Map) return true;
     final rawQueue = args['queue'];
     final rawIndex = args['index'];
     final items = _extractItems(rawQueue);
-    if (items.isEmpty) return;
+    if (items.isEmpty) return true;
     queue.assignAll(items);
     currentIndex.value = (rawIndex is int ? rawIndex : 0)
         .clamp(0, items.length - 1)
         .toInt();
+    return true;
   }
 
   List<MediaItem> _extractItems(dynamic rawQueue) {
@@ -208,20 +209,20 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> togglePlay() async {
-    if (audioService.isPlaying.value) {
-      await audioService.pause();
+    final item = currentItemOrNull;
+    final variant = item == null ? null : _resolveAudioVariant(item);
+    if (item == null || variant == null) return;
+
+    if (audioService.hasSourceLoaded && audioService.isSameTrack(item, variant)) {
+      await audioService.toggle();
       return;
     }
 
     if (audioService.resumePromptPending) {
-      await _handleResumePrompt(Get.arguments);
+      final handled = await _handleResumePrompt(Get.arguments);
       _syncFromService();
-      if (audioService.isPlaying.value) return;
+      if (handled) return;
     }
-
-    final item = currentItemOrNull;
-    final variant = item == null ? null : _resolveAudioVariant(item);
-    if (item == null || variant == null) return;
 
     if (!audioService.hasSourceLoaded || !audioService.isSameTrack(item, variant)) {
       await _playCurrent(forceReload: true);
