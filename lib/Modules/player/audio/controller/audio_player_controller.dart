@@ -41,6 +41,8 @@ class AudioPlayerController extends GetxController {
   bool _countedCurrentSession = false;
   String _currentSessionTrackKey = '';
   bool _handlingCompleted = false;
+  bool _autoPauseHandledForTrack = false;
+  String _autoPauseTrackKey = '';
 
   Rx<SpatialAudioMode> get spatialMode => _spatial.mode;
 
@@ -54,6 +56,7 @@ class AudioPlayerController extends GetxController {
     _posSub = audioService.positionStream.listen((v) {
       position.value = v;
       _maybeCountPlayback();
+      _maybeApplyAutoPlayNextPolicy();
     });
     _durSub = audioService.durationStream.listen(
       (v) => duration.value = v ?? Duration.zero,
@@ -76,6 +79,7 @@ class AudioPlayerController extends GetxController {
 
     _itemWorker = ever<MediaItem?>(audioService.currentItem, (_) {
       _resetCountSession();
+      _resetAutoPauseSession();
       _syncFromService();
     });
 
@@ -387,6 +391,49 @@ class AudioPlayerController extends GetxController {
     if (item == null) return;
     _countedCurrentSession = true;
     unawaited(_trackPlay(item));
+  }
+
+  void _resetAutoPauseSession() {
+    final item = audioService.currentItem.value;
+    if (item == null) {
+      _autoPauseTrackKey = '';
+      _autoPauseHandledForTrack = false;
+      return;
+    }
+
+    final key = item.publicId.trim().isNotEmpty
+        ? item.publicId.trim()
+        : item.id.trim();
+
+    if (_autoPauseTrackKey != key) {
+      _autoPauseTrackKey = key;
+      _autoPauseHandledForTrack = false;
+    }
+  }
+
+  void _maybeApplyAutoPlayNextPolicy() {
+    if (_settings.autoPlayNext.value) return;
+    if (!audioService.isPlaying.value) return;
+
+    final item = audioService.currentItem.value;
+    if (item == null) return;
+
+    final key = item.publicId.trim().isNotEmpty
+        ? item.publicId.trim()
+        : item.id.trim();
+    if (_autoPauseTrackKey != key) {
+      _autoPauseTrackKey = key;
+      _autoPauseHandledForTrack = false;
+    }
+
+    if (_autoPauseHandledForTrack) return;
+    if (duration.value <= Duration.zero) return;
+
+    const stopMargin = Duration(milliseconds: 350);
+    if (position.value >= duration.value - stopMargin) {
+      _autoPauseHandledForTrack = true;
+      unawaited(audioService.pause());
+    }
   }
 
   void _restoreRepeatMode() {
