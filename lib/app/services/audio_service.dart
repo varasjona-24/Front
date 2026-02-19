@@ -3,16 +3,22 @@ import 'dart:math';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:audio_service/audio_service.dart' as aud;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../config/api_config.dart';
+import '../controllers/theme_controller.dart';
 import '../models/media_item.dart';
 
 enum PlaybackState { stopped, loading, playing, paused }
 
 class AudioService extends GetxService {
+  static const MethodChannel _widgetChannel = MethodChannel(
+    'listenfy/player_widget',
+  );
   final AudioPlayer _player = AudioPlayer();
   final GetStorage _storage = GetStorage();
 
@@ -705,6 +711,45 @@ class AudioService extends GetxService {
       position: _player.position,
       speed: speed.value,
     );
+
+    _updateHomeWidget();
+  }
+
+  Future<void> _updateHomeWidget() async {
+    if (!Platform.isAndroid) return;
+
+    final item = currentItem.value;
+    final title = item?.title.trim().isNotEmpty == true
+        ? item!.title
+        : 'Listenfy';
+    final artist = item?.displaySubtitle ?? '';
+
+    String artPath = '';
+    final localThumb = item?.thumbnailLocalPath?.trim();
+    if (localThumb != null && localThumb.isNotEmpty) {
+      final file = File(localThumb);
+      if (file.existsSync()) {
+        artPath = file.path;
+      }
+    }
+
+    Color barColor = const Color(0xFF1E2633);
+    if (Get.isRegistered<ThemeController>()) {
+      barColor = Get.find<ThemeController>().palette.value.primary;
+    }
+    final logoColor =
+        barColor.computeLuminance() > 0.55 ? Colors.black : Colors.white;
+
+    try {
+      await _widgetChannel.invokeMethod('updateWidget', {
+        'title': title,
+        'artist': artist,
+        'artPath': artPath,
+        'playing': isPlaying.value,
+        'barColor': barColor.toARGB32(),
+        'logoColor': logoColor.toARGB32(),
+      });
+    } catch (_) {}
   }
 
   int? _runtimeDurationSecondsForCurrent(MediaItem current) {
