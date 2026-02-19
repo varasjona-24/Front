@@ -25,12 +25,23 @@ import 'app/services/video_service.dart';
 import 'Modules/settings/controller/settings_controller.dart';
 import 'Modules/downloads/controller/downloads_controller.dart';
 
+const _notifAskedOnceKey = 'notif_permission_asked_once';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
+  final storage = GetStorage();
   if (Platform.isAndroid) {
     Future.microtask(() async {
-      await Permission.notification.request();
+      final askedOnce = storage.read<bool>(_notifAskedOnceKey) ?? false;
+      if (askedOnce) return;
+
+      final status = await Permission.notification.status;
+      if (!status.isGranted) {
+        await Permission.notification.request();
+      }
+
+      storage.write(_notifAskedOnceKey, true);
     });
   }
   await SystemChrome.setPreferredOrientations([

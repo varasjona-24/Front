@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
+import 'package:just_audio/just_audio.dart';
 
+import '../../../settings/controller/settings_controller.dart';
 import '../../../../app/data/local/local_library_store.dart';
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
@@ -14,9 +16,11 @@ enum RepeatMode { off, once, loop }
 class AudioPlayerController extends GetxController {
   final AudioService audioService;
   final SpatialAudioService _spatial = Get.find<SpatialAudioService>();
+  final SettingsController _settings = Get.find<SettingsController>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
   final GetStorage _storage = GetStorage();
   static const _repeatModeKey = 'audio_repeat_mode';
+  static const _countThreshold = Duration(seconds: 15);
 
   AudioPlayerController({required this.audioService});
 
@@ -32,7 +36,11 @@ class AudioPlayerController extends GetxController {
 
   StreamSubscription<Duration>? _posSub;
   StreamSubscription<Duration?>? _durSub;
+  StreamSubscription<ProcessingState>? _procSub;
   Worker? _itemWorker;
+  bool _countedCurrentSession = false;
+  String _currentSessionTrackKey = '';
+  bool _handlingCompleted = false;
 
   Rx<SpatialAudioMode> get spatialMode => _spatial.mode;
 
@@ -43,22 +51,43 @@ class AudioPlayerController extends GetxController {
     isShuffling.value = audioService.shuffleEnabled;
     _restoreRepeatMode();
 
-    _posSub = audioService.positionStream.listen((v) => position.value = v);
+    _posSub = audioService.positionStream.listen((v) {
+      position.value = v;
+      _maybeCountPlayback();
+    });
     _durSub = audioService.durationStream.listen(
       (v) => duration.value = v ?? Duration.zero,
     );
+    _procSub = audioService.processingStateStream.listen((state) async {
+      if (state != ProcessingState.completed) return;
+      if (_handlingCompleted) return;
+      _handlingCompleted = true;
+      try {
+        if (_settings.autoPlayNext.value) {
+          await next();
+        } else {
+          await audioService.pause();
+        }
+      } finally {
+        await Future.delayed(const Duration(milliseconds: 200));
+        _handlingCompleted = false;
+      }
+    });
 
     _itemWorker = ever<MediaItem?>(audioService.currentItem, (_) {
+      _resetCountSession();
       _syncFromService();
     });
 
     _syncFromService();
+    _resetCountSession();
   }
 
   @override
   void onClose() {
     _posSub?.cancel();
     _durSub?.cancel();
+    _procSub?.cancel();
     _itemWorker?.dispose();
     super.onClose();
   }
@@ -76,7 +105,7 @@ class AudioPlayerController extends GetxController {
         .clamp(0, items.length - 1)
         .toInt();
 
-    _playCurrent(forceReload: true, countAsPlay: true);
+    _playCurrent(forceReload: true);
   }
 
   List<MediaItem> _extractItems(dynamic rawQueue) {
@@ -101,7 +130,6 @@ class AudioPlayerController extends GetxController {
 
   Future<void> _playCurrent({
     bool forceReload = false,
-    bool countAsPlay = false,
   }) async {
     final item = currentItemOrNull;
     if (item == null) return;
@@ -118,9 +146,6 @@ class AudioPlayerController extends GetxController {
     );
 
     _syncFromService();
-    if (countAsPlay) {
-      await _trackPlay(item);
-    }
   }
 
   Future<void> togglePlay() async {
@@ -129,7 +154,7 @@ class AudioPlayerController extends GetxController {
     if (item == null || variant == null) return;
 
     if (!audioService.hasSourceLoaded || !audioService.isSameTrack(item, variant)) {
-      await _playCurrent(forceReload: true, countAsPlay: true);
+      await _playCurrent(forceReload: true);
       return;
     }
 
@@ -142,11 +167,9 @@ class AudioPlayerController extends GetxController {
     if (audioService.hasSourceLoaded && _sameQueue(queue, audioService.queueItems)) {
       await audioService.jumpToQueueIndex(index);
       _syncFromService();
-      final item = currentItemOrNull;
-      if (item != null) await _trackPlay(item);
       return;
     }
-    await _playCurrent(forceReload: true, countAsPlay: true);
+    await _playCurrent(forceReload: true);
   }
 
   Future<void> next() async {
@@ -155,11 +178,7 @@ class AudioPlayerController extends GetxController {
     final fallback = currentIndex.value + 1;
     await audioService.next();
     _syncFromService();
-    if (currentIndex.value != before) {
-      final item = currentItemOrNull;
-      if (item != null) await _trackPlay(item);
-      return;
-    }
+    if (currentIndex.value != before) return;
     if (audioService.currentQueueIndex == currentIndex.value &&
         fallback >= 0 &&
         fallback < queue.length) {
@@ -173,11 +192,7 @@ class AudioPlayerController extends GetxController {
     final fallback = currentIndex.value - 1;
     await audioService.previous();
     _syncFromService();
-    if (currentIndex.value != before) {
-      final item = currentItemOrNull;
-      if (item != null) await _trackPlay(item);
-      return;
-    }
+    if (currentIndex.value != before) return;
     if (audioService.currentQueueIndex == currentIndex.value &&
         fallback >= 0 &&
         fallback < queue.length) {
@@ -221,7 +236,7 @@ class AudioPlayerController extends GetxController {
 
     final wasPlaying = audioService.isPlaying.value;
     final pos = position.value;
-    await _playCurrent(forceReload: true, countAsPlay: false);
+    await _playCurrent(forceReload: true);
     if (pos > Duration.zero) {
       await audioService.seek(pos);
     }
@@ -343,6 +358,35 @@ class AudioPlayerController extends GetxController {
     }
 
     await _store.upsert(updated);
+  }
+
+  void _resetCountSession() {
+    final item = audioService.currentItem.value;
+    if (item == null) {
+      _currentSessionTrackKey = '';
+      _countedCurrentSession = false;
+      return;
+    }
+
+    final key = item.publicId.trim().isNotEmpty
+        ? item.publicId.trim()
+        : item.id.trim();
+
+    if (_currentSessionTrackKey != key) {
+      _currentSessionTrackKey = key;
+      _countedCurrentSession = false;
+    }
+  }
+
+  void _maybeCountPlayback() {
+    if (_countedCurrentSession) return;
+    if (!audioService.isPlaying.value) return;
+    if (position.value < _countThreshold) return;
+
+    final item = audioService.currentItem.value;
+    if (item == null) return;
+    _countedCurrentSession = true;
+    unawaited(_trackPlay(item));
   }
 
   void _restoreRepeatMode() {
