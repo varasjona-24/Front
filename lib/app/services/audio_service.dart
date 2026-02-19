@@ -141,8 +141,11 @@ class AudioService extends GetxService {
     _notifyHandler();
   }
 
-  aud.MediaItem buildBackgroundItem(MediaItem item) {
-    final sec = item.effectiveDurationSeconds;
+  aud.MediaItem buildBackgroundItem(
+    MediaItem item, {
+    int? overrideDurationSeconds,
+  }) {
+    final sec = overrideDurationSeconds ?? item.effectiveDurationSeconds;
     return aud.MediaItem(
       id: item.id,
       title: item.title,
@@ -634,7 +637,10 @@ class AudioService extends GetxService {
     if (handler == null) return;
     final item = currentItem.value;
     if (item != null) {
-      handler.updateMediaItem(buildBackgroundItem(item));
+      final runtimeSec = _runtimeDurationSecondsForCurrent(item);
+      handler.updateMediaItem(
+        buildBackgroundItem(item, overrideDurationSeconds: runtimeSec),
+      );
       if (_queueItems.isNotEmpty) {
         handler.updateQueue(_queueItems.map(buildBackgroundItem).toList());
       } else {
@@ -647,6 +653,21 @@ class AudioService extends GetxService {
       position: _player.position,
       speed: speed.value,
     );
+  }
+
+  int? _runtimeDurationSecondsForCurrent(MediaItem current) {
+    if (_queueItems.isEmpty) return null;
+    final idx = currentQueueIndex;
+    if (idx < 0 || idx >= _queueItems.length) return null;
+    final q = _queueItems[idx];
+    final same = q.id == current.id ||
+        (q.publicId.trim().isNotEmpty &&
+            q.publicId.trim() == current.publicId.trim());
+    if (!same) return null;
+
+    final runtime = _player.duration;
+    if (runtime == null || runtime <= Duration.zero) return null;
+    return runtime.inSeconds;
   }
 
   _BuiltQueue _buildQueue({

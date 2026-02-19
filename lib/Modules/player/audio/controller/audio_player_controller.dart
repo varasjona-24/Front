@@ -58,9 +58,13 @@ class AudioPlayerController extends GetxController {
       _maybeCountPlayback();
       _maybeApplyAutoPlayNextPolicy();
     });
-    _durSub = audioService.durationStream.listen(
-      (v) => duration.value = v ?? Duration.zero,
-    );
+    _durSub = audioService.durationStream.listen((v) {
+      if (v != null && v > Duration.zero) {
+        duration.value = v;
+        return;
+      }
+      _applyDurationFallbackFromCurrentItem();
+    });
     _procSub = audioService.processingStateStream.listen((state) async {
       if (state != ProcessingState.completed) return;
       if (_handlingCompleted) return;
@@ -81,6 +85,7 @@ class AudioPlayerController extends GetxController {
       _resetCountSession();
       _resetAutoPauseSession();
       _syncFromService();
+      _applyDurationFallbackFromCurrentItem();
     });
 
     _syncFromService();
@@ -281,6 +286,15 @@ class AudioPlayerController extends GetxController {
       return ap.isNotEmpty && bp.isNotEmpty && ap == bp;
     });
     if (idx >= 0) currentIndex.value = idx;
+  }
+
+  void _applyDurationFallbackFromCurrentItem() {
+    final sec = audioService.currentItem.value?.effectiveDurationSeconds ?? 0;
+    if (sec > 0) {
+      duration.value = Duration(seconds: sec);
+    } else {
+      duration.value = Duration.zero;
+    }
   }
 
   bool _sameQueue(List<MediaItem> a, List<MediaItem> b) {
