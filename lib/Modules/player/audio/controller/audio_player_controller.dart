@@ -208,6 +208,11 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> togglePlay() async {
+    if (audioService.isPlaying.value) {
+      await audioService.pause();
+      return;
+    }
+
     if (audioService.resumePromptPending) {
       await _handleResumePrompt(Get.arguments);
       _syncFromService();

@@ -51,9 +51,9 @@ class AudioService extends GetxService {
   bool get shuffleEnabled => _shuffleEnabled;
   DateTime _lastSessionPersistAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _nextHandlerStopShouldHardStop = false;
+  bool _resumePromptPendingCache = false;
 
-  bool get resumePromptPending =>
-      _storage.read<bool>(_resumePromptPendingKey) ?? false;
+  bool get resumePromptPending => _resumePromptPendingCache;
 
   bool get eqSupported => false;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
@@ -81,6 +81,8 @@ class AudioService extends GetxService {
     await session.configure(const AudioSessionConfiguration.music());
 
     _shuffleEnabled = _storage.read<bool>(_shuffleEnabledKey) ?? false;
+    _resumePromptPendingCache =
+        _storage.read<bool>(_resumePromptPendingKey) ?? false;
     final storedSpeed = _storage.read<double>(_speedKey);
     if (storedSpeed != null && storedSpeed > 0) {
       speed.value = storedSpeed;
@@ -317,6 +319,7 @@ class AudioService extends GetxService {
     if (hasSourceLoaded) {
       _persistSessionSnapshot();
     }
+    _resumePromptPendingCache = true;
     _storage.write(_resumePromptPendingKey, true);
 
     await _player.stop();
@@ -631,12 +634,14 @@ class AudioService extends GetxService {
   Future<bool> restorePersistedSession({required bool autoPlay}) async {
     final ok = await _restoreSessionIfAny(autoPlayOverride: autoPlay);
     if (ok) {
+      _resumePromptPendingCache = false;
       _storage.write(_resumePromptPendingKey, false);
     }
     return ok;
   }
 
   Future<void> dismissResumePrompt({required bool discardSession}) async {
+    _resumePromptPendingCache = false;
     _storage.write(_resumePromptPendingKey, false);
     if (discardSession) {
       _clearSessionSnapshot();
