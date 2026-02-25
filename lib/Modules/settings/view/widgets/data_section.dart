@@ -5,16 +5,21 @@ import 'package:get/get.dart';
 import 'package:app_settings/app_settings.dart';
 
 import '../../controller/settings_controller.dart';
+import '../../controller/playback_settings_controller.dart';
+import '../../controller/backup_restore_controller.dart';
 import '../widgets/section_header.dart';
 import '../widgets/choice_chip_row.dart';
 import '../widgets/info_tile.dart';
 
-class DataSection extends GetView<SettingsController> {
+class DataSection extends StatelessWidget {
   const DataSection({super.key});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final playback = Get.find<PlaybackSettingsController>();
+    final backup = Get.find<BackupRestoreController>();
+    final settings = Get.find<SettingsController>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,8 +69,8 @@ class DataSection extends GetView<SettingsController> {
                           ChoiceOption(value: 'wifi_only', label: 'Solo Wi-Fi'),
                           ChoiceOption(value: 'all', label: 'Wi-Fi y móvil'),
                         ],
-                        selectedValue: controller.dataUsage.value,
-                        onSelected: (v) => controller.setDataUsage(v),
+                        selectedValue: playback.dataUsage.value,
+                        onSelected: (v) => playback.setDataUsage(v),
                       ),
                     ],
                   );
@@ -75,14 +80,11 @@ class DataSection extends GetView<SettingsController> {
                 Divider(color: theme.dividerColor.withOpacity(.12)),
                 const SizedBox(height: 12),
 
-                // Storage used
-                // Storage used removed
-
                 // Actions
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: controller.clearCache,
+                    onPressed: settings.clearCache,
                     icon: const Icon(Icons.delete_sweep_rounded),
                     label: const Text('Limpiar caché'),
                   ),
@@ -144,7 +146,7 @@ class DataSection extends GetView<SettingsController> {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: controller.exportLibrary,
+                        onPressed: backup.exportLibrary,
                         icon: const Icon(Icons.upload_file_rounded),
                         label: const Text('Exportar'),
                       ),
@@ -152,7 +154,7 @@ class DataSection extends GetView<SettingsController> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: controller.importLibrary,
+                        onPressed: backup.importLibrary,
                         icon: const Icon(Icons.download_rounded),
                         label: const Text('Importar'),
                       ),
@@ -171,18 +173,18 @@ class DataSection extends GetView<SettingsController> {
                 ),
                 const SizedBox(height: 8),
                 TextFormField(
-                  controller: controller.ytdlpAdminTokenController,
+                  controller: settings.ytdlpAdminTokenController,
                   decoration: const InputDecoration(
                     labelText: 'Token admin',
                     hintText: 'Pega tu token',
                   ),
-                  onChanged: controller.setYtDlpAdminToken,
+                  onChanged: settings.setYtDlpAdminToken,
                 ),
                 const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: controller.uploadYtDlpCookies,
+                    onPressed: settings.uploadYtDlpCookies,
                     icon: const Icon(Icons.upload_rounded),
                     label: const Text('Actualizar cookies'),
                   ),

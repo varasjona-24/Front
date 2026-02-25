@@ -5,19 +5,21 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 
-import '../../../settings/controller/settings_controller.dart';
+import '../../../settings/controller/playback_settings_controller.dart';
 import '../../../../app/data/local/local_library_store.dart';
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
 import '../../../../app/services/spatial_audio_service.dart';
 
 enum CoverStyle { square, vinyl }
+
 enum RepeatMode { off, once, loop }
 
 class AudioPlayerController extends GetxController {
   final AudioService audioService;
   final SpatialAudioService _spatial = Get.find<SpatialAudioService>();
-  final SettingsController _settings = Get.find<SettingsController>();
+  final PlaybackSettingsController _settings =
+      Get.find<PlaybackSettingsController>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
   final GetStorage _storage = GetStorage();
   static const _repeatModeKey = 'audio_repeat_mode';
@@ -188,9 +190,7 @@ class AudioPlayerController extends GetxController {
     return null;
   }
 
-  Future<void> _playCurrent({
-    bool forceReload = false,
-  }) async {
+  Future<void> _playCurrent({bool forceReload = false}) async {
     final item = currentItemOrNull;
     if (item == null) return;
     final variant = _resolveAudioVariant(item);
@@ -213,7 +213,8 @@ class AudioPlayerController extends GetxController {
     final variant = item == null ? null : _resolveAudioVariant(item);
     if (item == null || variant == null) return;
 
-    if (audioService.hasSourceLoaded && audioService.isSameTrack(item, variant)) {
+    if (audioService.hasSourceLoaded &&
+        audioService.isSameTrack(item, variant)) {
       await audioService.toggle();
       return;
     }
@@ -224,7 +225,8 @@ class AudioPlayerController extends GetxController {
       if (handled) return;
     }
 
-    if (!audioService.hasSourceLoaded || !audioService.isSameTrack(item, variant)) {
+    if (!audioService.hasSourceLoaded ||
+        !audioService.isSameTrack(item, variant)) {
       await _playCurrent(forceReload: true);
       return;
     }
@@ -235,7 +237,8 @@ class AudioPlayerController extends GetxController {
   Future<void> playAt(int index) async {
     if (index < 0 || index >= queue.length) return;
     currentIndex.value = index;
-    if (audioService.hasSourceLoaded && _sameQueue(queue, audioService.queueItems)) {
+    if (audioService.hasSourceLoaded &&
+        _sameQueue(queue, audioService.queueItems)) {
       await audioService.jumpToQueueIndex(index);
       _syncFromService();
       return;
@@ -387,8 +390,9 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> toggleRepeatOnce() async {
-    repeatMode.value =
-        repeatMode.value == RepeatMode.once ? RepeatMode.off : RepeatMode.once;
+    repeatMode.value = repeatMode.value == RepeatMode.once
+        ? RepeatMode.off
+        : RepeatMode.once;
     _storage.write(_repeatModeKey, repeatMode.value.name);
     if (repeatMode.value == RepeatMode.once) {
       await audioService.setLoopOne();
@@ -398,8 +402,9 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> toggleRepeatLoop() async {
-    repeatMode.value =
-        repeatMode.value == RepeatMode.loop ? RepeatMode.off : RepeatMode.loop;
+    repeatMode.value = repeatMode.value == RepeatMode.loop
+        ? RepeatMode.off
+        : RepeatMode.loop;
     _storage.write(_repeatModeKey, repeatMode.value.name);
     if (repeatMode.value == RepeatMode.loop) {
       await audioService.setLoopOne();

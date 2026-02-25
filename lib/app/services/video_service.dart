@@ -7,7 +7,7 @@ import 'package:video_player/video_player.dart' as vp;
 
 import '../models/media_item.dart';
 import '../config/api_config.dart';
-import '../../Modules/settings/controller/settings_controller.dart';
+import '../../Modules/settings/controller/playback_settings_controller.dart';
 
 enum VideoPlaybackState { stopped, loading, playing, paused }
 
@@ -49,8 +49,8 @@ class VideoService extends GetxService {
   @override
   void onInit() {
     super.onInit();
-    if (Get.isRegistered<SettingsController>()) {
-      final settings = Get.find<SettingsController>();
+    if (Get.isRegistered<PlaybackSettingsController>()) {
+      final settings = Get.find<PlaybackSettingsController>();
       setVolume(settings.defaultVolume.value / 100);
     }
     _restoreLastItem();
@@ -140,10 +140,10 @@ class VideoService extends GetxService {
 
         _setupPlayerListener();
 
-      duration.value = _player!.value.duration;
-      await _player!.setVolume(volume.value);
-      await _player!.setPlaybackSpeed(speed.value);
-      await _player!.play();
+        duration.value = _player!.value.duration;
+        await _player!.setVolume(volume.value);
+        await _player!.setPlaybackSpeed(speed.value);
+        await _player!.play();
         isPlaying.value = true;
         state.value = VideoPlaybackState.playing;
 
@@ -236,7 +236,8 @@ class VideoService extends GetxService {
       }
 
       final d = v.duration;
-      final completed = d > Duration.zero &&
+      final completed =
+          d > Duration.zero &&
           v.position >= d - const Duration(milliseconds: 200);
       if (!_completedOnce && completed) {
         _completedOnce = true;

@@ -8,6 +8,10 @@ import '../../sources/data/source_theme_pill_store.dart';
 import '../../sources/data/source_theme_topic_store.dart';
 import '../../sources/data/source_theme_topic_playlist_store.dart';
 import '../controller/settings_controller.dart';
+import '../controller/playback_settings_controller.dart';
+import '../controller/sleep_timer_controller.dart';
+import '../controller/equalizer_controller.dart';
+import '../controller/backup_restore_controller.dart';
 
 class SettingsBinding extends Bindings {
   @override
@@ -31,9 +35,24 @@ class SettingsBinding extends Bindings {
       Get.put(SourceThemeTopicStore(Get.find<GetStorage>()), permanent: true);
     }
     if (!Get.isRegistered<SourceThemeTopicPlaylistStore>()) {
-      Get.put(SourceThemeTopicPlaylistStore(Get.find<GetStorage>()),
-          permanent: true);
+      Get.put(
+        SourceThemeTopicPlaylistStore(Get.find<GetStorage>()),
+        permanent: true,
+      );
     }
     Get.lazyPut<SettingsController>(() => SettingsController(), fenix: true);
+    Get.lazyPut<PlaybackSettingsController>(
+      () => PlaybackSettingsController(),
+      fenix: true,
+    );
+    Get.lazyPut<SleepTimerController>(
+      () => SleepTimerController(),
+      fenix: true,
+    );
+    Get.lazyPut<EqualizerController>(() => EqualizerController(), fenix: true);
+    Get.lazyPut<BackupRestoreController>(
+      () => BackupRestoreController(),
+      fenix: true,
+    );
   }
 }

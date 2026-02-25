@@ -5,12 +5,13 @@ import 'package:video_player/video_player.dart' as vp;
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/video_service.dart';
 import '../../../../app/data/local/local_library_store.dart';
-import '../../../settings/controller/settings_controller.dart';
+import '../../../settings/controller/playback_settings_controller.dart';
 
 class VideoPlayerController extends GetxController {
   final VideoService videoService;
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
-  final SettingsController _settings = Get.find<SettingsController>();
+  final PlaybackSettingsController _settings =
+      Get.find<PlaybackSettingsController>();
   final GetStorage _storage = GetStorage();
   final List<MediaItem> queue;
   final int initialIndex;
@@ -167,8 +168,7 @@ class VideoPlayerController extends GetxController {
 
     for (final existing in all) {
       if (existing.id == item.id ||
-          (item.publicId.isNotEmpty &&
-              existing.publicId == item.publicId)) {
+          (item.publicId.isNotEmpty && existing.publicId == item.publicId)) {
         updated = existing.copyWith(
           playCount: existing.playCount + 1,
           lastPlayedAt: now,

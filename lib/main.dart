@@ -23,6 +23,9 @@ import 'app/services/app_audio_handler.dart';
 import 'app/services/spatial_audio_service.dart';
 import 'app/services/video_service.dart';
 import 'Modules/settings/controller/settings_controller.dart';
+import 'Modules/settings/controller/playback_settings_controller.dart';
+import 'Modules/settings/controller/sleep_timer_controller.dart';
+import 'Modules/settings/controller/equalizer_controller.dart';
 import 'Modules/downloads/controller/downloads_controller.dart';
 
 const _notifAskedOnceKey = 'notif_permission_asked_once';
@@ -57,6 +60,9 @@ Future<void> main() async {
 
   // ⚙️ Controller global de configuración
   Get.put(SettingsController(), permanent: true);
+  Get.put(PlaybackSettingsController(), permanent: true);
+  Get.put(SleepTimerController(), permanent: true);
+  Get.put(EqualizerController(), permanent: true);
 
   // 🎵 Audio global (CLAVE)
   final appAudio = AudioService();
@@ -103,10 +109,12 @@ Future<void> main() async {
   Get.put(DownloadsController(), permanent: true);
 
   // 🎚️ Reaplicar ecualizador cuando AudioService ya existe (no bloquear arranque)
-  if (Get.isRegistered<SettingsController>()) {
-    Future.microtask(() {
-      Get.find<SettingsController>().refreshEqualizer();
-    });
+  if (Get.isRegistered<EqualizerController>()) {
+    try {
+      Get.find<EqualizerController>().refreshEqualizer();
+    } catch (e) {
+      // TODO: Handle error or log it
+    }
   }
 
   runApp(const MyApp());

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../controller/downloads_controller.dart';
-import '../../../../Modules/settings/controller/settings_controller.dart';
+import '../../../../Modules/settings/controller/playback_settings_controller.dart';
 import '../../../../app/ui/themes/app_spacing.dart';
 
 /// Panel de configuración de descargas dinámico (audio vs video)
@@ -16,7 +16,7 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final settingsCtrl = Get.find<SettingsController>();
+    final settingsCtrl = Get.find<PlaybackSettingsController>();
 
     return Card(
       elevation: 0,
@@ -121,5 +121,4 @@ class DownloadSettingsPanel extends GetView<DownloadsController> {
   }
 
   // (helpers UI eliminados: no se usaban)
-
 }
