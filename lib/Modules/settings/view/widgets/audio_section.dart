@@ -190,6 +190,117 @@ class AudioSection extends StatelessWidget {
                 Divider(color: theme.dividerColor.withOpacity(.12)),
                 const SizedBox(height: 8),
 
+                // Equalizer
+                Obx(() {
+                  if (!equalizer.eqAvailable.value) {
+                    return InfoTile(
+                      icon: Icons.graphic_eq_rounded,
+                      title: 'Ecualizador',
+                      subtitle: 'Disponible solo en Android.',
+                    );
+                  }
+
+                  if (equalizer.eqFrequencies.isEmpty ||
+                      equalizer.eqGains.isEmpty) {
+                    return InfoTile(
+                      icon: Icons.graphic_eq_rounded,
+                      title: 'Ecualizador',
+                      subtitle: 'Cargando parámetros…',
+                      trailing: const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    );
+                  }
+
+                  final presets = const <String, String>{
+                    'normal': 'Normal',
+                    'bass': 'Bass',
+                    'vocal': 'Vocal',
+                    'rock': 'Rock',
+                    'treble': 'Agudos',
+                    'custom': 'Personalizado',
+                  };
+
+                  return Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          'Ecualizador',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Ajusta las frecuencias de audio.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        value: equalizer.eqEnabled.value,
+                        onChanged: equalizer.setEqEnabled,
+                      ),
+                      const SizedBox(height: 8),
+
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: presets.entries.map((entry) {
+                          final isSelected =
+                              equalizer.eqPreset.value == entry.key;
+                          return ChoiceChip(
+                            label: Text(entry.value),
+                            selected: isSelected,
+                            onSelected: (_) => equalizer.setEqPreset(entry.key),
+                          );
+                        }).toList(),
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      ...List.generate(equalizer.eqGains.length, (i) {
+                        final freq = equalizer.eqFrequencies[i];
+                        final value = equalizer.eqGains[i];
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '$freq Hz',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 3,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 9,
+                                ),
+                              ),
+                              child: Slider(
+                                value: value,
+                                min: equalizer.eqMinDb.value,
+                                max: equalizer.eqMaxDb.value,
+                                divisions: 20,
+                                label: '${value.toStringAsFixed(1)} dB',
+                                onChanged: equalizer.eqEnabled.value
+                                    ? (v) => equalizer.setEqGain(i, v)
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                        );
+                      }),
+                    ],
+                  );
+                }),
+
+                const SizedBox(height: 8),
+                Divider(color: theme.dividerColor.withOpacity(.12)),
+                const SizedBox(height: 8),
+
                 // Sleep timer
                 Obx(
                   () => Column(
@@ -353,117 +464,6 @@ class AudioSection extends StatelessWidget {
                     ],
                   ),
                 ),
-
-                const SizedBox(height: 8),
-                Divider(color: theme.dividerColor.withOpacity(.12)),
-                const SizedBox(height: 8),
-
-                // Equalizer
-                Obx(() {
-                  if (!equalizer.eqAvailable.value) {
-                    return InfoTile(
-                      icon: Icons.graphic_eq_rounded,
-                      title: 'Ecualizador',
-                      subtitle: 'Disponible solo en Android.',
-                    );
-                  }
-
-                  if (equalizer.eqFrequencies.isEmpty ||
-                      equalizer.eqGains.isEmpty) {
-                    return InfoTile(
-                      icon: Icons.graphic_eq_rounded,
-                      title: 'Ecualizador',
-                      subtitle: 'Cargando parámetros…',
-                      trailing: const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    );
-                  }
-
-                  final presets = const <String, String>{
-                    'normal': 'Normal',
-                    'bass': 'Bass',
-                    'vocal': 'Vocal',
-                    'rock': 'Rock',
-                    'treble': 'Agudos',
-                    'custom': 'Personalizado',
-                  };
-
-                  return Column(
-                    children: [
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: Text(
-                          'Ecualizador',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Ajusta las frecuencias de audio.',
-                          style: theme.textTheme.bodySmall,
-                        ),
-                        value: equalizer.eqEnabled.value,
-                        onChanged: equalizer.setEqEnabled,
-                      ),
-                      const SizedBox(height: 8),
-
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: presets.entries.map((entry) {
-                          final isSelected =
-                              equalizer.eqPreset.value == entry.key;
-                          return ChoiceChip(
-                            label: Text(entry.value),
-                            selected: isSelected,
-                            onSelected: (_) => equalizer.setEqPreset(entry.key),
-                          );
-                        }).toList(),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      ...List.generate(equalizer.eqGains.length, (i) {
-                        final freq = equalizer.eqFrequencies[i];
-                        final value = equalizer.eqGains[i];
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$freq Hz',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 3,
-                                thumbShape: const RoundSliderThumbShape(
-                                  enabledThumbRadius: 9,
-                                ),
-                              ),
-                              child: Slider(
-                                value: value,
-                                min: equalizer.eqMinDb.value,
-                                max: equalizer.eqMaxDb.value,
-                                divisions: 20,
-                                label: '${value.toStringAsFixed(1)} dB',
-                                onChanged: equalizer.eqEnabled.value
-                                    ? (v) => equalizer.setEqGain(i, v)
-                                    : null,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                          ],
-                        );
-                      }),
-                    ],
-                  );
-                }),
 
                 const SizedBox(height: 8),
                 Divider(color: theme.dividerColor.withOpacity(.12)),
