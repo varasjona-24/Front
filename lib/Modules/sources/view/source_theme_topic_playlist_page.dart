@@ -13,6 +13,7 @@ import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic_playlist.dart';
+import '../ui/source_media_list_item.dart';
 import '../ui/source_playlist_card.dart';
 import '../../../app/utils/format_bytes.dart';
 
@@ -163,20 +164,14 @@ class _SourceThemeTopicPlaylistPageState
             ),
             const SizedBox(height: 8),
             ...items.map(
-              (item) => ListTile(
-                leading: Icon(
-                  item.hasVideoLocal
-                      ? Icons.videocam_rounded
-                      : Icons.music_note_rounded,
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: SourceMediaListItem(
+                  item: item,
+                  onTap: () => _playItem(items, item),
+                  onLongPress: () => _showItemActions(playlist, item),
+                  onMore: () => _showItemActions(playlist, item),
                 ),
-                title: Text(item.title),
-                subtitle: Text(item.displaySubtitle),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => _removeItem(playlist, item),
-                ),
-                onTap: () => _playItem(items, item),
-                onLongPress: () => _showItemActions(playlist, item),
               ),
             ),
           ],
@@ -216,6 +211,7 @@ class _SourceThemeTopicPlaylistPageState
               playlist: pl,
               onOpen: () => Get.toNamed(
                 AppRoutes.sourcePlaylist,
+                preventDuplicates: false,
                 arguments: {
                   'playlistId': pl.id,
                   'theme': widget.theme,
@@ -386,6 +382,7 @@ class _SourceThemeTopicPlaylistPageState
   Future<void> _addSubList(SourceThemeTopicPlaylist playlist) async {
     await Get.toNamed(
       AppRoutes.createEntity,
+      preventDuplicates: false,
       arguments: CreateEntityArgs.topicPlaylist(
         storageId: 'stpl_${playlist.id}_create',
         topicId: playlist.topicId,

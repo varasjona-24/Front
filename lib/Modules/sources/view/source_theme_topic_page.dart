@@ -15,6 +15,7 @@ import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic.dart';
 import '../domain/source_theme_topic_playlist.dart';
+import '../ui/source_media_list_item.dart';
 import '../ui/source_playlist_card.dart';
 import '../../../app/utils/format_bytes.dart';
 
@@ -214,20 +215,14 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
             ),
             const SizedBox(height: 8),
             ...items.map(
-              (item) => ListTile(
-                leading: Icon(
-                  item.hasVideoLocal
-                      ? Icons.videocam_rounded
-                      : Icons.music_note_rounded,
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: SourceMediaListItem(
+                  item: item,
+                  onTap: () => _playItem(items, item),
+                  onLongPress: () => _showItemActions(topic, item),
+                  onMore: () => _showItemActions(topic, item),
                 ),
-                title: Text(item.title),
-                subtitle: Text(item.displaySubtitle),
-                trailing: IconButton(
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () => _sources.removeItemFromTopic(topic, item),
-                ),
-                onTap: () => _playItem(items, item),
-                onLongPress: () => _showItemActions(topic, item),
               ),
             ),
           ],
@@ -281,6 +276,7 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
               playlist: pl,
               onOpen: () => Get.toNamed(
                 AppRoutes.sourcePlaylist,
+                preventDuplicates: false,
                 arguments: {
                   'playlistId': pl.id,
                   'theme': widget.theme,
@@ -415,6 +411,7 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
   Future<void> _addTopicPlaylist(SourceThemeTopic topic) async {
     await Get.toNamed(
       AppRoutes.createEntity,
+      preventDuplicates: false,
       arguments: CreateEntityArgs.topicPlaylist(
         storageId: 'stpl_${topic.id}_create',
         topicId: topic.id,
