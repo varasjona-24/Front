@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -19,7 +20,14 @@ class AudioService extends GetxService {
   static const MethodChannel _widgetChannel = MethodChannel(
     'listenfy/player_widget',
   );
-  final AudioPlayer _player = AudioPlayer();
+  late final AndroidEqualizer? _androidEqualizer = Platform.isAndroid
+      ? AndroidEqualizer()
+      : null;
+  late final AudioPlayer _player = AudioPlayer(
+    audioPipeline: _androidEqualizer == null
+        ? null
+        : AudioPipeline(androidAudioEffects: [_androidEqualizer]),
+  );
   final GetStorage _storage = GetStorage();
 
   static const _lastItemKey = 'audio_last_item';
@@ -61,7 +69,7 @@ class AudioService extends GetxService {
 
   bool get resumePromptPending => _resumePromptPendingCache;
 
-  bool get eqSupported => false;
+  bool get eqSupported => Platform.isAndroid && _androidEqualizer != null;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
   Stream<int?> get androidAudioSessionIdStream =>
       _player.androidAudioSessionIdStream;
@@ -509,9 +517,42 @@ class AudioService extends GetxService {
     _notifyHandler();
   }
 
-  Future<AndroidEqualizerParameters?> getEqParameters() async => null;
-  Future<void> setEqEnabled(bool enabled) async {}
-  Future<void> setEqBandGain(int index, double gain) async {}
+  Future<AndroidEqualizerParameters?> getEqParameters() async {
+    if (!eqSupported || _androidEqualizer == null) return null;
+    if (_player.processingState == ProcessingState.idle) return null;
+
+    try {
+      return await _androidEqualizer.parameters.timeout(
+        const Duration(seconds: 2),
+      );
+    } on TimeoutException {
+      return null;
+    } catch (e) {
+      debugPrint('Equalizer getEqParameters error: $e');
+      return null;
+    }
+  }
+
+  Future<void> setEqEnabled(bool enabled) async {
+    if (!eqSupported || _androidEqualizer == null) return;
+    try {
+      await _androidEqualizer.setEnabled(enabled);
+    } catch (e) {
+      debugPrint('Equalizer setEqEnabled error: $e');
+    }
+  }
+
+  Future<void> setEqBandGain(int index, double gain) async {
+    if (!eqSupported || _androidEqualizer == null) return;
+    try {
+      final params = await getEqParameters();
+      if (params == null) return;
+      if (index < 0 || index >= params.bands.length) return;
+      await params.bands[index].setGain(gain);
+    } catch (e) {
+      debugPrint('Equalizer setEqBandGain error: $e');
+    }
+  }
 
   Future<void> stopAndDismissNotification() async {
     await stop();

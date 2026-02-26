@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 
@@ -15,12 +17,22 @@ class EqualizerController extends GetxController {
   final RxDouble eqMinDb = (-6.0).obs;
   final RxDouble eqMaxDb = (6.0).obs;
   final RxBool eqAvailable = false.obs;
+  final RxString eqUnavailableMessage = 'Disponible solo en Android.'.obs;
+  StreamSubscription<int?>? _audioSessionSub;
+  int? _lastAudioSessionId;
 
   @override
   void onInit() {
     super.onInit();
     _loadSettings();
+    _bindAudioSession();
     _initEqualizer();
+  }
+
+  @override
+  void onClose() {
+    _audioSessionSub?.cancel();
+    super.onClose();
   }
 
   void _loadSettings() {
@@ -66,19 +78,44 @@ class EqualizerController extends GetxController {
   // ============================
   Future<void> refreshEqualizer() => _initEqualizer();
 
-  Future<void> _initEqualizer() async {
+  void _bindAudioSession() {
     if (!Get.isRegistered<AudioService>()) return;
+    final audio = Get.find<AudioService>();
+    if (!audio.eqSupported) return;
+
+    _audioSessionSub?.cancel();
+    _audioSessionSub = audio.androidAudioSessionIdStream.listen((sessionId) {
+      if (sessionId == null || sessionId <= 0) return;
+      if (_lastAudioSessionId == sessionId && eqAvailable.value) return;
+      _lastAudioSessionId = sessionId;
+      _initEqualizer();
+    });
+  }
+
+  Future<void> _initEqualizer() async {
+    if (!Get.isRegistered<AudioService>()) {
+      eqAvailable.value = false;
+      eqUnavailableMessage.value = 'Audio no inicializado.';
+      return;
+    }
     final audio = Get.find<AudioService>();
     if (!audio.eqSupported) {
       eqAvailable.value = false;
+      eqUnavailableMessage.value = 'Disponible solo en Android.';
       return;
     }
 
     try {
       final params = await audio.getEqParameters();
-      if (params == null) return;
+      if (params == null) {
+        eqAvailable.value = false;
+        eqUnavailableMessage.value =
+            'Reproduce una pista para activar el ecualizador.';
+        return;
+      }
 
       eqAvailable.value = true;
+      eqUnavailableMessage.value = '';
       eqMinDb.value = params.minDecibels;
       eqMaxDb.value = params.maxDecibels;
       eqFrequencies.assignAll(
@@ -96,6 +133,7 @@ class EqualizerController extends GetxController {
     } catch (e) {
       print('Equalizer init error: $e');
       eqAvailable.value = false;
+      eqUnavailableMessage.value = 'No se pudo iniciar el ecualizador.';
     }
   }
 
@@ -128,10 +166,31 @@ class EqualizerController extends GetxController {
     double maxDb,
   ) {
     final base = switch (preset) {
+      'normal' => [0.0, 0.0, 0.0, 0.0, 0.0],
       'bass' => [0.6, 0.4, 0.0, -0.2, -0.3],
+      'pop' => [0.2, 0.1, 0.15, 0.25, 0.2],
+      'jazz' => [0.15, 0.25, 0.05, 0.15, 0.2],
+      'classical' => [0.0, 0.05, 0.05, 0.15, 0.2],
+      'acoustic' => [0.05, 0.15, 0.2, 0.1, 0.0],
       'vocal' => [-0.2, 0.1, 0.5, 0.4, -0.1],
+      'podcast' => [-0.45, -0.15, 0.35, 0.45, 0.15],
+      'hiphop' => [0.7, 0.45, -0.1, 0.1, 0.15],
+      'rnb' => [0.35, 0.15, 0.05, 0.2, 0.25],
+      'dance' => [0.45, 0.25, -0.15, 0.1, 0.45],
+      'edm' => [0.55, 0.25, -0.15, 0.2, 0.5],
+      'latin' => [0.3, 0.2, 0.0, 0.15, 0.25],
+      'blues' => [0.15, 0.05, 0.2, 0.1, 0.05],
+      'country' => [0.05, 0.15, 0.2, 0.15, 0.1],
+      'reggae' => [0.35, 0.25, 0.0, 0.1, 0.2],
+      'electronic' => [0.45, 0.2, -0.1, 0.2, 0.45],
+      'night' => [0.2, 0.1, 0.05, 0.0, -0.05],
+      'loudness' => [0.25, 0.15, 0.05, 0.2, 0.25],
       'treble' => [-0.3, -0.2, 0.0, 0.4, 0.6],
       'rock' => [0.4, 0.3, 0.1, 0.2, 0.4],
+      'metal' => [0.55, 0.2, -0.2, 0.3, 0.6],
+      'piano' => [-0.05, 0.1, 0.2, 0.15, 0.0],
+      'movie' => [0.1, 0.0, 0.2, 0.35, 0.2],
+      'gaming' => [0.15, -0.05, 0.25, 0.35, 0.15],
       _ => [0.0, 0.0, 0.0, 0.0, 0.0],
     };
 

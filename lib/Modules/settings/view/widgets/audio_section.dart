@@ -196,7 +196,10 @@ class AudioSection extends StatelessWidget {
                     return InfoTile(
                       icon: Icons.graphic_eq_rounded,
                       title: 'Ecualizador',
-                      subtitle: 'Disponible solo en Android.',
+                      subtitle:
+                          equalizer.eqUnavailableMessage.value.isNotEmpty
+                          ? equalizer.eqUnavailableMessage.value
+                          : 'Disponible solo en Android.',
                     );
                   }
 
@@ -216,12 +219,101 @@ class AudioSection extends StatelessWidget {
 
                   final presets = const <String, String>{
                     'normal': 'Normal',
-                    'bass': 'Bass',
-                    'vocal': 'Vocal',
-                    'rock': 'Rock',
-                    'treble': 'Agudos',
                     'custom': 'Personalizado',
+                    'bass': 'Bass',
+                    'treble': 'Agudos',
+                    'vocal': 'Vocal',
+                    'podcast': 'Podcast',
+                    'movie': 'Cine',
+                    'gaming': 'Gaming',
+                    'pop': 'Pop',
+                    'rock': 'Rock',
+                    'jazz': 'Jazz',
+                    'classical': 'Clásica',
+                    'acoustic': 'Acústica',
+                    'hiphop': 'Hip-Hop',
+                    'rnb': 'R&B',
+                    'dance': 'Dance',
+                    'edm': 'EDM',
+                    'latin': 'Latina',
+                    'metal': 'Metal',
+                    'piano': 'Piano',
+                    'blues': 'Blues',
+                    'country': 'Country',
+                    'reggae': 'Reggae',
+                    'electronic': 'Electronic',
+                    'night': 'Noche',
+                    'loudness': 'Loudness',
                   };
+
+                  final presetGroups = [
+                    _EqPresetGroupSpec(
+                      id: 'basicos',
+                      title: 'Básicos',
+                      subtitle: 'Perfiles rápidos para uso general.',
+                      icon: Icons.tune_rounded,
+                      keys: const [
+                        'normal',
+                        'custom',
+                        'bass',
+                        'treble',
+                        'vocal',
+                      ],
+                    ),
+                    _EqPresetGroupSpec(
+                      id: 'musica_1',
+                      title: 'Música',
+                      subtitle: 'Perfiles populares y balanceados.',
+                      icon: Icons.library_music_rounded,
+                      keys: const [
+                        'pop',
+                        'rock',
+                        'jazz',
+                        'classical',
+                        'acoustic',
+                        'piano',
+                      ],
+                    ),
+                    _EqPresetGroupSpec(
+                      id: 'musica_2',
+                      title: 'Géneros',
+                      subtitle: 'Perfiles con más carácter.',
+                      icon: Icons.graphic_eq_rounded,
+                      keys: const [
+                        'hiphop',
+                        'rnb',
+                        'dance',
+                        'edm',
+                        'latin',
+                        'metal',
+                      ],
+                    ),
+                    _EqPresetGroupSpec(
+                      id: 'voz_escena',
+                      title: 'Voz y Escena',
+                      subtitle: 'Mejora diálogo, voz o sensación de cine/juego.',
+                      icon: Icons.record_voice_over_rounded,
+                      keys: const [
+                        'podcast',
+                        'movie',
+                        'gaming',
+                      ],
+                    ),
+                    _EqPresetGroupSpec(
+                      id: 'extras',
+                      title: 'Extras',
+                      subtitle: 'Perfiles situacionales y colores adicionales.',
+                      icon: Icons.auto_awesome_rounded,
+                      keys: const [
+                        'blues',
+                        'country',
+                        'reggae',
+                        'electronic',
+                        'night',
+                        'loudness',
+                      ],
+                    ),
+                  ];
 
                   return Column(
                     children: [
@@ -243,18 +335,33 @@ class AudioSection extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
 
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: presets.entries.map((entry) {
-                          final isSelected =
-                              equalizer.eqPreset.value == entry.key;
-                          return ChoiceChip(
-                            label: Text(entry.value),
-                            selected: isSelected,
-                            onSelected: (_) => equalizer.setEqPreset(entry.key),
-                          );
-                        }).toList(),
+                      SectionBlock(
+                        title: 'Presets',
+                        subtitle:
+                            'Perfiles organizados en secciones desplegables.',
+                        trailing: ValuePill(
+                          text:
+                              presets[equalizer.eqPreset.value] ??
+                              equalizer.eqPreset.value,
+                        ),
+                        child: Column(
+                          children: presetGroups.map((group) {
+                            final entries = group.keys
+                                .where(presets.containsKey)
+                                .map((key) => MapEntry(key, presets[key]!))
+                                .toList(growable: false);
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: _EqPresetGroupTile(
+                                group: group,
+                                presets: entries,
+                                selectedKey: equalizer.eqPreset.value,
+                                onSelected: (key) => equalizer.setEqPreset(key),
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
 
                       const SizedBox(height: 12),
@@ -590,6 +697,104 @@ class AudioSection extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _EqPresetGroupSpec {
+  const _EqPresetGroupSpec({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.keys,
+  });
+
+  final String id;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<String> keys;
+}
+
+class _EqPresetGroupTile extends StatelessWidget {
+  const _EqPresetGroupTile({
+    required this.group,
+    required this.presets,
+    required this.selectedKey,
+    required this.onSelected,
+  });
+
+  final _EqPresetGroupSpec group;
+  final List<MapEntry<String, String>> presets;
+  final String selectedKey;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    String? selectedLabel;
+    for (final entry in presets) {
+      if (entry.key == selectedKey) {
+        selectedLabel = entry.value;
+        break;
+      }
+    }
+    final hasSelected = selectedLabel != null;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest.withOpacity(.28),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant.withOpacity(.35)),
+      ),
+      child: Theme(
+        data: theme.copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          key: PageStorageKey<String>('eq_group_${group.id}'),
+          maintainState: true,
+          initiallyExpanded: hasSelected,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+          leading: Icon(
+            group.icon,
+            size: 18,
+            color: hasSelected ? scheme.primary : scheme.onSurfaceVariant,
+          ),
+          title: Text(
+            group.title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          subtitle: Text(
+            hasSelected ? 'Seleccionado: $selectedLabel' : group.subtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+              height: 1.2,
+            ),
+          ),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: presets.map((entry) {
+                  final isSelected = selectedKey == entry.key;
+                  return ChoiceChip(
+                    label: Text(entry.value),
+                    selected: isSelected,
+                    onSelected: (_) => onSelected(entry.key),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
