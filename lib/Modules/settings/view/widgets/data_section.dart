@@ -142,6 +142,52 @@ class DataSection extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
 
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.amber.withOpacity(.25),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.warning_amber_rounded,
+                        size: 18,
+                        color: Colors.amber.shade800,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Respaldo actual: completo',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Incluye toda la media offline (audio, video e imágenes). '
+                              'Puede tardar varios minutos y generar archivos ZIP pesados.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
                 Obx(() {
                   final isExporting = backup.isExporting.value;
                   final isImporting = backup.isImporting.value;
@@ -151,7 +197,9 @@ class DataSection extends StatelessWidget {
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: isLoading ? null : backup.exportLibrary,
+                          onPressed: isLoading
+                              ? null
+                              : backup.confirmExportLibrary,
                           icon: isExporting
                               ? const SizedBox(
                                   width: 16,
@@ -160,16 +208,18 @@ class DataSection extends StatelessWidget {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Icon(Icons.upload_file_rounded),
+                              : const Icon(Icons.archive_rounded),
                           label: Text(
-                            isExporting ? 'Exportando...' : 'Exportar',
+                            isExporting ? 'Exportando...' : 'Exportar ZIP',
                           ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: isLoading ? null : backup.importLibrary,
+                          onPressed: isLoading
+                              ? null
+                              : backup.confirmImportLibrary,
                           icon: isImporting
                               ? const SizedBox(
                                   width: 16,
@@ -178,9 +228,9 @@ class DataSection extends StatelessWidget {
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Icon(Icons.download_rounded),
+                              : const Icon(Icons.restore_rounded),
                           label: Text(
-                            isImporting ? 'Importando...' : 'Importar',
+                            isImporting ? 'Importando...' : 'Restaurar ZIP',
                           ),
                         ),
                       ),

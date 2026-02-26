@@ -118,25 +118,73 @@ class AudioSection extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 8),
-                Obx(
-                  () => SectionBlock(
-                    title: 'Crossfade',
-                    subtitle:
-                        'Mezcla canciones al final/inicio de la transición.',
-                    trailing: ValuePill(
-                      text: playback.crossfadeSeconds.value == 0
-                          ? 'Off'
-                          : '${playback.crossfadeSeconds.value}s',
-                    ),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: const [0, 2, 4, 6].map((seconds) {
-                        return _CrossfadeChip(seconds: seconds);
-                      }).toList(),
-                    ),
-                  ),
-                ),
+                Obx(() {
+                  final crossfadeEnabled = playback.crossfadeSeconds.value > 0;
+                  final crossfadeValue = crossfadeEnabled
+                      ? playback.crossfadeSeconds.value
+                      : 2;
+
+                  return Column(
+                    children: [
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          'Crossfade',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Mezcla canciones al final/inicio de la transición.',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                        value: crossfadeEnabled,
+                        onChanged: (enabled) {
+                          if (!enabled) {
+                            playback.setCrossfadeSeconds(0);
+                            return;
+                          }
+                          final restore = playback.crossfadeSeconds.value > 0
+                              ? playback.crossfadeSeconds.value
+                              : 2;
+                          playback.setCrossfadeSeconds(restore);
+                        },
+                      ),
+                      const SizedBox(height: 6),
+                      SectionBlock(
+                        title: 'Duración del crossfade',
+                        subtitle: 'En segundos',
+                        trailing: ValuePill(
+                          text: crossfadeEnabled
+                              ? '${playback.crossfadeSeconds.value}s'
+                              : 'Off',
+                        ),
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 4,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 10,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 18,
+                            ),
+                          ),
+                          child: Slider(
+                            value: crossfadeValue.toDouble(),
+                            min: 1,
+                            max: 12,
+                            divisions: 11,
+                            label: '${crossfadeValue}s',
+                            onChanged: crossfadeEnabled
+                                ? (v) => playback.setCrossfadeSeconds(v.round())
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
 
                 const SizedBox(height: 8),
                 Divider(color: theme.dividerColor.withOpacity(.12)),
@@ -180,30 +228,42 @@ class AudioSection extends StatelessWidget {
                         ),
                       const SizedBox(height: 6),
 
-                      // Duración: chips discretos
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Duración',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
+                      SectionBlock(
+                        title: 'Duración',
+                        subtitle: 'En minutos',
+                        trailing: ValuePill(
+                          text: sleepTimer.sleepTimerEnabled.value
+                              ? '${sleepTimer.sleepTimerMinutes.value}m'
+                              : 'Off',
+                        ),
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: 4,
+                            thumbShape: const RoundSliderThumbShape(
+                              enabledThumbRadius: 10,
+                            ),
+                            overlayShape: const RoundSliderOverlayShape(
+                              overlayRadius: 18,
+                            ),
+                          ),
+                          child: Slider(
+                            value: sleepTimer.sleepTimerMinutes.value
+                                .clamp(5, 90)
+                                .toDouble(),
+                            min: 5,
+                            max: 90,
+                            divisions: 17, // pasos de 5 minutos
+                            label: '${sleepTimer.sleepTimerMinutes.value}m',
+                            onChanged: sleepTimer.sleepTimerEnabled.value
+                                ? (v) {
+                                    final rounded = ((v / 5).round() * 5)
+                                        .clamp(5, 90)
+                                        .toInt();
+                                    sleepTimer.setSleepTimerMinutes(rounded);
+                                  }
+                                : null,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: SleepTimerController.timerPresets.map((mins) {
-                          final selected =
-                              sleepTimer.sleepTimerMinutes.value == mins;
-                          return ChoiceChip(
-                            label: Text('${mins}m'),
-                            selected: selected,
-                            onSelected: (_) =>
-                                sleepTimer.setSleepTimerMinutes(mins),
-                          );
-                        }).toList(),
                       ),
 
                       const SizedBox(height: 12),
@@ -260,7 +320,9 @@ class AudioSection extends StatelessWidget {
                         title: 'Tiempo de inactividad',
                         subtitle: 'En minutos',
                         trailing: ValuePill(
-                          text: '${sleepTimer.inactivityPauseMinutes.value}m',
+                          text: sleepTimer.inactivityPauseEnabled.value
+                              ? '${sleepTimer.inactivityPauseMinutes.value}m'
+                              : 'Off',
                         ),
                         child: SliderTheme(
                           data: SliderTheme.of(context).copyWith(
@@ -529,24 +591,5 @@ class AudioSection extends StatelessWidget {
         ),
       ],
     );
-  }
-}
-
-class _CrossfadeChip extends StatelessWidget {
-  final int seconds;
-
-  const _CrossfadeChip({required this.seconds});
-
-  @override
-  Widget build(BuildContext context) {
-    final playback = Get.find<PlaybackSettingsController>();
-    return Obx(() {
-      final selected = playback.crossfadeSeconds.value == seconds;
-      return ChoiceChip(
-        label: Text(seconds == 0 ? 'Off' : '${seconds}s'),
-        selected: selected,
-        onSelected: (_) => playback.setCrossfadeSeconds(seconds),
-      );
-    });
   }
 }

@@ -9,7 +9,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:archive/archive.dart';
 import 'package:archive/archive_io.dart';
 
 import '../../../app/data/local/local_library_store.dart';
@@ -62,6 +61,20 @@ void _createZipIsolate(Map<String, dynamic> params) {
   encoder.close();
 }
 
+class _BackupEstimate {
+  const _BackupEstimate({
+    required this.contentBytes,
+    required this.estimatedZipBytes,
+    required this.includedFiles,
+    required this.missingFiles,
+  });
+
+  final int contentBytes;
+  final int estimatedZipBytes;
+  final int includedFiles;
+  final int missingFiles;
+}
+
 /// Gestiona: exportar e importar copias de seguridad de la librería.
 class BackupRestoreController extends GetxController {
   // ============================
@@ -76,25 +89,206 @@ class BackupRestoreController extends GetxController {
     await Future.delayed(Duration(milliseconds: ms));
   }
 
+  Future<void> confirmExportLibrary() async {
+    if (isExporting.value || isImporting.value) return;
+
+    _showBusyDialog(
+      title: 'Preparando respaldo',
+      message: 'Calculando tamaño estimado del backup completo...',
+      icon: Icons.calculate_rounded,
+      accent: Colors.orange,
+    );
+
+    _BackupEstimate estimate;
+    try {
+      estimate = await _estimateFullBackup();
+    } catch (e) {
+      await _closeProgressDialog();
+      Get.snackbar(
+        'Copia de seguridad',
+        'No se pudo calcular el tamaño estimado',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    await _closeProgressDialog();
+    await _yieldUi(80);
+
+    final estimateLabel = _formatBytes(estimate.estimatedZipBytes);
+    final contentLabel = _formatBytes(estimate.contentBytes);
+    final confirmed = await _showActionDialog(
+      title: 'Respaldo completo',
+      subtitle:
+          'Incluye toda tu media offline (audio, video e imágenes) junto con la librería.',
+      icon: Icons.archive_rounded,
+      accent: Colors.orange,
+      notes: [
+        'Tamaño estimado: ~$estimateLabel (contenido detectado: $contentLabel).',
+        'Archivos incluidos en la estimación: ${estimate.includedFiles}.',
+        if (estimate.missingFiles > 0)
+          'Archivos no encontrados (no se incluirán): ${estimate.missingFiles}.',
+        'Puede tardar varios minutos si tienes muchos archivos.',
+        'No cierres la app durante el proceso.',
+      ],
+      confirmText: 'Continuar',
+    );
+
+    if (confirmed == true) {
+      await exportLibrary();
+    }
+  }
+
+  Future<void> confirmImportLibrary() async {
+    if (isExporting.value || isImporting.value) return;
+
+    final action = await _showImportDialog();
+    if (action == null) return;
+    await _yieldUi(80);
+
+    final kind = action['action']?.trim();
+    if (kind == 'pick') {
+      await importLibrary();
+      return;
+    }
+
+    if (kind == 'locate') {
+      final reference = (action['value'] ?? '').trim();
+      if (reference.isEmpty) return;
+
+      _showBusyDialog(
+        title: 'Localizando backup',
+        message: 'Buscando el ZIP usando la ruta o código indicado...',
+        icon: Icons.search_rounded,
+        accent: Colors.teal,
+      );
+
+      final foundPath = await _locateBackupZipByReference(reference);
+      await _closeProgressDialog();
+      await _yieldUi(80);
+
+      if (foundPath == null) {
+        await _showResultDialog(
+          title: 'No se encontró el backup',
+          message:
+              'No pude localizar el ZIP con ese código/ruta. Puedes usar "Seleccionar ZIP" para elegirlo manualmente.',
+          icon: Icons.search_off_rounded,
+          accent: Colors.orange,
+          confirmText: 'Entendido',
+        );
+        return;
+      }
+
+      await importLibrary(zipPath: foundPath);
+    }
+  }
+
   void _showProgressDialog(String title) {
     progress.value = 0.0;
     currentOperation.value = 'Iniciando...';
+    final isExport = title.toLowerCase().contains('respaldo');
+    final icon = isExport ? Icons.archive_rounded : Icons.restore_rounded;
+    final accent = isExport ? Colors.orange : Colors.teal;
     Get.dialog(
       PopScope(
         canPop: false, // Prevenir que cierren el diálogo durante la operación
-        child: AlertDialog(
-          title: Text(title),
-          content: Obx(
-            () => Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                LinearProgressIndicator(
-                  value: progress.value > 0 ? progress.value : null,
-                ),
-                const SizedBox(height: 16),
-                Text(currentOperation.value, textAlign: TextAlign.center),
-              ],
-            ),
+        child: Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          child: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              final scheme = theme.colorScheme;
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                child: Obx(() {
+                  final raw = progress.value;
+                  final hasProgress = raw > 0;
+                  final value = raw.clamp(0.0, 1.0).toDouble();
+                  final percent = (value * 100).round();
+
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: accent.withOpacity(.14),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(icon, color: accent),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  hasProgress
+                                      ? '$percent% completado'
+                                      : 'Preparando proceso...',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest.withOpacity(.45),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: scheme.outlineVariant.withOpacity(.35),
+                          ),
+                        ),
+                        child: Text(
+                          currentOperation.value,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          minHeight: 10,
+                          value: hasProgress ? value : null,
+                          backgroundColor: scheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation<Color>(accent),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'No cierres la app mientras se procesa la operación.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              );
+            },
           ),
         ),
       ),
@@ -102,9 +296,504 @@ class BackupRestoreController extends GetxController {
     );
   }
 
-  void _closeProgressDialog() {
+  Future<void> _closeProgressDialog() async {
     if (Get.isDialogOpen ?? false) {
       Get.back();
+      await _yieldUi(120);
+    }
+  }
+
+  void _showBusyDialog({
+    required String title,
+    required String message,
+    required IconData icon,
+    required Color accent,
+  }) {
+    Get.dialog(
+      PopScope(
+        canPop: false,
+        child: Dialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Builder(
+            builder: (context) {
+              final theme = Theme.of(context);
+              final scheme = theme.colorScheme;
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: accent.withOpacity(.14),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            message,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              minHeight: 8,
+                              backgroundColor: scheme.surfaceContainerHighest,
+                              valueColor:
+                                  AlwaysStoppedAnimation<Color>(accent),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+      barrierDismissible: false,
+    );
+  }
+
+  Future<Map<String, String>?> _showImportDialog() async {
+    var inputValue = '';
+
+    return Get.dialog<Map<String, String>>(
+      Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+        ),
+        child: Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            final scheme = theme.colorScheme;
+            final media = MediaQuery.of(context);
+
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  final hasInput = inputValue.trim().isNotEmpty;
+
+                  void closeWith(Map<String, String>? result) {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    Get.back(result: result);
+                  }
+
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: media.size.height * 0.82,
+                    ),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: Colors.teal.withOpacity(.14),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.restore_rounded,
+                                  color: Colors.teal,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Restaurar respaldo',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Puedes seleccionar el ZIP manualmente o pegar la ruta/código de ubicación generado al exportar.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.teal.withOpacity(.06),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: Colors.teal.withOpacity(.20),
+                              ),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  minLines: 1,
+                                  maxLines: 3,
+                                  textInputAction: TextInputAction.done,
+                                  onChanged: (value) {
+                                    inputValue = value;
+                                    setState(() {});
+                                  },
+                                  onSubmitted: (_) {
+                                    if (!hasInput) return;
+                                    closeWith({
+                                      'action': 'locate',
+                                      'value': inputValue.trim(),
+                                    });
+                                  },
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    labelText: 'Codigo o ruta del backup',
+                                    hintText:
+                                        'Ej: LFB:listenfy_backup_20260226_1030.zip',
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Si el archivo se movió, usa el codigo (LFB:...) para intentar localizarlo.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: scheme.onSurfaceVariant,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => closeWith(null),
+                                  child: const Text('Cancelar'),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () =>
+                                      closeWith(const {'action': 'pick'}),
+                                  icon: const Icon(Icons.folder_open_rounded),
+                                  label: const Text('Seleccionar ZIP'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: hasInput
+                                  ? () => closeWith({
+                                        'action': 'locate',
+                                        'value': inputValue.trim(),
+                                      })
+                                  : null,
+                              icon: const Icon(Icons.search_rounded),
+                              label: const Text('Localizar'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  Future<bool?> _showActionDialog({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color accent,
+    required List<String> notes,
+    required String confirmText,
+  }) {
+    return Get.dialog<bool>(
+      Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            final scheme = theme.colorScheme;
+            final maxHeight = MediaQuery.of(context).size.height * 0.82;
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: accent.withOpacity(.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: accent),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.25,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: accent.withOpacity(.07),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: accent.withOpacity(.22)),
+                    ),
+                    child: Column(
+                      children: notes
+                          .map(
+                            (note) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Icon(
+                                      Icons.circle,
+                                      size: 7,
+                                      color: accent,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      note,
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        height: 1.25,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Get.back(result: false),
+                            child: const Text('Cancelar'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () => Get.back(result: true),
+                            icon: Icon(icon, size: 18),
+                            label: Text(confirmText),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  Future<void> _showResultDialog({
+    required String title,
+    required String message,
+    required IconData icon,
+    required Color accent,
+    String? detailLabel,
+    String? detailValue,
+    String confirmText = 'Cerrar',
+    String? cancelText,
+    Future<void> Function()? onConfirm,
+  }) async {
+    final result = await Get.dialog<bool>(
+      Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        child: Builder(
+          builder: (context) {
+            final theme = Theme.of(context);
+            final scheme = theme.colorScheme;
+            final maxHeight = MediaQuery.of(context).size.height * 0.82;
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: accent.withOpacity(.14),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: accent),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.25,
+                    ),
+                  ),
+                  if ((detailValue ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHighest.withOpacity(.45),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withOpacity(.35),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if ((detailLabel ?? '').trim().isNotEmpty) ...[
+                            Text(
+                              detailLabel!,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                          SelectableText(
+                            detailValue!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              height: 1.25,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        if (cancelText != null) ...[
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Get.back(result: false),
+                              child: Text(cancelText),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: FilledButton.icon(
+                            onPressed: () => Get.back(result: true),
+                            icon: Icon(icon, size: 18),
+                            label: Text(confirmText),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      barrierDismissible: true,
+    );
+
+    if (result == true && onConfirm != null) {
+      await onConfirm();
     }
   }
 
@@ -274,22 +963,22 @@ class BackupRestoreController extends GetxController {
 
       await tempDir.delete(recursive: true);
 
-      _closeProgressDialog();
+      await _closeProgressDialog();
+      await _yieldUi(80);
+      final locationCode = _backupLocationCode(zipPath);
 
-      Get.defaultDialog(
-        title: 'Copia de seguridad',
-        content: Column(
-          children: [
-            const Text('Backup guardado en:'),
-            const SizedBox(height: 8),
-            SelectableText(zipPath, textAlign: TextAlign.center),
-          ],
-        ),
-        textConfirm: 'Copiar ruta',
-        textCancel: 'Cerrar',
+      await _showResultDialog(
+        title: 'Respaldo completo creado',
+        message:
+            'Se guardó la copia con tu librería y toda la media offline. Guarda la ruta o el codigo LFB para localizar el ZIP después.',
+        icon: Icons.task_alt_rounded,
+        accent: Colors.green,
+        detailLabel: 'Ruta / codigo de ubicacion',
+        detailValue: 'Ruta:\n$zipPath\n\nCodigo:\n$locationCode',
+        confirmText: 'Copiar ruta',
+        cancelText: 'Cerrar',
         onConfirm: () async {
           await Clipboard.setData(ClipboardData(text: zipPath));
-          Get.back();
           Get.snackbar(
             'Copia de seguridad',
             'Ruta copiada al portapapeles',
@@ -298,7 +987,7 @@ class BackupRestoreController extends GetxController {
         },
       );
     } catch (e) {
-      _closeProgressDialog();
+      await _closeProgressDialog();
       Get.snackbar(
         'Copia de seguridad',
         'No se pudo exportar',
@@ -314,24 +1003,38 @@ class BackupRestoreController extends GetxController {
   // ============================
   // 📥 IMPORTAR
   // ============================
-  Future<void> importLibrary() async {
+  Future<void> importLibrary({String? zipPath}) async {
     if (isExporting.value || isImporting.value) return;
 
     try {
-      FilePickerResult? res;
-      try {
-        res = await FilePicker.platform.pickFiles(
-          type: FileType.custom,
-          allowedExtensions: const ['zip'],
-        );
-      } catch (pickErr) {
-        print('Error al abrir FilePicker: $pickErr');
-        return;
+      String path = (zipPath ?? '').trim();
+      if (path.isEmpty) {
+        FilePickerResult? res;
+        try {
+          res = await FilePicker.platform.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: const ['zip'],
+          );
+        } catch (pickErr) {
+          print('Error al abrir FilePicker: $pickErr');
+          return;
+        }
+
+        final file = res?.files.first;
+        final pickedPath = file?.path?.trim() ?? '';
+        if (pickedPath.isEmpty) return;
+        path = pickedPath;
       }
 
-      final file = res?.files.first;
-      final path = file?.path;
-      if (path == null || path.trim().isEmpty) return;
+      final zipFile = File(path);
+      if (!await zipFile.exists()) {
+        Get.snackbar(
+          'Copia de seguridad',
+          'No se encontró el archivo ZIP indicado',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
 
       // Esperar a que la transición de la Activity Nativa termine antes de abrir el Dialog
       // Esto previene el clásico crash "fail in deliverResultsIfNeeded" en Android (MIUI).
@@ -525,15 +1228,19 @@ class BackupRestoreController extends GetxController {
         await Get.find<SourcesController>().refreshAll();
       }
 
-      _closeProgressDialog();
+      await _closeProgressDialog();
+      await _yieldUi(80);
 
-      Get.snackbar(
-        'Copia de seguridad',
-        'Importación completada',
-        snackPosition: SnackPosition.BOTTOM,
+      await _showResultDialog(
+        title: 'Importación completada',
+        message:
+            'La librería y los archivos offline se restauraron correctamente. Ya puedes usar tu contenido sin conexión.',
+        icon: Icons.task_alt_rounded,
+        accent: Colors.green,
+        confirmText: 'Entendido',
       );
     } catch (e) {
-      _closeProgressDialog();
+      await _closeProgressDialog();
       Get.snackbar(
         'Copia de seguridad',
         'No se pudo importar',
@@ -549,6 +1256,271 @@ class BackupRestoreController extends GetxController {
   // ============================
   // 🧰 HELPERS
   // ============================
+  Future<_BackupEstimate> _estimateFullBackup() async {
+    final libraryStore = Get.find<LocalLibraryStore>();
+    final playlistStore = Get.find<PlaylistStore>();
+    final artistStore = Get.find<ArtistStore>();
+    final topicStore = Get.find<SourceThemeTopicStore>();
+    final topicPlaylistStore = Get.find<SourceThemeTopicPlaylistStore>();
+
+    final items = await libraryStore.readAll();
+    final playlists = await playlistStore.readAll();
+    final artists = await artistStore.readAll();
+    final topics = await topicStore.readAll();
+    final topicPlaylists = await topicPlaylistStore.readAll();
+
+    final paths = <String>{};
+
+    void addPath(String? rawPath) {
+      final clean = rawPath?.trim() ?? '';
+      if (clean.isEmpty) return;
+      paths.add(p.normalize(clean));
+    }
+
+    for (final item in items) {
+      addPath(item.thumbnailLocalPath);
+      for (final v in item.variants) {
+        addPath(v.localPath);
+      }
+    }
+
+    for (final playlist in playlists) {
+      addPath(playlist.coverLocalPath);
+    }
+
+    for (final artist in artists) {
+      addPath(artist.thumbnailLocalPath);
+    }
+
+    for (final topic in topics) {
+      addPath(topic.coverLocalPath);
+    }
+
+    for (final topicPlaylist in topicPlaylists) {
+      addPath(topicPlaylist.coverLocalPath);
+    }
+
+    int contentBytes = 0;
+    int includedFiles = 0;
+    int missingFiles = 0;
+
+    final pathList = paths.toList(growable: false);
+    for (var i = 0; i < pathList.length; i++) {
+      if (i % 25 == 0) {
+        await _yieldUi();
+      }
+
+      final file = File(pathList[i]);
+      try {
+        if (!await file.exists()) {
+          missingFiles++;
+          continue;
+        }
+
+        final size = await file.length();
+        if (size > 0) {
+          contentBytes += size;
+        }
+        includedFiles++;
+      } catch (_) {
+        missingFiles++;
+      }
+    }
+
+    final estimatedZipBytes = contentBytes + (1024 * 1024) + (includedFiles * 256);
+
+    return _BackupEstimate(
+      contentBytes: contentBytes,
+      estimatedZipBytes: estimatedZipBytes,
+      includedFiles: includedFiles,
+      missingFiles: missingFiles,
+    );
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes <= 0) return '0 B';
+
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var value = bytes.toDouble();
+    var unitIndex = 0;
+
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex++;
+    }
+
+    final decimals = unitIndex <= 1 ? 0 : (value >= 100 ? 0 : 1);
+    return '${value.toStringAsFixed(decimals)} ${units[unitIndex]}';
+  }
+
+  String _backupLocationCode(String zipPath) {
+    return 'LFB:${p.basename(zipPath)}';
+  }
+
+  Future<String?> _locateBackupZipByReference(String reference) async {
+    final normalizedRef = _normalizeBackupReference(reference);
+    if (normalizedRef.isEmpty) return null;
+
+    if (normalizedRef.startsWith('file://')) {
+      final uri = Uri.tryParse(normalizedRef);
+      if (uri != null) {
+        final filePath = uri.toFilePath();
+        if (filePath.trim().isNotEmpty && await File(filePath).exists()) {
+          return filePath;
+        }
+      }
+    }
+
+    final exactPath = normalizedRef;
+    if (await File(exactPath).exists()) {
+      return p.normalize(exactPath);
+    }
+
+    var fileName = '';
+    if (normalizedRef.toUpperCase().startsWith('LFB:')) {
+      fileName = normalizedRef.substring(4).trim();
+    } else {
+      fileName = p.basename(normalizedRef).trim();
+    }
+
+    if (fileName.isEmpty) return null;
+    if (!fileName.toLowerCase().endsWith('.zip')) {
+      fileName = '$fileName.zip';
+    }
+
+    final candidates = <String>{};
+    final appDir = await getApplicationDocumentsDirectory();
+
+    void addCandidateDir(String dirPath) {
+      final clean = dirPath.trim();
+      if (clean.isEmpty) return;
+      candidates.add(p.join(clean, fileName));
+      candidates.add(p.join(clean, 'ListenfyBackups', fileName));
+    }
+
+    addCandidateDir(appDir.path);
+    addCandidateDir(p.join(appDir.path, 'ListenfyBackups'));
+
+    final refDir = p.dirname(exactPath);
+    if (refDir != '.' && refDir.trim().isNotEmpty && refDir != exactPath) {
+      addCandidateDir(refDir);
+    }
+
+    if (Platform.isAndroid) {
+      addCandidateDir('/storage/emulated/0');
+      addCandidateDir('/storage/emulated/0/Download');
+      addCandidateDir('/storage/emulated/0/Documents');
+      addCandidateDir('/sdcard');
+      addCandidateDir('/sdcard/Download');
+      addCandidateDir('/sdcard/Documents');
+    }
+
+    for (final candidate in candidates) {
+      try {
+        if (await File(candidate).exists()) {
+          return p.normalize(candidate);
+        }
+      } catch (_) {
+        // Ignorar directorios sin permiso o rutas inválidas.
+      }
+    }
+
+    final searchRoots = <String>{
+      p.join(appDir.path, 'ListenfyBackups'),
+      appDir.path,
+      if (Platform.isAndroid) ...{
+        '/storage/emulated/0/Download',
+        '/storage/emulated/0/Documents',
+        '/sdcard/Download',
+        '/sdcard/Documents',
+      },
+    };
+
+    for (final root in searchRoots) {
+      final found = await _searchBackupZipInDir(root, fileName);
+      if (found != null) return found;
+    }
+
+    return null;
+  }
+
+  String _normalizeBackupReference(String input) {
+    final raw = input.trim();
+    if (raw.isEmpty) return '';
+
+    final codeMatch = RegExp(r'(LFB:[^\s]+\.zip)', caseSensitive: false)
+        .firstMatch(raw.replaceAll('\n', ' '));
+    if (codeMatch != null) {
+      return codeMatch.group(1)!.trim();
+    }
+
+    final lines = raw
+        .split(RegExp(r'[\r\n]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+
+    for (final line in lines) {
+      final lower = line.toLowerCase();
+      if (lower.endsWith('.zip') ||
+          line.startsWith('/') ||
+          line.startsWith('file://')) {
+        return line;
+      }
+    }
+
+    return raw;
+  }
+
+  Future<String?> _searchBackupZipInDir(String rootPath, String fileName) async {
+    final root = Directory(rootPath);
+    try {
+      if (!await root.exists()) return null;
+    } catch (_) {
+      return null;
+    }
+
+    var seen = 0;
+
+    Future<String?> walk(Directory dir, int depth) async {
+      if (depth > 2) return null;
+
+      Stream<FileSystemEntity> stream;
+      try {
+        stream = dir.list(followLinks: false);
+      } catch (_) {
+        return null;
+      }
+
+      await for (final entity in stream) {
+        seen++;
+        if (seen % 50 == 0) {
+          await _yieldUi();
+        }
+
+        try {
+          if (entity is File) {
+            if (p.basename(entity.path).toLowerCase() == fileName.toLowerCase()) {
+              return p.normalize(entity.path);
+            }
+            continue;
+          }
+
+          if (entity is Directory) {
+            final found = await walk(entity, depth + 1);
+            if (found != null) return found;
+          }
+        } catch (_) {
+          // Ignorar entradas inaccesibles.
+        }
+      }
+
+      return null;
+    }
+
+    return walk(root, 0);
+  }
+
   Future<Directory?> _resolveBackupDir() async {
     if (Platform.isAndroid) {
       final picked = await FilePicker.platform.getDirectoryPath();
