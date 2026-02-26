@@ -142,25 +142,51 @@ class DataSection extends StatelessWidget {
                   const SizedBox(height: 12),
                 ],
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: backup.exportLibrary,
-                        icon: const Icon(Icons.upload_file_rounded),
-                        label: const Text('Exportar'),
+                Obx(() {
+                  final isExporting = backup.isExporting.value;
+                  final isImporting = backup.isImporting.value;
+                  final isLoading = isExporting || isImporting;
+
+                  return Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: isLoading ? null : backup.exportLibrary,
+                          icon: isExporting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.upload_file_rounded),
+                          label: Text(
+                            isExporting ? 'Exportando...' : 'Exportar',
+                          ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: backup.importLibrary,
-                        icon: const Icon(Icons.download_rounded),
-                        label: const Text('Importar'),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: isLoading ? null : backup.importLibrary,
+                          icon: isImporting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.download_rounded),
+                          label: Text(
+                            isImporting ? 'Importando...' : 'Importar',
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  );
+                }),
 
                 const SizedBox(height: 12),
                 Divider(color: theme.dividerColor.withOpacity(.12)),

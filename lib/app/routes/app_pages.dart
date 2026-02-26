@@ -6,6 +6,7 @@ import 'app_routes.dart';
 import 'package:flutter_listenfy/Modules/home/binding/home_binding.dart';
 import 'package:flutter_listenfy/Modules/home/view/home_entry_page.dart';
 import 'package:flutter_listenfy/Modules/home/view/home_page.dart';
+import 'package:flutter_listenfy/Modules/home/view/section_list_page.dart';
 
 // Player
 import 'package:flutter_listenfy/Modules/player/audio/binding/audio_player_binding.dart';
@@ -46,6 +47,16 @@ import 'package:flutter_listenfy/Modules/edit/binding/edit_entity_binding.dart';
 import 'package:flutter_listenfy/Modules/edit/view/edit_entity_page.dart';
 import 'package:flutter_listenfy/Modules/edit/view/create_entity_page.dart';
 
+// Queues & Details (New)
+import 'package:flutter_listenfy/Modules/player/audio/view/queue_page.dart';
+import 'package:flutter_listenfy/Modules/player/Video/view/video_queue_page.dart';
+import 'package:flutter_listenfy/Modules/artists/view/artist_detail_page.dart';
+import 'package:flutter_listenfy/Modules/playlists/view/playlist_detail_page.dart';
+import 'package:flutter_listenfy/Modules/home/view/app_songs_search_page.dart';
+import 'package:flutter_listenfy/Modules/sources/view/source_library_page.dart';
+import 'package:flutter_listenfy/Modules/sources/view/source_theme_topic_page.dart';
+import 'package:flutter_listenfy/Modules/sources/view/source_theme_topic_playlist_page.dart';
+
 abstract class AppPages {
   static final routes = <GetPage>[
     // Entry
@@ -61,6 +72,20 @@ abstract class AppPages {
       page: () => const HomePage(),
       binding: HomeBinding(),
     ),
+    GetPage(
+      name: AppRoutes.homeSectionList,
+      page: () {
+        final args = Get.arguments as Map<String, dynamic>? ?? {};
+        return SectionListPage(
+          title: args['title'] ?? 'Sección',
+          items: args['items'] ?? [],
+          onItemTap: args['onItemTap'],
+          onItemLongPress: args['onItemLongPress'],
+          onShuffle: args['onShuffle'],
+        );
+      },
+      transition: Transition.rightToLeft,
+    ),
 
     // Audio Player
     GetPage(
@@ -74,6 +99,63 @@ abstract class AppPages {
       name: AppRoutes.videoPlayer,
       page: () => const VideoPlayerPage(),
       binding: VideoPlayerBinding(),
+    ),
+
+    // Queues
+    GetPage(name: AppRoutes.audioQueue, page: () => const QueuePage()),
+    GetPage(name: AppRoutes.videoQueue, page: () => const VideoQueuePage()),
+
+    // Search
+    GetPage(name: AppRoutes.homeSearch, page: () => const AppSongsSearchPage()),
+
+    // Sub-sources
+    GetPage(
+      name: AppRoutes.sourceLibrary,
+      page: () => SourceLibraryPage(
+        title: Get.arguments['title'] ?? '',
+        themeId: Get.arguments['themeId'] ?? '',
+        onlyOffline: Get.arguments['onlyOffline'] ?? false,
+        origins: Get.arguments['origins'],
+        forceKind: Get.arguments['forceKind'],
+      ),
+    ),
+    GetPage(
+      name: AppRoutes.sourceTheme,
+      page: () => SourceThemeTopicPage(
+        topicId: Get.arguments['topicId'] ?? '',
+        theme: Get.arguments['theme'],
+        origins: Get.arguments['origins'],
+      ),
+    ),
+    GetPage(
+      name: AppRoutes.sourcePlaylist,
+      preventDuplicates: false,
+      page: () => SourceThemeTopicPlaylistPage(
+        playlistId: Get.arguments['playlistId'] ?? '',
+        theme: Get.arguments['theme'],
+        origins: Get.arguments['origins'],
+      ),
+    ),
+
+    // Details
+    GetPage(
+      name: AppRoutes.artistDetail,
+      page: () =>
+          ArtistDetailPage(artistKey: Get.arguments?['artistKey'] ?? ''),
+    ),
+    GetPage(
+      name: AppRoutes.playlistDetail,
+      page: () {
+        final isSmart = Get.arguments?['isSmart'] ?? false;
+        if (isSmart) {
+          return PlaylistDetailPage.smart(
+            playlistId: Get.arguments?['playlistId'] ?? '',
+          );
+        }
+        return PlaylistDetailPage.custom(
+          playlistId: Get.arguments?['playlistId'] ?? '',
+        );
+      },
     ),
 
     // Sources

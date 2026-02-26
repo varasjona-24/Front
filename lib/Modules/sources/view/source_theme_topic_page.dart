@@ -16,7 +16,6 @@ import '../domain/source_theme.dart';
 import '../domain/source_theme_topic.dart';
 import '../domain/source_theme_topic_playlist.dart';
 import '../ui/source_playlist_card.dart';
-import 'source_theme_topic_playlist_page.dart';
 import '../../../app/utils/format_bytes.dart';
 
 // ============================
@@ -280,12 +279,13 @@ class _SourceThemeTopicPageState extends State<SourceThemeTopicPage> {
             child: SourcePlaylistCard(
               theme: widget.theme,
               playlist: pl,
-              onOpen: () => Get.to(
-                () => SourceThemeTopicPlaylistPage(
-                  playlistId: pl.id,
-                  theme: widget.theme,
-                  origins: widget.origins,
-                ),
+              onOpen: () => Get.toNamed(
+                AppRoutes.sourcePlaylist,
+                arguments: {
+                  'playlistId': pl.id,
+                  'theme': widget.theme,
+                  'origins': widget.origins,
+                },
               ),
               onEdit: () => _openEditPlaylist(pl),
               onDelete: () => _sources.deleteTopicPlaylist(pl),

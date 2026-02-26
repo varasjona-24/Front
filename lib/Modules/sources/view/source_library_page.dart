@@ -14,14 +14,12 @@ import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 
 import '../../../app/routes/app_routes.dart';
 import '../../home/controller/home_controller.dart';
-import '../../player/audio/view/audio_player_page.dart';
 import '../../edit/controller/edit_entity_controller.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_origin.dart';
 import '../domain/source_theme.dart';
 import '../domain/source_theme_topic.dart';
 import '../ui/source_color_picker_field.dart';
-import 'source_theme_topic_page.dart';
 
 // ============================
 // 🧭 PAGE: SOURCE LIBRARY
@@ -254,7 +252,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
       padding: EdgeInsets.only(bottom: widget.onlyOffline ? 12 : 8),
       child: Card(
         elevation: 0,
-        color: widget.onlyOffline ? scheme.surfaceContainer : Colors.transparent,
+        color: widget.onlyOffline
+            ? scheme.surfaceContainer
+            : Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(widget.onlyOffline ? 18 : 12),
         ),
@@ -295,8 +295,8 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                   final idx = queue.indexWhere((e) => e.id == item.id);
                   final safeIdx = idx == -1 ? 0 : idx;
 
-                  Get.to(
-                    () => const AudioPlayerPage(),
+                  Get.toNamed(
+                    AppRoutes.audioPlayer,
                     arguments: {
                       'queue': queue,
                       'index': safeIdx,
@@ -400,12 +400,13 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                 themeMeta: themeMeta,
                 topic: topic,
                 listCount: _sources.playlistsForTopic(topic.id).length,
-                onOpen: () => Get.to(
-                  () => SourceThemeTopicPage(
-                    topicId: topic.id,
-                    theme: themeMeta,
-                    origins: widget.origins,
-                  ),
+                onOpen: () => Get.toNamed(
+                  AppRoutes.sourceTheme,
+                  arguments: {
+                    'topicId': topic.id,
+                    'theme': themeMeta,
+                    'origins': widget.origins,
+                  },
                 ),
                 onEdit: () => _openEditTopic(topic),
                 onDelete: () => _confirmDeleteTopic(topic),
@@ -541,7 +542,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
   }
 }
 
-class _TopicCard extends StatelessWidget {
+class _TopicCard extends StatefulWidget {
   const _TopicCard({
     required this.themeMeta,
     required this.topic,
@@ -559,12 +560,22 @@ class _TopicCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
+  State<_TopicCard> createState() => _TopicCardState();
+}
+
+class _TopicCardState extends State<_TopicCard> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final topic = widget.topic;
     final base = topic.colorValue != null
         ? Color(topic.colorValue!)
-        : themeMeta.colors.first;
+        : widget.themeMeta.colors.first;
     final textColor = Colors.white;
+    final scale = _isPressed ? 0.97 : (_isHovered ? 1.01 : 1.0);
 
     ImageProvider? provider;
     final path = topic.coverLocalPath?.trim();
@@ -575,73 +586,144 @@ class _TopicCard extends StatelessWidget {
       provider = NetworkImage(url);
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
-          decoration: BoxDecoration(color: base.withOpacity(0.92)),
-          child: InkWell(
-            onTap: onOpen,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      width: 52,
-                      height: 52,
-                      color: Colors.black.withOpacity(0.18),
-                      child: provider != null
-                          ? Image(image: provider, fit: BoxFit.cover)
-                          : Icon(Icons.folder_rounded, color: textColor),
-                    ),
+    return AnimatedScale(
+      scale: scale,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) {
+          setState(() => _isPressed = false);
+          widget.onOpen();
+        },
+        onTapCancel: () => setState(() => _isPressed = false),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [base.withOpacity(0.95), base.withOpacity(0.8)],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          topic.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: t.textTheme.titleMedium?.copyWith(
-                            color: textColor,
-                            fontWeight: FontWeight.w700,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: base.withOpacity(0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Subtle glass overlay
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withOpacity(0.12),
+                              Colors.transparent,
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${topic.itemIds.length} items · $listCount listas',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: t.textTheme.bodySmall?.copyWith(
-                            color: textColor.withOpacity(0.85),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                  PopupMenuButton<_TopicAction>(
-                    onSelected: (value) {
-                      if (value == _TopicAction.edit) onEdit();
-                      if (value == _TopicAction.delete) onDelete();
-                    },
-                    icon: Icon(Icons.more_vert_rounded, color: textColor),
-                    itemBuilder: (ctx) => const [
-                      PopupMenuItem(
-                        value: _TopicAction.edit,
-                        child: Text('Editar'),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              width: 56,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.2),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: provider != null
+                                  ? Image(image: provider, fit: BoxFit.cover)
+                                  : Icon(
+                                      Icons.folder_rounded,
+                                      color: textColor,
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  topic.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: t.textTheme.titleMedium?.copyWith(
+                                    color: textColor,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${topic.itemIds.length} items · ${widget.listCount} listas',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: t.textTheme.bodySmall?.copyWith(
+                                    color: textColor.withOpacity(0.85),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          PopupMenuButton<_TopicAction>(
+                            onSelected: (value) {
+                              if (value == _TopicAction.edit) widget.onEdit();
+                              if (value == _TopicAction.delete)
+                                widget.onDelete();
+                            },
+                            icon: Icon(
+                              Icons.more_vert_rounded,
+                              color: textColor.withOpacity(0.9),
+                            ),
+                            color: t.colorScheme.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            itemBuilder: (ctx) => [
+                              const PopupMenuItem(
+                                value: _TopicAction.edit,
+                                child: Text('Editar'),
+                              ),
+                              const PopupMenuItem(
+                                value: _TopicAction.delete,
+                                child: Text('Eliminar'),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      PopupMenuItem(
-                        value: _TopicAction.delete,
-                        child: Text('Eliminar'),
-                      ),
-                    ],
-                  ),
-                ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

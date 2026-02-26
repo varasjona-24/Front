@@ -4,13 +4,13 @@ import 'package:get/get.dart';
 import '../../home/controller/home_controller.dart';
 import '../controller/sources_controller.dart';
 import '../domain/source_theme.dart';
-import 'source_library_page.dart';
 
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/routes/app_routes.dart';
 
 // ============================
 // 🧭 PAGE: SOURCES
@@ -32,54 +32,52 @@ class SourcesPage extends GetView<SourcesController> {
     final HomeController home = Get.find<HomeController>();
 
     return Scaffold(
-        backgroundColor: Colors.transparent,
-        extendBody: true,
-        appBar: AppTopBar(
-          title: ListenfyLogo(size: 28, color: scheme.primary),
-                  ),
-        body: AppGradientBackground(
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: RefreshIndicator(
-                  onRefresh: controller.refreshAll,
-                  child: ScrollConfiguration(
-                    behavior: const _NoGlowScrollBehavior(),
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: EdgeInsets.only(
-                        top: AppSpacing.md,
-                        bottom: kBottomNavigationBarHeight + 18,
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _header(theme: theme, scheme: scheme, home: home),
-                          const SizedBox(height: AppSpacing.lg),
+      backgroundColor: Colors.transparent,
+      extendBody: true,
+      appBar: AppTopBar(title: ListenfyLogo(size: 28, color: scheme.primary)),
+      body: AppGradientBackground(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: RefreshIndicator(
+                onRefresh: controller.refreshAll,
+                child: ScrollConfiguration(
+                  behavior: const _NoGlowScrollBehavior(),
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.only(
+                      top: AppSpacing.md,
+                      bottom: kBottomNavigationBarHeight + 18,
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _header(theme: theme, scheme: scheme, home: home),
+                        const SizedBox(height: AppSpacing.lg),
 
-                          ..._themeSections(
-                            theme: theme,
-                            themes: controller.themes,
-                          ),
-                        ],
-                      ),
+                        ..._themeSections(
+                          theme: theme,
+                          themes: controller.themes,
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
+            ),
 
-              _bottomNav(
-                barBg: barBg,
-                scheme: scheme,
-                isDark: isDark,
-                home: home,
-              ),
-            ],
-          ),
+            _bottomNav(
+              barBg: barBg,
+              scheme: scheme,
+              isDark: isDark,
+              home: home,
+            ),
+          ],
         ),
-      );
+      ),
+    );
   }
 
   // ===========================================================================
@@ -123,15 +121,11 @@ class SourcesPage extends GetView<SourcesController> {
   }) {
     return [
       for (final t in themes) ...[
-        _ThemeCard(
-          theme: t,
-          onOpen: () => _openTheme(t),
-        ),
+        _ThemeCard(theme: t, onOpen: () => _openTheme(t)),
         const SizedBox(height: AppSpacing.lg),
       ],
     ];
   }
-
 
   Widget _bottomNav({
     required Color barBg,
@@ -186,97 +180,155 @@ class SourcesPage extends GetView<SourcesController> {
   // ACTIONS
   // ===========================================================================
 
-
   void _openTheme(SourceTheme theme) {
     final origins = theme.defaultOrigins;
-    Get.to(
-      () => SourceLibraryPage(
-        title: theme.title,
-        onlyOffline: theme.onlyOffline,
-        origins: origins.isNotEmpty ? origins : null,
-        forceKind: theme.forceKind,
-        themeId: theme.id,
-      ),
+    Get.toNamed(
+      AppRoutes.sourceLibrary,
+      arguments: {
+        'title': theme.title,
+        'onlyOffline': theme.onlyOffline,
+        'origins': origins.isNotEmpty ? origins : null,
+        'forceKind': theme.forceKind,
+        'themeId': theme.id,
+      },
     );
   }
-
 }
 
-class _ThemeCard extends StatelessWidget {
-  const _ThemeCard({
-    required this.theme,
-    required this.onOpen,
-  });
+class _ThemeCard extends StatefulWidget {
+  const _ThemeCard({required this.theme, required this.onOpen});
 
   final SourceTheme theme;
   final VoidCallback onOpen;
 
   @override
+  State<_ThemeCard> createState() => _ThemeCardState();
+}
+
+class _ThemeCardState extends State<_ThemeCard> {
+  bool _isHovered = false;
+  bool _isPressed = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = Theme.of(context);
+    final theme = widget.theme;
     final textColor = Colors.white;
     final subColor = Colors.white.withOpacity(0.85);
+    final scale = _isPressed ? 0.96 : (_isHovered ? 1.02 : 1.0);
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Material(
-        color: Colors.transparent,
-        child: Ink(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: theme.colors,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-                color: Colors.black.withOpacity(0.18),
-              ),
-            ],
-          ),
-          child: InkWell(
-            onTap: onOpen,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
+    return AnimatedScale(
+      scale: scale,
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _isPressed = true),
+        onTapUp: (_) {
+          setState(() => _isPressed = false);
+          widget.onOpen();
+        },
+        onTapCancel: () => setState(() => _isPressed = false),
+        child: MouseRegion(
+          onEnter: (_) => setState(() => _isHovered = true),
+          onExit: (_) => setState(() => _isHovered = false),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: theme.colors,
+                    stops: const [0.1, 0.9],
+                  ),
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: theme.colors.last.withOpacity(0.4),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Subtle glass overlay
+                    Positioned.fill(
+                      child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.18),
-                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.white.withOpacity(0.15),
+                              Colors.transparent,
+                            ],
+                          ),
                         ),
-                        child: Icon(theme.icon, color: textColor, size: 20),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    theme.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.textTheme.titleMedium?.copyWith(
-                      color: textColor,
-                      fontWeight: FontWeight.w700,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    theme.subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.textTheme.bodySmall?.copyWith(
-                      color: subColor,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.lg,
+                        vertical: 20,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Icon(
+                                  theme.icon,
+                                  color: textColor,
+                                  size: 24,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            theme.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.textTheme.titleLarge?.copyWith(
+                              color: textColor,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            theme.subtitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.textTheme.bodyMedium?.copyWith(
+                              color: subColor,
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

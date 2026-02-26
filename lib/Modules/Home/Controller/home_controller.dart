@@ -6,7 +6,6 @@ import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
-import '../view/app_songs_search_page.dart';
 
 enum HomeMode { audio, video }
 
@@ -57,22 +56,15 @@ class HomeController extends GetxController {
 
     final filtered = items.where(matchesMode).toList();
 
-    final recentAll = filtered
-        .where((e) => (e.lastPlayedAt ?? 0) > 0)
-        .toList()
-      ..sort(
-        (a, b) =>
-            (b.lastPlayedAt ?? 0).compareTo(a.lastPlayedAt ?? 0),
-      );
+    final recentAll = filtered.where((e) => (e.lastPlayedAt ?? 0) > 0).toList()
+      ..sort((a, b) => (b.lastPlayedAt ?? 0).compareTo(a.lastPlayedAt ?? 0));
     fullRecentlyPlayed.assignAll(recentAll);
     recentlyPlayed.assignAll(recentAll.take(10));
 
-    final downloadsAll = filtered
-        .where((e) => e.isOfflineStored)
-        .toList()
+    final downloadsAll = filtered.where((e) => e.isOfflineStored).toList()
       ..sort(
-        (a, b) => _latestVariantCreatedAt(b)
-            .compareTo(_latestVariantCreatedAt(a)),
+        (a, b) =>
+            _latestVariantCreatedAt(b).compareTo(_latestVariantCreatedAt(a)),
       );
     fullLatestDownloads.assignAll(downloadsAll);
     latestDownloads.assignAll(downloadsAll.take(10));
@@ -81,9 +73,7 @@ class HomeController extends GetxController {
     fullFavorites.assignAll(favoritesAll);
     favorites.assignAll(favoritesAll.take(10));
 
-    final mostAll = filtered
-        .where((e) => e.playCount > 0)
-        .toList()
+    final mostAll = filtered.where((e) => e.playCount > 0).toList()
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
     fullMostPlayed.assignAll(mostAll);
     mostPlayed.assignAll(mostAll.take(12));
@@ -166,10 +156,14 @@ class HomeController extends GetxController {
   }
 
   void onSearch() {
-    Get.to(() => const AppSongsSearchPage());
+    Get.toNamed(AppRoutes.homeSearch);
   }
 
-  Future<void> openMedia(MediaItem item, int index, List<MediaItem> list) async {
+  Future<void> openMedia(
+    MediaItem item,
+    int index,
+    List<MediaItem> list,
+  ) async {
     final route = mode.value == HomeMode.audio
         ? AppRoutes.audioPlayer
         : AppRoutes.videoPlayer;
@@ -180,7 +174,9 @@ class HomeController extends GetxController {
 
   Future<void> deleteLocalItem(MediaItem item) async {
     try {
-      print('Home delete requested id=${item.id} variants=${item.variants.length}');
+      print(
+        'Home delete requested id=${item.id} variants=${item.variants.length}',
+      );
 
       _allItems.removeWhere((e) => e.id == item.id);
       recentlyPlayed.removeWhere((e) => e.id == item.id);

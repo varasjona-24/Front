@@ -8,7 +8,7 @@ import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_controller.dart';
-import 'video_queue_page.dart';
+import '../../../../app/routes/app_routes.dart';
 import '../../../../app/ui/widgets/layout/app_gradient_background.dart';
 
 class VideoPlayerPage extends StatefulWidget {
@@ -138,10 +138,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
             return Stack(
               children: [
-                Positioned.fill(
-                  child: _buildVideoArea(theme),
-                ),
-                if (_showControls) Positioned.fill(child: _buildControls(theme, item)),
+                Positioned.fill(child: _buildVideoArea(theme)),
+                if (_showControls)
+                  Positioned.fill(child: _buildControls(theme, item)),
                 if (_speedToast != null)
                   Center(
                     child: Container(
@@ -186,52 +185,52 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           }
         },
         child: Obx(() {
-        final _ = controller.state.value;
-        final err = controller.error.value;
-        if (err != null) {
-          return _ErrorPanel(
-            message: err,
-            onPickOther: () => Get.to(() => const VideoQueuePage()),
-            onRetry: controller.retry,
-          );
-        }
+          final _ = controller.state.value;
+          final err = controller.error.value;
+          if (err != null) {
+            return _ErrorPanel(
+              message: err,
+              onPickOther: () => Get.toNamed(AppRoutes.videoQueue),
+              onRetry: controller.retry,
+            );
+          }
 
-        final vpCtrl = controller.playerController;
-        if (vpCtrl == null || !vpCtrl.value.isInitialized) {
-          return Container(
-            color: theme.colorScheme.surfaceVariant,
-            child: const Center(child: CircularProgressIndicator()),
-          );
-        }
+          final vpCtrl = controller.playerController;
+          if (vpCtrl == null || !vpCtrl.value.isInitialized) {
+            return Container(
+              color: theme.colorScheme.surfaceVariant,
+              child: const Center(child: CircularProgressIndicator()),
+            );
+          }
 
-        final size = vpCtrl.value.size;
-        if (size.width <= 0 || size.height <= 0) {
+          final size = vpCtrl.value.size;
+          if (size.width <= 0 || size.height <= 0) {
+            return Container(
+              color: theme.colorScheme.surfaceVariant,
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: const Center(
+                child: Text(
+                  'No se pudo obtener el tamaño del vídeo.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
           return Container(
-            color: theme.colorScheme.surfaceVariant,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: const Center(
-              child: Text(
-                'No se pudo obtener el tamaño del vídeo.',
-                textAlign: TextAlign.center,
+            color: Colors.black,
+            child: SizedBox.expand(
+              child: FittedBox(
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                child: SizedBox(
+                  width: size.width,
+                  height: size.height,
+                  child: vp.VideoPlayer(vpCtrl),
+                ),
               ),
             ),
           );
-        }
-
-        return Container(
-          color: Colors.black,
-          child: SizedBox.expand(
-            child: FittedBox(
-              fit: BoxFit.contain,
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: size.width,
-                height: size.height,
-                child: vp.VideoPlayer(vpCtrl),
-              ),
-            ),
-          ),
-        );
         }),
       ),
     );
@@ -265,7 +264,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   IconButton(
                     tooltip: 'Ver cola',
                     icon: const Icon(Icons.playlist_play),
-                    onPressed: () => Get.to(() => const VideoQueuePage()),
+                    onPressed: () => Get.toNamed(AppRoutes.videoQueue),
                   ),
                 ],
               ),
@@ -292,8 +291,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         style: ElevatedButton.styleFrom(
                           shape: const CircleBorder(),
                           padding: EdgeInsets.zero,
-                          backgroundColor:
-                              theme.colorScheme.primary.withOpacity(0.25),
+                          backgroundColor: theme.colorScheme.primary
+                              .withOpacity(0.25),
                           elevation: 0,
                         ),
                         child: Icon(
@@ -320,9 +319,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         foregroundColor: Colors.white,
                       ),
                       icon: const Icon(Icons.speed),
-                      label: Obx(() => Text(
-                            '${controller.videoService.speed.value.toStringAsFixed(1)}x',
-                          )),
+                      label: Obx(
+                        () => Text(
+                          '${controller.videoService.speed.value.toStringAsFixed(1)}x',
+                        ),
+                      ),
                     ),
                     IconButton(
                       icon: Icon(
@@ -350,8 +351,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           ? Duration(seconds: _dragValue!.toInt())
           : pos;
 
-      final maxSeconds =
-          dur.inSeconds > 0 ? dur.inSeconds.toDouble() : 1.0;
+      final maxSeconds = dur.inSeconds > 0 ? dur.inSeconds.toDouble() : 1.0;
       final posSeconds = (previewPos.inSeconds.toDouble()).clamp(
         0.0,
         maxSeconds,
@@ -411,10 +411,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             child: SizedBox(width: 56, height: 36, child: image),
           ),
           const SizedBox(width: 8),
-          Text(
-            _fmt(position),
-            style: const TextStyle(color: Colors.white),
-          ),
+          Text(_fmt(position), style: const TextStyle(color: Colors.white)),
         ],
       ),
     );

@@ -12,7 +12,7 @@ import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/controllers/media_actions_controller.dart';
 import '../../../app/routes/app_routes.dart';
-import 'section_list_page.dart';
+
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 
 /// ===============================================================
@@ -94,28 +94,30 @@ class HomePage extends GetView<HomeController> {
                                   MediaHorizontalList(
                                     title: 'Mis favoritos',
                                     items: controller.favorites,
-                                    onHeaderTap: () => Get.to(
-                                      () => SectionListPage(
-                                        title: 'Mis favoritos',
-                                        items: controller.fullFavorites,
-                                        onItemTap: (item, index) =>
+                                    onHeaderTap: () => Get.toNamed(
+                                      AppRoutes.homeSectionList,
+                                      arguments: {
+                                        'title': 'Mis favoritos',
+                                        'items': controller.fullFavorites,
+                                        'onItemTap': (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
                                               controller.fullFavorites,
                                             ),
-                                        onItemLongPress: (item, _) =>
+                                        'onItemLongPress': (item, _) =>
                                             actions.showItemActions(
                                               context,
                                               item,
                                               onChanged: controller.loadHome,
                                             ),
-                                        onShuffle: (queue) => controller
+                                        'onShuffle': (queue) => controller
                                             .openMedia(queue.first, 0, queue),
-                                      ),
+                                      },
                                     ),
                                     onItemTap: (item, index) {
-                                      final fullQueue = controller.fullFavorites;
+                                      final fullQueue =
+                                          controller.fullFavorites;
                                       final fullIndex = fullQueue.indexWhere(
                                         (e) => e.id == item.id,
                                       );
@@ -140,32 +142,34 @@ class HomePage extends GetView<HomeController> {
                                 if (controller.mostPlayed.isNotEmpty) ...[
                                   _SectionHeader(
                                     title: 'Más reproducido',
-                                    onTap: () => Get.to(
-                                      () => SectionListPage(
-                                        title: 'Más reproducido',
-                                        items: controller.fullMostPlayed,
-                                        onItemTap: (item, index) =>
+                                    onTap: () => Get.toNamed(
+                                      AppRoutes.homeSectionList,
+                                      arguments: {
+                                        'title': 'Más reproducido',
+                                        'items': controller.fullMostPlayed,
+                                        'onItemTap': (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
                                               controller.fullMostPlayed,
                                             ),
-                                        onItemLongPress: (item, _) =>
+                                        'onItemLongPress': (item, _) =>
                                             actions.showItemActions(
                                               context,
                                               item,
                                               onChanged: controller.loadHome,
                                             ),
-                                        onShuffle: (queue) => controller
+                                        'onShuffle': (queue) => controller
                                             .openMedia(queue.first, 0, queue),
-                                      ),
+                                      },
                                     ),
                                   ),
                                   const SizedBox(height: 10),
                                   _MostPlayedRow(
                                     items: controller.mostPlayed,
                                     onTap: (item, index) {
-                                      final fullQueue = controller.fullMostPlayed;
+                                      final fullQueue =
+                                          controller.fullMostPlayed;
                                       final fullIndex = fullQueue.indexWhere(
                                         (e) => e.id == item.id,
                                       );
@@ -220,25 +224,26 @@ class HomePage extends GetView<HomeController> {
                                 if (controller.featured.isNotEmpty) ...[
                                   _SectionHeader(
                                     title: 'Destacado',
-                                    onTap: () => Get.to(
-                                      () => SectionListPage(
-                                        title: 'Destacado',
-                                        items: controller.fullFeatured,
-                                        onItemTap: (item, index) =>
+                                    onTap: () => Get.toNamed(
+                                      AppRoutes.homeSectionList,
+                                      arguments: {
+                                        'title': 'Destacado',
+                                        'items': controller.fullFeatured,
+                                        'onItemTap': (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
                                               controller.fullFeatured,
                                             ),
-                                        onItemLongPress: (item, _) =>
+                                        'onItemLongPress': (item, _) =>
                                             actions.showItemActions(
                                               context,
                                               item,
                                               onChanged: controller.loadHome,
                                             ),
-                                        onShuffle: (queue) => controller
+                                        'onShuffle': (queue) => controller
                                             .openMedia(queue.first, 0, queue),
-                                      ),
+                                      },
                                     ),
                                     trailing: null,
                                   ),
@@ -271,25 +276,26 @@ class HomePage extends GetView<HomeController> {
                                   MediaHorizontalList(
                                     title: 'Últimos imports',
                                     items: controller.latestDownloads,
-                                    onHeaderTap: () => Get.to(
-                                      () => SectionListPage(
-                                        title: 'Últimos imports',
-                                        items: controller.fullLatestDownloads,
-                                        onItemTap: (item, index) =>
+                                    onHeaderTap: () => Get.toNamed(
+                                      AppRoutes.homeSectionList,
+                                      arguments: {
+                                        'title': 'Últimos imports',
+                                        'items': controller.fullLatestDownloads,
+                                        'onItemTap': (item, index) =>
                                             controller.openMedia(
                                               item,
                                               index,
                                               controller.fullLatestDownloads,
                                             ),
-                                        onItemLongPress: (item, _) =>
+                                        'onItemLongPress': (item, _) =>
                                             actions.showItemActions(
                                               context,
                                               item,
                                               onChanged: controller.loadHome,
                                             ),
-                                        onShuffle: (queue) => controller
+                                        'onShuffle': (queue) => controller
                                             .openMedia(queue.first, 0, queue),
-                                      ),
+                                      },
                                     ),
                                     onItemTap: (item, index) {
                                       final fullQueue =

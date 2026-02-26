@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'playlist_detail_page.dart';
 
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/routes/app_routes.dart';
@@ -197,8 +196,10 @@ class PlaylistsPage extends GetView<PlaylistsController> {
               final data = smart[index];
               return _SmartPlaylistCard(
                 data: data,
-                onOpen: () =>
-                    Get.to(() => PlaylistDetailPage.smart(playlistId: data.id)),
+                onOpen: () => Get.toNamed(
+                  AppRoutes.playlistDetail,
+                  arguments: {'playlistId': data.id, 'isSmart': true},
+                ),
               );
             },
           ),
@@ -235,8 +236,9 @@ class PlaylistsPage extends GetView<PlaylistsController> {
             child: _PlaylistTile(
               playlist: playlist,
               resolveItems: controller.resolvePlaylistItems,
-              onOpen: () => Get.to(
-                () => PlaylistDetailPage.custom(playlistId: playlist.id),
+              onOpen: () => Get.toNamed(
+                AppRoutes.playlistDetail,
+                arguments: {'playlistId': playlist.id, 'isSmart': false},
               ),
               onMenu: () => _openPlaylistActions(Get.context!, playlist),
             ),

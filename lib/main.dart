@@ -28,25 +28,13 @@ import 'Modules/settings/controller/sleep_timer_controller.dart';
 import 'Modules/settings/controller/equalizer_controller.dart';
 import 'Modules/downloads/controller/downloads_controller.dart';
 
-const _notifAskedOnceKey = 'notif_permission_asked_once';
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await GetStorage.init();
-  final storage = GetStorage();
-  if (Platform.isAndroid) {
-    Future.microtask(() async {
-      final askedOnce = storage.read<bool>(_notifAskedOnceKey) ?? false;
-      if (askedOnce) return;
 
-      final status = await Permission.notification.status;
-      if (!status.isGranted) {
-        await Permission.notification.request();
-      }
+  // Eliminado bloqueo de UI en main()
+  // ...
 
-      storage.write(_notifAskedOnceKey, true);
-    });
-  }
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -120,8 +108,34 @@ Future<void> main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    _checkPermissions();
+  }
+
+  Future<void> _checkPermissions() async {
+    if (Platform.isAndroid) {
+      final isBtGranted = await Permission.bluetoothConnect.isGranted;
+      final isNotifGranted = await Permission.notification.isGranted;
+
+      if (!isBtGranted || !isNotifGranted) {
+        await [
+          Permission.notification,
+          Permission.bluetoothConnect,
+          Permission.bluetoothScan,
+        ].request();
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

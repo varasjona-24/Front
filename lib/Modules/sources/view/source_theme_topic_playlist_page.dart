@@ -214,12 +214,13 @@ class _SourceThemeTopicPlaylistPageState
             child: SourcePlaylistCard(
               theme: widget.theme,
               playlist: pl,
-              onOpen: () => Get.to(
-                () => SourceThemeTopicPlaylistPage(
-                  playlistId: pl.id,
-                  theme: widget.theme,
-                  origins: widget.origins,
-                ),
+              onOpen: () => Get.toNamed(
+                AppRoutes.sourcePlaylist,
+                arguments: {
+                  'playlistId': pl.id,
+                  'theme': widget.theme,
+                  'origins': widget.origins,
+                },
               ),
               onEdit: () => _openEditPlaylist(pl),
               onDelete: () => _sources.deleteTopicPlaylist(pl),

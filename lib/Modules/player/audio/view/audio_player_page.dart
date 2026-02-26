@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controller/audio_player_controller.dart';
-import 'queue_page.dart';
+import '../../../../app/routes/app_routes.dart';
 import '../widgets/cover_art.dart';
 import '../widgets/playback_controls.dart';
 import '../widgets/progress_bar.dart';
@@ -75,7 +75,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                       IconButton(
                         tooltip: 'Ver cola',
                         icon: const Icon(Icons.playlist_play),
-                        onPressed: () => Get.to(() => const QueuePage()),
+                        onPressed: () => Get.toNamed(AppRoutes.audioQueue),
                       ),
                     ],
                   ),

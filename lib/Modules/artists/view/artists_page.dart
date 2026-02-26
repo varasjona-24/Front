@@ -13,7 +13,6 @@ import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../controller/artists_controller.dart';
 import '../../edit/controller/edit_entity_controller.dart';
 import 'widgets/artist_avatar.dart';
-import 'artist_detail_page.dart';
 
 class ArtistsPage extends GetView<ArtistsController> {
   const ArtistsPage({super.key});
@@ -35,9 +34,7 @@ class ArtistsPage extends GetView<ArtistsController> {
       return Scaffold(
         backgroundColor: Colors.transparent,
         extendBody: true,
-        appBar: AppTopBar(
-          title: ListenfyLogo(size: 28, color: scheme.primary),
-                  ),
+        appBar: AppTopBar(title: ListenfyLogo(size: 28, color: scheme.primary)),
         body: AppGradientBackground(
           child: Stack(
             children: [
@@ -214,7 +211,7 @@ class ArtistsPage extends GetView<ArtistsController> {
               child: _ArtistCard(
                 artist: artist,
                 onOpen: () =>
-                    Get.to(() => ArtistDetailPage(artistKey: artist.key)),
+                    Get.toNamed(AppRoutes.artistDetail, arguments: artist.key),
                 onEdit: () => Get.toNamed(
                   AppRoutes.editEntity,
                   arguments: EditEntityArgs.artist(artist),
@@ -369,7 +366,7 @@ class _ArtistCoverCard extends StatelessWidget {
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: () => Get.to(() => ArtistDetailPage(artistKey: artist.key)),
+      onTap: () => Get.toNamed(AppRoutes.artistDetail, arguments: artist.key),
       child: SizedBox(
         width: 96,
         child: Column(
@@ -382,10 +379,7 @@ class _ArtistCoverCard extends StatelessWidget {
                 color: scheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(16),
                 image: imageProvider != null
-                    ? DecorationImage(
-                        image: imageProvider,
-                        fit: BoxFit.cover,
-                      )
+                    ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
                     : null,
               ),
               child: imageProvider == null
