@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 import 'package:flutter_listenfy/Modules/sources/domain/source_origin.dart';
 import 'package:flutter_listenfy/Modules/sources/domain/detect_source_origin.dart';
+import 'package:flutter_listenfy/app/models/subtitle_track.dart';
 
 enum MediaSource { local, youtube }
 
@@ -27,6 +28,7 @@ class MediaItem {
   final String? thumbnailLocalPath;
 
   final List<MediaVariant> variants;
+  final List<SubtitleTrack> subtitles;
   final SourceOrigin origin;
 
   /// Favorito en UI
@@ -48,6 +50,7 @@ class MediaItem {
     required this.subtitle,
     required this.source,
     required this.variants,
+    this.subtitles = const [],
     required this.origin,
     this.thumbnail,
     this.thumbnailLocalPath,
@@ -69,6 +72,7 @@ class MediaItem {
     String? thumbnail,
     String? thumbnailLocalPath,
     List<MediaVariant>? variants,
+    List<SubtitleTrack>? subtitles,
     SourceOrigin? origin,
     int? durationSeconds,
     bool? isFavorite,
@@ -84,6 +88,7 @@ class MediaItem {
       thumbnail: thumbnail ?? this.thumbnail,
       thumbnailLocalPath: thumbnailLocalPath ?? this.thumbnailLocalPath,
       variants: variants ?? this.variants,
+      subtitles: subtitles ?? this.subtitles,
       origin: origin ?? this.origin,
       durationSeconds: durationSeconds ?? this.durationSeconds,
       isFavorite: isFavorite ?? this.isFavorite,
@@ -220,6 +225,12 @@ class MediaItem {
         .map((m) => MediaVariant.fromJson(Map<String, dynamic>.from(m)))
         .where((v) => v.isValid)
         .toList();
+    final subtitlesJson = (json['subtitles'] as List?) ?? const [];
+    final subtitles = subtitlesJson
+        .whereType<Map>()
+        .map((m) => SubtitleTrack.fromJson(Map<String, dynamic>.from(m)))
+        .where((s) => s.isValid)
+        .toList();
 
     final id = (json['id'] as String?)?.trim() ?? '';
     final publicId = (json['publicId'] as String?)?.trim() ?? '';
@@ -260,6 +271,7 @@ class MediaItem {
       thumbnail: (json['thumbnail'] as String?)?.trim(),
       thumbnailLocalPath: (json['thumbnailLocalPath'] as String?)?.trim(),
       variants: variants,
+      subtitles: subtitles,
       durationSeconds: durationSeconds,
       origin: origin,
       isFavorite: isFavorite,
@@ -277,6 +289,7 @@ class MediaItem {
     'origin': origin.key,
     'thumbnail': thumbnail,
     'thumbnailLocalPath': thumbnailLocalPath,
+    'subtitles': subtitles.map((s) => s.toJson()).toList(),
     'duration': durationSeconds,
     'isFavorite': isFavorite,
     'playCount': playCount,

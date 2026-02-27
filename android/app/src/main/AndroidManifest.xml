@@ -59,6 +59,10 @@
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">
 
+        <meta-data
+            android:name="io.flutter.embedding.android.EnableImpeller"
+            android:value="false" />
+
         <!-- AudioService -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"

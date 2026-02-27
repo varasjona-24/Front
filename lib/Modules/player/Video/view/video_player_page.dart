@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_controller.dart';
+import 'package:flutter_listenfy/app/models/media_item.dart';
 import '../../../../app/routes/app_routes.dart';
 import '../../../../app/ui/widgets/layout/app_gradient_background.dart';
 
@@ -29,6 +30,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   double _speedDragAccumulator = 0;
   int _activePointers = 0;
   bool _pipRequested = false;
+  // TODO: Migrate this channel to a shared background playback/PiP coordinator.
   final MethodChannel _pipChannel = const MethodChannel('listenfy/pip');
   late final _LifecycleObserver _lifecycleObserver;
   Worker? _pipWorker;
@@ -121,122 +123,163 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: AppGradientBackground(
-        child: SafeArea(
-          child: Obx(() {
-            final queue = controller.queue;
-            final idx = controller.currentIndex.value;
-
-            final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
-                ? queue[idx]
-                : null;
-
-            if (item == null) {
-              return const Center(child: Text('No hay vídeo'));
-            }
-
-            return Stack(
-              children: [
-                Positioned.fill(child: _buildVideoArea(theme)),
-                if (_showControls)
-                  Positioned.fill(child: _buildControls(theme, item)),
-                if (_speedToast != null)
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _speedToast!,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVideoArea(ThemeData theme) {
-    return Listener(
-      behavior: HitTestBehavior.opaque,
-      onPointerDown: (_) => _activePointers++,
-      onPointerUp: (_) => _activePointers = (_activePointers - 1).clamp(0, 10),
-      onPointerCancel: (_) => _activePointers = 0,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: _toggleControls,
-        onDoubleTap: _pauseOnDoubleTap,
-        onVerticalDragUpdate: (details) {
-          if (_activePointers >= 2) {
-            _onVerticalDragUpdate(details);
-          }
-        },
+      backgroundColor: Colors.black,
+      body: SafeArea(
         child: Obx(() {
-          final _ = controller.state.value;
-          final err = controller.error.value;
-          if (err != null) {
-            return _ErrorPanel(
-              message: err,
-              onPickOther: () => Get.toNamed(AppRoutes.videoQueue),
-              onRetry: controller.retry,
-            );
+          final queue = controller.queue;
+          final idx = controller.currentIndex.value;
+
+          final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
+              ? queue[idx]
+              : null;
+
+          if (item == null) {
+            return const Center(child: Text('No hay vídeo'));
           }
 
-          final vpCtrl = controller.playerController;
-          if (vpCtrl == null || !vpCtrl.value.isInitialized) {
-            return Container(
-              color: theme.colorScheme.surfaceVariant,
-              child: const Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          final size = vpCtrl.value.size;
-          if (size.width <= 0 || size.height <= 0) {
-            return Container(
-              color: theme.colorScheme.surfaceVariant,
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: const Center(
-                child: Text(
-                  'No se pudo obtener el tamaño del vídeo.',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-
-          return Container(
-            color: Colors.black,
-            child: SizedBox.expand(
-              child: FittedBox(
-                fit: BoxFit.contain,
-                alignment: Alignment.center,
-                child: SizedBox(
-                  width: size.width,
-                  height: size.height,
-                  child: vp.VideoPlayer(vpCtrl),
-                ),
-              ),
-            ),
+          return Column(
+            children: [
+              Expanded(child: _buildVideoArea(theme)),
+              if (controller.isLoading.value)
+                const LinearProgressIndicator(minHeight: 2),
+              _buildSimpleControls(theme, item),
+            ],
           );
         }),
       ),
     );
   }
 
-  Widget _buildControls(ThemeData theme, dynamic item) {
+  Widget _buildVideoArea(ThemeData theme) {
+    return Obx(() {
+      final err = controller.error.value;
+      if (err != null) {
+        return _ErrorPanel(
+          message: err,
+          onPickOther: () => Get.toNamed(AppRoutes.videoQueue),
+          onRetry: controller.retry,
+        );
+      }
+
+      final vpCtrl = controller.playerController;
+      if (vpCtrl == null) {
+        return Container(
+          color: theme.colorScheme.surfaceVariant,
+          child: Center(
+            child: controller.isLoading.value
+                ? const CircularProgressIndicator()
+                : const Text('Preparando vídeo...'),
+          ),
+        );
+      }
+
+      return ColoredBox(
+        color: Colors.black,
+        child: Center(
+          child: ValueListenableBuilder<vp.VideoPlayerValue>(
+            valueListenable: vpCtrl,
+            builder: (context, value, _) {
+              if (!value.isInitialized) {
+                return const CircularProgressIndicator();
+              }
+
+              final size = value.size;
+              if (size.width <= 0 || size.height <= 0) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    'No se pudo obtener el tamaño del vídeo.',
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              }
+
+              return AspectRatio(
+                aspectRatio: size.width / size.height,
+                child: vp.VideoPlayer(vpCtrl),
+              );
+            },
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildSimpleControls(ThemeData theme, MediaItem item) {
+    return ColoredBox(
+      color: Colors.black,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: Get.back,
+                ),
+                Expanded(
+                  child: Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Ver cola',
+                  icon: const Icon(Icons.playlist_play, color: Colors.white),
+                  onPressed: () => Get.toNamed(AppRoutes.videoQueue),
+                ),
+              ],
+            ),
+            _buildProgress(theme, item),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.skip_previous, color: Colors.white),
+                  onPressed: controller.previous,
+                ),
+                const SizedBox(width: 12),
+                Obx(() {
+                  final playing = controller.isPlaying.value;
+                  return ElevatedButton(
+                    onPressed: controller.togglePlay,
+                    style: ElevatedButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: EdgeInsets.zero,
+                      backgroundColor: theme.colorScheme.primary.withOpacity(
+                        0.25,
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Icon(
+                      playing ? Icons.pause : Icons.play_arrow,
+                      size: 30,
+                      color: Colors.white,
+                    ),
+                  );
+                }),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: const Icon(Icons.skip_next, color: Colors.white),
+                  onPressed: controller.next,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildControls(ThemeData theme, MediaItem item) {
     return IconTheme(
       data: const IconThemeData(color: Colors.white),
       child: Column(
@@ -311,8 +354,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
                 const SizedBox(height: 6),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
+                    if (item.subtitles.isNotEmpty)
+                      TextButton.icon(
+                        onPressed: () => _openSubtitlePicker(item),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                        ),
+                        icon: const Icon(Icons.subtitles_outlined),
+                        label: const Text('Subtítulos'),
+                      ),
+                    const Spacer(),
                     TextButton.icon(
                       onPressed: _openSpeedPicker,
                       style: TextButton.styleFrom(
@@ -343,7 +395,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
-  Widget _buildProgress(ThemeData theme, dynamic item) {
+  Widget _buildProgress(ThemeData theme, MediaItem item) {
     return Obx(() {
       final dur = controller.duration.value;
       final pos = controller.position.value;
@@ -386,7 +438,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
   }
 
-  Widget _buildPreview(dynamic item, Duration position) {
+  Widget _buildPreview(MediaItem item, Duration position) {
     final thumb = item.effectiveThumbnail;
     if (thumb == null || thumb.isEmpty) {
       return Padding(
@@ -510,6 +562,50 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
+  void _openSubtitlePicker(MediaItem item) {
+    final tracks = item.subtitles.where((s) => s.isValid).toList();
+    if (tracks.isEmpty) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Obx(() {
+            final selected = controller.currentSubtitle.value;
+            return ListView(
+              shrinkWrap: true,
+              children: [
+                const ListTile(title: Text('Subtítulos disponibles')),
+                for (final track in tracks)
+                  ListTile(
+                    leading: Icon(
+                      selected?.url == track.url
+                          ? Icons.check_circle
+                          : Icons.subtitles_outlined,
+                    ),
+                    title: Text(track.language),
+                    subtitle: Text(
+                      track.url,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    onTap: () async {
+                      await controller.loadSubtitle(track);
+                      if (ctx.mounted) Navigator.of(ctx).pop();
+                    },
+                  ),
+              ],
+            );
+          }),
+        );
+      },
+    );
+  }
+
   static String _fmt(Duration d) {
     final h = d.inHours;
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -535,6 +631,38 @@ class _LifecycleObserver with WidgetsBindingObserver {
       state._pipRequested = false;
       state._setPipEnabled(state.controller.isPlaying.value);
     }
+  }
+}
+
+class _LoadingOverlay extends StatelessWidget {
+  const _LoadingOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Color(0x55000000),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color(0xCC000000),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Cargando video...', style: TextStyle(color: Colors.white)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

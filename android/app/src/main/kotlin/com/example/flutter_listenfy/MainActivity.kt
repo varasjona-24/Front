@@ -26,6 +26,7 @@ class MainActivity : AudioServiceActivity() {
     private val channel = "listenfy/bluetooth_audio"
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
+    // TODO: Consolidate PiP/background playback control with audio_service state.
     private val pipChannel = "listenfy/pip"
     private val widgetChannel = "listenfy/player_widget"
     private var pipEnabled: Boolean = false

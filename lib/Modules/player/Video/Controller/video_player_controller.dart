@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import '../../../../app/models/media_item.dart';
+import '../../../../app/models/subtitle_track.dart';
 import '../../../../app/services/video_service.dart';
 import '../../../../app/data/local/local_library_store.dart';
 import '../../../settings/controller/playback_settings_controller.dart';
@@ -18,6 +22,10 @@ class VideoPlayerController extends GetxController {
 
   final RxInt currentIndex = 0.obs;
   final Rxn<String> error = Rxn<String>();
+  final RxBool isLoading = false.obs;
+  final Rxn<SubtitleTrack> currentSubtitle = Rxn<SubtitleTrack>();
+  final RxInt queueVersion = 0.obs;
+  Worker? _playbackErrorWorker;
 
   static const _queueKey = 'video_queue_items';
   static const _queueIndexKey = 'video_queue_index';
@@ -59,6 +67,11 @@ class VideoPlayerController extends GetxController {
     ever<int>(videoService.completedTick, (_) async {
       if (!_settings.autoPlayNext.value) return;
       await next();
+    });
+
+    _playbackErrorWorker = ever<String?>(videoService.playbackError, (err) {
+      if (err == null || err.trim().isEmpty) return;
+      _setError(err);
     });
   }
 
@@ -126,12 +139,12 @@ class VideoPlayerController extends GetxController {
   // ===========================================================================
 
   Future<void> _playCurrent() async {
-    error.value = null;
+    clearError();
 
     final item = currentItemOrNull;
     final variant = currentVideoVariant;
     if (item == null || variant == null) {
-      error.value = 'Este archivo está corrupto o no existe, selecciona otro.';
+      _setError('Este archivo está corrupto o no existe, selecciona otro.');
       return;
     }
 
@@ -141,19 +154,22 @@ class VideoPlayerController extends GetxController {
   Future<void> _playItem(MediaItem item, MediaVariant variant) async {
     // Validar variante
     if (!variant.isValid) {
-      error.value = 'Variante de video no válida.';
+      _setError('Variante de video no válida.');
       return;
     }
 
+    isLoading.value = true;
     try {
       print('▶️ Playing: ${item.title} (${variant.kind}/${variant.format})');
       await videoService.play(item, variant);
       await _resumeIfAny(item);
       await _trackPlay(item);
-      error.value = null;
+      clearError();
     } catch (e) {
       print('❌ Error in _playItem: $e');
-      error.value = 'Error al reproducir: $e';
+      _setError('Error al reproducir: $e');
+    } finally {
+      isLoading.value = false;
     }
   }
 
@@ -191,6 +207,7 @@ class VideoPlayerController extends GetxController {
   Future<void> next() async {
     if (currentIndex.value < queue.length - 1) {
       currentIndex.value++;
+      _persistQueue();
       await _playCurrent();
     }
   }
@@ -198,6 +215,7 @@ class VideoPlayerController extends GetxController {
   Future<void> previous() async {
     if (currentIndex.value > 0) {
       currentIndex.value--;
+      _persistQueue();
       await _playCurrent();
     }
   }
@@ -205,6 +223,7 @@ class VideoPlayerController extends GetxController {
   Future<void> playAt(int index) async {
     if (index < 0 || index >= queue.length) return;
     currentIndex.value = index;
+    _persistQueue();
     await _playCurrent();
   }
 
@@ -213,8 +232,117 @@ class VideoPlayerController extends GetxController {
     await _playCurrent();
   }
 
+  void clearError() {
+    error.value = null;
+  }
+
+  void _setError(String message) {
+    error.value = message;
+    Get.snackbar(
+      'Error',
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFFD32F2F),
+      colorText: const Color(0xFFFFFFFF),
+      duration: const Duration(seconds: 3),
+    );
+  }
+
+  Future<void> updateQueue(
+    List<MediaItem> newQueue,
+    int index, {
+    bool autoPlay = true,
+  }) async {
+    final hasItems = newQueue.isNotEmpty;
+    final safeIndex = hasItems ? index.clamp(0, newQueue.length - 1) : 0;
+    final sameQueue = _sameQueue(queue, newQueue);
+    final sameIndex = currentIndex.value == safeIndex;
+    if (sameQueue && sameIndex) return;
+
+    queue
+      ..clear()
+      ..addAll(newQueue);
+    currentIndex.value = safeIndex;
+    _persistQueue();
+    queueVersion.value++;
+    clearError();
+
+    if (autoPlay && hasItems) {
+      await _playCurrent();
+    }
+  }
+
+  bool _sameQueue(List<MediaItem> a, List<MediaItem> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id == b[i].id) continue;
+      final ap = a[i].publicId.trim();
+      final bp = b[i].publicId.trim();
+      if (ap.isEmpty || bp.isEmpty || ap != bp) return false;
+    }
+    return true;
+  }
+
+  void reorderQueue(int oldIndex, int newIndex) {
+    if (queue.length <= 1) return;
+    if (oldIndex < 0 || oldIndex >= queue.length) return;
+    if (newIndex < 0 || newIndex > queue.length) return;
+
+    if (oldIndex < newIndex) newIndex -= 1;
+    if (oldIndex == newIndex) return;
+
+    final moved = queue.removeAt(oldIndex);
+    queue.insert(newIndex, moved);
+
+    if (currentIndex.value == oldIndex) {
+      currentIndex.value = newIndex;
+    } else if (currentIndex.value > oldIndex &&
+        currentIndex.value <= newIndex) {
+      currentIndex.value--;
+    } else if (currentIndex.value < oldIndex &&
+        currentIndex.value >= newIndex) {
+      currentIndex.value++;
+    }
+
+    _persistQueue();
+    queueVersion.value++;
+  }
+
+  Future<void> removeFromQueue(int index) async {
+    if (index < 0 || index >= queue.length) return;
+
+    final removedCurrent = index == currentIndex.value;
+    queue.removeAt(index);
+
+    if (queue.isEmpty) {
+      currentIndex.value = 0;
+      _persistQueue();
+      queueVersion.value++;
+      await videoService.stop();
+      clearError();
+      return;
+    }
+
+    if (index < currentIndex.value) {
+      currentIndex.value--;
+    } else if (currentIndex.value >= queue.length) {
+      currentIndex.value = queue.length - 1;
+    }
+
+    _persistQueue();
+    queueVersion.value++;
+
+    if (removedCurrent) {
+      await _playCurrent();
+    }
+  }
+
   void _persistQueue() {
-    if (queue.isEmpty) return;
+    if (queue.isEmpty) {
+      _storage.remove(_queueKey);
+      _storage.remove(_queueIndexKey);
+      return;
+    }
     _storage.write(_queueKey, queue.map((e) => e.toJson()).toList());
     _storage.write(_queueIndexKey, currentIndex.value);
   }
@@ -242,6 +370,12 @@ class VideoPlayerController extends GetxController {
   }
 
   Future<void> _resumeIfAny(MediaItem item) async {
+    if (GetPlatform.isAndroid) {
+      // TODO: Re-enable Android auto-resume once seek no longer forces a black
+      // frame on hybrid/platform-view rendering paths.
+      return;
+    }
+
     final key = item.publicId.isNotEmpty ? item.publicId : item.id;
     final map = _storage.read<Map>(_resumePosKey);
     if (map == null) return;
@@ -266,8 +400,17 @@ class VideoPlayerController extends GetxController {
     }
   }
 
+  Future<void> loadSubtitle(SubtitleTrack track) async {
+    currentSubtitle.value = track;
+    await videoService.loadSubtitle(track);
+  }
+
+  // TODO: Integrate Android/iOS background playback session handoff.
+  // TODO: Connect controller lifecycle with platform PiP resume/restore events.
+
   @override
   void onClose() {
+    _playbackErrorWorker?.dispose();
     super.onClose();
   }
 }
