@@ -54,6 +54,15 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
   // 📚 DATA
   // ============================
   Future<List<MediaItem>> _load([HomeMode? mode]) async {
+    if (widget.forceKind != null) {
+      return _sources.loadLibraryItems(
+        onlyOffline: widget.onlyOffline,
+        origin: widget.origin,
+        origins: widget.origins,
+        forceKind: widget.forceKind,
+      );
+    }
+
     final modeKind = mode == null
         ? null
         : (mode == HomeMode.audio
@@ -64,7 +73,6 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
       onlyOffline: widget.onlyOffline,
       origin: widget.origin,
       origins: widget.origins,
-      forceKind: widget.forceKind,
       modeKind: modeKind,
     );
   }
@@ -95,7 +103,12 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
     );
 
     return Obx(() {
-      final mode = home.mode.value;
+      final homeMode = home.mode.value;
+      final displayMode = widget.forceKind == MediaVariantKind.audio
+          ? HomeMode.audio
+          : (widget.forceKind == MediaVariantKind.video
+                ? HomeMode.video
+                : homeMode);
 
       return Scaffold(
         backgroundColor: Colors.transparent,
@@ -105,7 +118,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
               ? ListenfyLogo(size: 28, color: scheme.primary)
               : Text(widget.title),
           onToggleMode: widget.forceKind == null ? home.toggleMode : null,
-          mode: mode == HomeMode.audio
+          mode: displayMode == HomeMode.audio
               ? AppMediaMode.audio
               : AppMediaMode.video,
         ),
@@ -114,7 +127,7 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
             children: [
               Positioned.fill(
                 child: FutureBuilder<List<MediaItem>>(
-                  future: _load(mode),
+                  future: _load(displayMode),
                   builder: (context, snap) {
                     if (snap.connectionState != ConnectionState.done) {
                       return const Center(child: CircularProgressIndicator());
@@ -127,16 +140,18 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                     final hasVideo = (MediaItem e) =>
                         e.variants.any((v) => v.kind == MediaVariantKind.video);
 
-                    final modeList = mode == HomeMode.audio
-                        ? list.where(hasAudio).toList()
-                        : list.where(hasVideo).toList();
+                    final modeList = widget.forceKind != null
+                        ? list
+                        : (displayMode == HomeMode.audio
+                              ? list.where(hasAudio).toList()
+                              : list.where(hasVideo).toList());
 
                     return RefreshIndicator(
-                      onRefresh: () async {
-                        await _sources.refreshAll();
-                        await _load(mode);
-                        if (mounted) setState(() {});
-                      },
+                        onRefresh: () async {
+                          await _sources.refreshAll();
+                          await _load(displayMode);
+                          if (mounted) setState(() {});
+                        },
                       child: ScrollConfiguration(
                         behavior: const _NoGlowScrollBehavior(),
                         child: SingleChildScrollView(
@@ -153,7 +168,11 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                               if (widget.onlyOffline) ...[
                                 _offlineHeader(theme),
                                 const SizedBox(height: 10),
-                                _offlineSummary(theme, modeList.length, mode),
+                                _offlineSummary(
+                                  theme,
+                                  modeList.length,
+                                  displayMode,
+                                ),
                                 const SizedBox(height: AppSpacing.md),
                               ],
                               if (themeMeta != null &&
@@ -163,20 +182,26 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
                                 _topicList(themeMeta),
                                 const SizedBox(height: 18),
                               ],
-                              if (modeList.isEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 12),
-                                  child: Text(
-                                    'No hay contenido aquí todavía.',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant,
+                              if (themeMeta == null ||
+                                  themeMeta.onlyOffline == true) ...[
+                                if (modeList.isEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: Text(
+                                      'No hay contenido aquí todavía.',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: theme
+                                                .colorScheme
+                                                .onSurfaceVariant,
+                                          ),
                                     ),
+                                  )
+                                else
+                                  ...modeList.map(
+                                    (item) => _itemTile(item, modeList),
                                   ),
-                                )
-                              else
-                                ...modeList.map(
-                                  (item) => _itemTile(item, modeList),
-                                ),
+                              ],
                             ],
                           ),
                         ),

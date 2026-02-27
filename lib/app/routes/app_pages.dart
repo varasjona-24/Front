@@ -140,8 +140,15 @@ abstract class AppPages {
     // Details
     GetPage(
       name: AppRoutes.artistDetail,
-      page: () =>
-          ArtistDetailPage(artistKey: Get.arguments?['artistKey'] ?? ''),
+      page: () {
+        final args = Get.arguments;
+        final artistKey = switch (args) {
+          String s => s,
+          Map m => (m['artistKey'] ?? '').toString(),
+          _ => '',
+        };
+        return ArtistDetailPage(artistKey: artistKey);
+      },
     ),
     GetPage(
       name: AppRoutes.playlistDetail,

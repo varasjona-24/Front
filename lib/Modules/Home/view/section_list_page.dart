@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -8,7 +9,7 @@ import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 
-class SectionListPage extends StatelessWidget {
+class SectionListPage extends StatefulWidget {
   const SectionListPage({
     super.key,
     required this.title,
@@ -20,10 +21,15 @@ class SectionListPage extends StatelessWidget {
 
   final String title;
   final List<MediaItem> items;
-  final void Function(MediaItem item, int index) onItemTap;
-  final void Function(MediaItem item, int index) onItemLongPress;
+  final FutureOr<void> Function(MediaItem item, int index) onItemTap;
+  final FutureOr<void> Function(MediaItem item, int index) onItemLongPress;
   final void Function(List<MediaItem> queue)? onShuffle;
 
+  @override
+  State<SectionListPage> createState() => _SectionListPageState();
+}
+
+class _SectionListPageState extends State<SectionListPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -49,7 +55,7 @@ class SectionListPage extends StatelessWidget {
             AppSpacing.md,
             AppSpacing.lg,
           ),
-          itemCount: items.length + 1,
+          itemCount: widget.items.length + 1,
           separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, index) {
             if (index == 0) {
@@ -57,21 +63,21 @@ class SectionListPage extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
+                    widget.title,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  if (onShuffle != null) ...[
+                  if (widget.onShuffle != null) ...[
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
                         onPressed: () {
-                          final queue = List<MediaItem>.from(items);
+                          final queue = List<MediaItem>.from(widget.items);
                           queue.shuffle(Random());
                           if (queue.isEmpty) return;
-                          onShuffle?.call(queue);
+                          widget.onShuffle?.call(queue);
                         },
                         icon: const Icon(Icons.shuffle_rounded),
                         label: const Text('Reproducción aleatoria'),
@@ -83,11 +89,17 @@ class SectionListPage extends StatelessWidget {
               );
             }
 
-            final item = items[index - 1];
+            final item = widget.items[index - 1];
             return _MediaRow(
               item: item,
-              onTap: () => onItemTap(item, index - 1),
-              onLongPress: () => onItemLongPress(item, index - 1),
+              onTap: () async {
+                await widget.onItemTap(item, index - 1);
+                if (mounted) setState(() {});
+              },
+              onLongPress: () async {
+                await widget.onItemLongPress(item, index - 1);
+                if (mounted) setState(() {});
+              },
             );
           },
         ),
@@ -185,10 +197,20 @@ class _Thumb extends StatelessWidget {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
         child: Image(
+          key: ValueKey<String>(thumb!),
           image: provider,
           width: 56,
           height: 56,
           fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.music_note, color: scheme.onSurfaceVariant),
+          ),
         ),
       );
     }

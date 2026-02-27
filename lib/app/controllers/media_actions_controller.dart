@@ -18,11 +18,12 @@ class MediaActionsController extends GetxController {
   // ============================
   // 🧭 NAVEGACION UI
   // ============================
-  Future<void> openEditPage(MediaItem item) async {
-    await Get.toNamed(
+  Future<bool?> openEditPage(MediaItem item) async {
+    final result = await Get.toNamed(
       AppRoutes.editEntity,
       arguments: EditEntityArgs.media(item),
     );
+    return result is bool ? result : null;
   }
 
   // ============================
@@ -151,6 +152,7 @@ class MediaActionsController extends GetxController {
         : null;
 
     final resolved = await _resolveLatest(item);
+    Future<void> Function()? pendingAction;
 
     nav?.setOverlayOpen(true);
     await showModalBottomSheet<void>(
@@ -171,8 +173,13 @@ class MediaActionsController extends GetxController {
                   leading: const Icon(Icons.edit_rounded),
                   title: const Text('Editar cancion'),
                   onTap: () {
+                    pendingAction = () async {
+                      final changed = await openEditPage(resolved);
+                      if (changed == true && onChanged != null) {
+                        await onChanged();
+                      }
+                    };
                     Navigator.of(ctx).pop();
-                    openEditPage(resolved);
                   },
                 ),
                 ListTile(
@@ -186,17 +193,21 @@ class MediaActionsController extends GetxController {
                         ? 'Quitar de favoritos'
                         : 'Agregar a favoritos',
                   ),
-                  onTap: () async {
+                  onTap: () {
+                    pendingAction = () async {
+                      await toggleFavorite(resolved, onChanged: onChanged);
+                    };
                     Navigator.of(ctx).pop();
-                    await toggleFavorite(resolved, onChanged: onChanged);
                   },
                 ),
                 ListTile(
                   leading: const Icon(Icons.delete_outline_rounded),
                   title: const Text('Borrar del dispositivo'),
                   onTap: () {
+                    pendingAction = () async {
+                      await confirmDelete(context, resolved, onChanged: onChanged);
+                    };
                     Navigator.of(ctx).pop();
-                    confirmDelete(context, resolved, onChanged: onChanged);
                   },
                 ),
               ],
@@ -205,6 +216,10 @@ class MediaActionsController extends GetxController {
         );
       },
     );
+    final action = pendingAction;
+    if (action != null) {
+      await action();
+    }
     nav?.setOverlayOpen(false);
   }
 }
