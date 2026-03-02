@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_controller.dart';
@@ -32,6 +33,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Uint8List? _previewFrameBytes;
   String? _previewFrameKey;
   bool _previewLoading = false;
+  bool _captureSaving = false;
   int _previewRequestId = 0;
   int _activePointers = 0;
   bool _pipRequested = false;
@@ -343,13 +345,34 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(
-                        _isFullscreen
-                            ? Icons.fullscreen_exit_rounded
-                            : Icons.fullscreen_rounded,
-                      ),
-                      onPressed: _toggleFullscreen,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Captura',
+                          onPressed: _captureSaving
+                              ? null
+                              : () => _captureFrame(item),
+                          icon: _captureSaving
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.photo_camera_outlined),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            _isFullscreen
+                                ? Icons.fullscreen_exit_rounded
+                                : Icons.fullscreen_rounded,
+                          ),
+                          onPressed: _toggleFullscreen,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -573,6 +596,82 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         );
       },
     );
+  }
+
+  Future<void> _captureFrame(dynamic item) async {
+    if (_captureSaving) return;
+    if (item is! MediaItem) return;
+
+    final source = controller.previewSourceFor(item);
+    if (source == null || source.isEmpty) {
+      _showCaptureMessage('No se pudo obtener la fuente del video.');
+      return;
+    }
+
+    final livePosition =
+        controller.playerController?.value.position ?? controller.position.value;
+    final positionMs = livePosition.inMilliseconds;
+    setState(() => _captureSaving = true);
+
+    try {
+      if (Platform.isAndroid) {
+        final result = await _previewChannel.invokeMethod<Map<dynamic, dynamic>>(
+          'saveFrame',
+          {
+            'source': source,
+            'positionMs': positionMs,
+            'title': item.title,
+            'maxWidth': 1920,
+            'quality': 92,
+          },
+        );
+        final name = result?['displayName']?.toString();
+        _showCaptureMessage(
+          name == null || name.isEmpty
+              ? 'Captura guardada.'
+              : 'Captura guardada: $name',
+        );
+      } else {
+        final bytes = await _previewChannel.invokeMethod<Uint8List>(
+          'extractFrame',
+          {
+            'source': source,
+            'positionMs': positionMs,
+            'maxWidth': 1920,
+            'quality': 92,
+          },
+        );
+        if (bytes == null || bytes.isEmpty) {
+          throw Exception('No se pudo generar la captura.');
+        }
+        final dir = await getApplicationDocumentsDirectory();
+        final safeTitle = _sanitizeFileName(item.title);
+        final fileName =
+            'listenfy_capture_${safeTitle}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final file = File('${dir.path}/$fileName');
+        await file.writeAsBytes(bytes, flush: true);
+        _showCaptureMessage('Captura guardada en ${file.path}');
+      }
+    } catch (_) {
+      _showCaptureMessage('No se pudo guardar la captura.');
+    } finally {
+      if (mounted) {
+        setState(() => _captureSaving = false);
+      }
+    }
+  }
+
+  void _showCaptureMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  String _sanitizeFileName(String value) {
+    final sanitized = value
+        .replaceAll(RegExp(r'[^\w\s-]'), '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_');
+    return sanitized.isEmpty ? 'video' : sanitized;
   }
 
   static String _fmt(Duration d) {

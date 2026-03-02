@@ -4,8 +4,10 @@ import android.graphics.Bitmap
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
+import android.content.ContentValues
 import android.content.Context
 import android.os.Build
+import android.os.Environment
 import android.util.Rational
 import android.app.PictureInPictureParams
 import android.media.AudioDeviceInfo
@@ -23,6 +25,7 @@ import com.example.flutter_listenfy.widget.PlayerWidgetProvider
 import android.content.Intent
 import java.io.ByteArrayOutputStream
 import java.util.HashMap
+import android.provider.MediaStore
 import kotlin.math.roundToInt
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -243,80 +246,75 @@ class MainActivity : AudioServiceActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, videoPreviewChannel)
             .setMethodCallHandler { call, result ->
-                if (call.method != "extractFrame") {
-                    result.notImplemented()
-                    return@setMethodCallHandler
-                }
+                when (call.method) {
+                    "extractFrame" -> {
+                        val source = call.argument<String>("source")?.trim().orEmpty()
+                        val positionMs = call.argument<Int>("positionMs") ?: 0
+                        val maxWidth = (call.argument<Int>("maxWidth") ?: 240).coerceAtLeast(64)
+                        val quality = (call.argument<Int>("quality") ?: 72).coerceIn(40, 90)
 
-                val source = call.argument<String>("source")?.trim().orEmpty()
-                val positionMs = call.argument<Int>("positionMs") ?: 0
-                val maxWidth = (call.argument<Int>("maxWidth") ?: 240).coerceAtLeast(64)
-                val quality = (call.argument<Int>("quality") ?: 72).coerceIn(40, 90)
-
-                if (source.isBlank()) {
-                    result.success(null)
-                    return@setMethodCallHandler
-                }
-
-                Thread {
-                    var retriever: MediaMetadataRetriever? = null
-                    var bitmap: Bitmap? = null
-                    var scaledBitmap: Bitmap? = null
-                    var output: ByteArrayOutputStream? = null
-
-                    try {
-                        retriever = MediaMetadataRetriever()
-                        if (source.startsWith("http://") || source.startsWith("https://")) {
-                            retriever.setDataSource(source, HashMap<String, String>())
-                        } else {
-                            retriever.setDataSource(source.removePrefix("file://"))
+                        if (source.isBlank()) {
+                            result.success(null)
+                            return@setMethodCallHandler
                         }
 
-                        val timeUs = positionMs.coerceAtLeast(0).toLong() * 1000L
-                        bitmap = retriever.getFrameAtTime(
-                            timeUs,
-                            MediaMetadataRetriever.OPTION_CLOSEST_SYNC
-                        ) ?: retriever.getFrameAtTime(
-                            timeUs,
-                            MediaMetadataRetriever.OPTION_CLOSEST
-                        )
+                        Thread {
+                            var bitmap: Bitmap? = null
+                            var output: ByteArrayOutputStream? = null
 
-                        val frame = bitmap
-                        if (frame == null) {
-                            runOnUiThread { result.success(null) }
-                            return@Thread
-                        }
+                            try {
+                                bitmap = extractVideoFrameBitmap(source, positionMs, maxWidth)
+                                if (bitmap == null) {
+                                    runOnUiThread { result.success(null) }
+                                    return@Thread
+                                }
 
-                        val targetHeight = if (frame.width > maxWidth) {
-                            (frame.height * (maxWidth.toFloat() / frame.width.toFloat()))
-                                .roundToInt()
-                                .coerceAtLeast(1)
-                        } else {
-                            frame.height
-                        }
-                        scaledBitmap = if (frame.width > maxWidth) {
-                            Bitmap.createScaledBitmap(frame, maxWidth, targetHeight, true)
-                        } else {
-                            frame
-                        }
-
-                        output = ByteArrayOutputStream()
-                        scaledBitmap!!.compress(Bitmap.CompressFormat.JPEG, quality, output)
-                        val bytes = output.toByteArray()
-                        runOnUiThread { result.success(bytes) }
-                    } catch (_: Throwable) {
-                        runOnUiThread { result.success(null) }
-                    } finally {
-                        try {
-                            output?.close()
-                        } catch (_: Throwable) {}
-                        if (scaledBitmap != null && scaledBitmap !== bitmap) {
-                            scaledBitmap?.recycle()
-                        }
-                        bitmap?.recycle()
-                        retriever?.release()
+                                output = ByteArrayOutputStream()
+                                bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)
+                                val bytes = output.toByteArray()
+                                runOnUiThread { result.success(bytes) }
+                            } catch (_: Throwable) {
+                                runOnUiThread { result.success(null) }
+                            } finally {
+                                try {
+                                    output?.close()
+                                } catch (_: Throwable) {}
+                                bitmap?.recycle()
+                            }
+                        }.start()
                     }
-                }.start()
+                    "saveFrame" -> {
+                        val source = call.argument<String>("source")?.trim().orEmpty()
+                        val title = call.argument<String>("title")?.trim().orEmpty()
+                        val positionMs = call.argument<Int>("positionMs") ?: 0
+                        val maxWidth = (call.argument<Int>("maxWidth") ?: 1920).coerceAtLeast(128)
+                        val quality = (call.argument<Int>("quality") ?: 92).coerceIn(50, 100)
+
+                        if (source.isBlank()) {
+                            result.success(null)
+                            return@setMethodCallHandler
+                        }
+
+                        Thread {
+                            var bitmap: Bitmap? = null
+                            try {
+                                bitmap = extractVideoFrameBitmap(source, positionMs, maxWidth)
+                                if (bitmap == null) {
+                                    runOnUiThread { result.success(null) }
+                                    return@Thread
+                                }
+
+                                val saved = saveBitmapToGallery(bitmap, title, quality)
+                                runOnUiThread { result.success(saved) }
+                            } catch (_: Throwable) {
+                                runOnUiThread { result.success(null) }
+                            } finally {
+                                bitmap?.recycle()
+                            }
+                        }.start()
+                    }
+                    else -> result.notImplemented()
+                }
             }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, widgetChannel)
@@ -459,6 +457,96 @@ class MainActivity : AudioServiceActivity() {
         val w = 1000
         val h = (w / clamped).roundToInt().coerceAtLeast(1)
         return Rational(w, h)
+    }
+
+    private fun extractVideoFrameBitmap(source: String, positionMs: Int, maxWidth: Int): Bitmap? {
+        var retriever: MediaMetadataRetriever? = null
+        var bitmap: Bitmap? = null
+        var scaledBitmap: Bitmap? = null
+
+        try {
+            retriever = MediaMetadataRetriever()
+            if (source.startsWith("http://") || source.startsWith("https://")) {
+                retriever.setDataSource(source, HashMap<String, String>())
+            } else {
+                retriever.setDataSource(source.removePrefix("file://"))
+            }
+
+            val timeUs = positionMs.coerceAtLeast(0).toLong() * 1000L
+            bitmap = retriever.getFrameAtTime(
+                timeUs,
+                MediaMetadataRetriever.OPTION_CLOSEST
+            ) ?: retriever.getFrameAtTime(
+                timeUs,
+                MediaMetadataRetriever.OPTION_PREVIOUS_SYNC
+            ) ?: retriever.getFrameAtTime(
+                timeUs,
+                MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+            )
+
+            val frame = bitmap ?: return null
+            if (frame.width <= maxWidth) {
+                return frame.copy(Bitmap.Config.ARGB_8888, false)
+            }
+
+            val targetHeight = (frame.height * (maxWidth.toFloat() / frame.width.toFloat()))
+                .roundToInt()
+                .coerceAtLeast(1)
+            scaledBitmap = Bitmap.createScaledBitmap(frame, maxWidth, targetHeight, true)
+            return scaledBitmap.copy(Bitmap.Config.ARGB_8888, false)
+        } finally {
+            if (scaledBitmap != null) {
+                scaledBitmap.recycle()
+            }
+            bitmap?.recycle()
+            retriever?.release()
+        }
+    }
+
+    private fun saveBitmapToGallery(
+        bitmap: Bitmap,
+        title: String,
+        quality: Int
+    ): Map<String, String>? {
+        val resolver = contentResolver
+        val safeTitle = sanitizeFileName(title.ifBlank { "video" })
+        val displayName = "Listenfy_${safeTitle}_${System.currentTimeMillis()}.jpg"
+        val relativePath = "${Environment.DIRECTORY_PICTURES}/Listenfy"
+
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, relativePath)
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        }
+
+        val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+
+        try {
+            resolver.openOutputStream(uri)?.use { stream ->
+                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)) {
+                    throw IllegalStateException("compress failed")
+                }
+            } ?: throw IllegalStateException("output stream unavailable")
+
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+            return mapOf(
+                "displayName" to displayName,
+                "uri" to uri.toString()
+            )
+        } catch (_: Throwable) {
+            resolver.delete(uri, null, null)
+            return null
+        }
+    }
+
+    private fun sanitizeFileName(value: String): String {
+        val sanitized = value.replace(Regex("[^A-Za-z0-9 _-]"), "")
+            .trim()
+            .replace(Regex("\\s+"), "_")
+        return if (sanitized.isBlank()) "video" else sanitized
     }
 
     private fun releaseSpatial() {
