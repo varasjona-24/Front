@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import 'package:flutter_listenfy/Modules/player/Video/controller/video_player_controller.dart';
+import '../../../../app/models/media_item.dart';
 import '../../../../app/routes/app_routes.dart';
 
 class VideoPlayerPage extends StatefulWidget {
@@ -26,9 +27,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   String? _speedToast;
   double _speedGestureOffset = 0;
   bool _speedGestureConsumed = false;
+  final Map<String, Uint8List> _previewFrameCache = <String, Uint8List>{};
+  Timer? _previewTimer;
+  Uint8List? _previewFrameBytes;
+  String? _previewFrameKey;
+  bool _previewLoading = false;
+  int _previewRequestId = 0;
   int _activePointers = 0;
   bool _pipRequested = false;
   final MethodChannel _pipChannel = const MethodChannel('listenfy/pip');
+  final MethodChannel _previewChannel = const MethodChannel(
+    'listenfy/video_preview',
+  );
   late final _LifecycleObserver _lifecycleObserver;
   Worker? _pipWorker;
 
@@ -52,6 +62,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void dispose() {
     _hideTimer?.cancel();
     _speedTimer?.cancel();
+    _previewTimer?.cancel();
     _pipWorker?.dispose();
     _pipWorker = null;
     _setPipEnabled(false);
@@ -375,12 +386,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   value: posSeconds,
                   min: 0.0,
                   max: maxSeconds,
+                  onChangeStart: (v) {
+                    final next = v.clamp(0.0, maxSeconds);
+                    setState(() => _dragValue = next);
+                    _requestPreview(item, Duration(seconds: next.toInt()));
+                    _showControlsTemp();
+                  },
                   onChanged: (v) {
-                    setState(() => _dragValue = v);
+                    final next = v.clamp(0.0, maxSeconds);
+                    setState(() => _dragValue = next);
+                    _requestPreview(item, Duration(seconds: next.toInt()));
                     _showControlsTemp();
                   },
                   onChangeEnd: (v) {
                     controller.seek(Duration(seconds: v.toInt()));
+                    _clearPreviewState();
                     setState(() => _dragValue = null);
                   },
                 ),
@@ -394,8 +414,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Widget _buildPreview(dynamic item, Duration position) {
+    const previewWidth = 120.0;
+    const previewHeight = 68.0;
+    final source = _previewSourceFor(item);
+    final key = source == null ? null : _previewCacheKey(source, position);
+    final frame = key == null
+        ? null
+        : (_previewFrameKey == key
+              ? _previewFrameBytes ?? _previewFrameCache[key]
+              : _previewFrameCache[key]);
     final thumb = item.effectiveThumbnail;
-    if (thumb == null || thumb.isEmpty) {
+    final hasFrame = frame != null && frame.isNotEmpty;
+    final hasThumb = thumb != null && thumb.isNotEmpty;
+    if (!hasFrame && !hasThumb) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 6),
         child: Text(
@@ -405,9 +436,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       );
     }
 
-    final image = thumb.startsWith('http')
-        ? Image.network(thumb, fit: BoxFit.cover)
-        : Image.file(File(thumb), fit: BoxFit.cover);
+    final Widget image;
+    if (hasFrame) {
+      image = Image.memory(frame, fit: BoxFit.cover, gaplessPlayback: true);
+    } else {
+      final thumbValue = thumb!;
+      image = thumbValue.startsWith('http')
+          ? Image.network(thumbValue, fit: BoxFit.cover)
+          : Image.file(File(thumbValue), fit: BoxFit.cover);
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
@@ -415,7 +452,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: SizedBox(width: 56, height: 36, child: image),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(width: previewWidth, height: previewHeight, child: image),
+                if (_previewLoading && !hasFrame)
+                  Container(
+                    width: previewWidth,
+                    height: previewHeight,
+                    color: Colors.black.withValues(alpha: 0.24),
+                    alignment: Alignment.center,
+                    child: const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(width: 8),
           Text(_fmt(position), style: const TextStyle(color: Colors.white)),
@@ -530,6 +584,93 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       return '$hh:$m:$s';
     }
     return '$m:$s';
+  }
+
+  String? _previewSourceFor(dynamic item) {
+    if (item is! MediaItem) return null;
+    return controller.previewSourceFor(item);
+  }
+
+  String _previewCacheKey(String source, Duration position) {
+    return '$source@${position.inSeconds}';
+  }
+
+  void _requestPreview(dynamic item, Duration position) {
+    final source = _previewSourceFor(item);
+    if (source == null || source.isEmpty) {
+      _clearPreviewState(clearCache: false);
+      return;
+    }
+
+    final key = _previewCacheKey(source, position);
+    final cached = _previewFrameCache[key];
+    if (cached != null && cached.isNotEmpty) {
+      setState(() {
+        _previewFrameKey = key;
+        _previewFrameBytes = cached;
+        _previewLoading = false;
+      });
+      return;
+    }
+
+    _previewTimer?.cancel();
+    setState(() {
+      _previewFrameKey = key;
+      _previewFrameBytes = null;
+      _previewLoading = true;
+    });
+    _previewTimer = Timer(const Duration(milliseconds: 120), () {
+      _loadPreviewFrame(source, position);
+    });
+  }
+
+  Future<void> _loadPreviewFrame(String source, Duration position) async {
+    final requestId = ++_previewRequestId;
+    final key = _previewCacheKey(source, position);
+
+    try {
+      final bytes = await _previewChannel
+          .invokeMethod<Uint8List>('extractFrame', {
+            'source': source,
+            'positionMs': position.inMilliseconds,
+            'maxWidth': 320,
+            'quality': 72,
+          });
+      if (!mounted || requestId != _previewRequestId) return;
+
+      if (bytes != null && bytes.isNotEmpty) {
+        _previewFrameCache[key] = bytes;
+        if (_previewFrameCache.length > 80) {
+          _previewFrameCache.remove(_previewFrameCache.keys.first);
+        }
+      }
+
+      setState(() {
+        _previewFrameKey = key;
+        _previewFrameBytes = bytes;
+        _previewLoading = false;
+      });
+    } on MissingPluginException {
+      if (!mounted || requestId != _previewRequestId) return;
+      setState(() => _previewLoading = false);
+    } catch (_) {
+      if (!mounted || requestId != _previewRequestId) return;
+      setState(() => _previewLoading = false);
+    }
+  }
+
+  void _clearPreviewState({bool clearCache = false}) {
+    _previewTimer?.cancel();
+    _previewRequestId++;
+    if (!mounted) return;
+    setState(() {
+      _previewFrameKey = null;
+      _previewFrameBytes = null;
+      _previewLoading = false;
+      if (clearCache) {
+        _previewFrameCache.clear();
+      }
+    });
   }
 }
 

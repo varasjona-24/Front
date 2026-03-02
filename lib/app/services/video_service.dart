@@ -40,6 +40,20 @@ class VideoService extends GetxService {
 
   bool get hasSourceLoaded => _player != null;
 
+  String? resolveVideoSource(MediaItem item, MediaVariant variant) {
+    if (!variant.isValid) return null;
+
+    final localPath = variant.localPath?.trim();
+    if (localPath != null && localPath.isNotEmpty) {
+      return localPath;
+    }
+
+    final fileId = item.fileId.trim();
+    final format = variant.format.trim();
+    if (fileId.isEmpty || format.isEmpty) return null;
+    return '${ApiConfig.baseUrl}/api/v1/media/file/$fileId/video/$format';
+  }
+
   bool isSameVideo(MediaItem item, MediaVariant v) {
     return _currentItem?.id == item.id &&
         _currentVariant?.format == v.format &&

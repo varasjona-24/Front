@@ -136,7 +136,10 @@ class VideoPlayerController extends GetxController {
   MediaVariant? get currentVideoVariant {
     final item = currentItemOrNull;
     if (item == null) return null;
+    return resolveVideoVariantFor(item);
+  }
 
+  MediaVariant? resolveVideoVariantFor(MediaItem item) {
     // 1️⃣ Buscar video local con localPath válido
     final localVideo = item.variants.firstWhereOrNull(
       (v) =>
@@ -161,6 +164,12 @@ class VideoPlayerController extends GetxController {
       (v) => v.kind == MediaVariantKind.video && v.isValid,
     );
     return anyVideo;
+  }
+
+  String? previewSourceFor(MediaItem item) {
+    final variant = resolveVideoVariantFor(item);
+    if (variant == null) return null;
+    return videoService.resolveVideoSource(item, variant);
   }
 
   // ===========================================================================
