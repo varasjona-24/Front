@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:get/get.dart';
@@ -5,7 +6,6 @@ import 'package:get_storage/get_storage.dart';
 import 'package:video_player/video_player.dart' as vp;
 
 import '../models/media_item.dart';
-import '../models/subtitle_track.dart';
 import '../config/api_config.dart';
 import '../../Modules/settings/controller/playback_settings_controller.dart';
 
@@ -34,13 +34,9 @@ class VideoService extends GetxService {
   MediaVariant? _currentVariant;
   final Rxn<MediaItem> currentItem = Rxn<MediaItem>();
   final Rxn<MediaVariant> currentVariant = Rxn<MediaVariant>();
-  final Rxn<String> playbackError = Rxn<String>();
-  final Rxn<SubtitleTrack> currentSubtitle = Rxn<SubtitleTrack>();
 
   vp.VideoPlayerController? _player;
-  void Function()? _playerListener;
-
-  vp.VideoViewType get _preferredViewType => vp.VideoViewType.textureView;
+  Timer? _posTimer;
 
   bool get hasSourceLoaded => _player != null;
 
@@ -62,7 +58,7 @@ class VideoService extends GetxService {
 
   @override
   void onClose() {
-    _detachPlayerListener();
+    _posTimer?.cancel();
     _player?.dispose();
     super.onClose();
   }
@@ -89,7 +85,6 @@ class VideoService extends GetxService {
     isLoading.value = true;
     isPlaying.value = false;
     state.value = VideoPlaybackState.loading;
-    playbackError.value = null;
     _completedOnce = false;
 
     // -----------------------------------------------------------------------
@@ -125,7 +120,6 @@ class VideoService extends GetxService {
           videoPlayerOptions: vp.VideoPlayerOptions(
             allowBackgroundPlayback: true,
           ),
-          viewType: _preferredViewType,
         );
 
         await _player!.initialize().timeout(const Duration(seconds: 12));
@@ -189,12 +183,11 @@ class VideoService extends GetxService {
     print('🌐 Video URL: $videoUrl');
 
     try {
-      _player = vp.VideoPlayerController.networkUrl(
-        Uri.parse(videoUrl),
+      _player = vp.VideoPlayerController.network(
+        videoUrl,
         videoPlayerOptions: vp.VideoPlayerOptions(
           allowBackgroundPlayback: true,
         ),
-        viewType: _preferredViewType,
       );
 
       await _player!.initialize().timeout(const Duration(seconds: 12));
@@ -228,43 +221,18 @@ class VideoService extends GetxService {
   }
 
   void _setupPlayerListener() {
-    _detachPlayerListener();
-    final player = _player;
-    if (player == null) return;
+    _posTimer?.cancel();
+    _posTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (_player == null) return;
+      final v = _player!.value;
+      position.value = v.position;
+      isPlaying.value = v.isPlaying;
+      duration.value = v.duration;
 
-    void listener() {
-      final v = player.value;
-
-      if (v.hasError) {
-        final nextError =
-            v.errorDescription ?? 'Error desconocido de reproducción';
-        if (playbackError.value != nextError) {
-          playbackError.value = nextError;
-        }
-        if (isPlaying.value) {
-          isPlaying.value = false;
-        }
-        if (state.value != VideoPlaybackState.stopped) {
-          state.value = VideoPlaybackState.stopped;
-        }
-        return;
-      }
-
-      if (position.value != v.position) {
-        position.value = v.position;
-      }
-      if (duration.value != v.duration) {
-        duration.value = v.duration;
-      }
-      if (isPlaying.value != v.isPlaying) {
-        isPlaying.value = v.isPlaying;
-      }
-
-      final nextState = v.isPlaying
-          ? VideoPlaybackState.playing
-          : VideoPlaybackState.paused;
-      if (state.value != nextState) {
-        state.value = nextState;
+      if (v.isPlaying) {
+        state.value = VideoPlaybackState.playing;
+      } else {
+        state.value = VideoPlaybackState.paused;
       }
 
       final d = v.duration;
@@ -275,26 +243,12 @@ class VideoService extends GetxService {
         _completedOnce = true;
         completedTick.value++;
       }
-    }
-
-    _playerListener = listener;
-    player.addListener(listener);
-    listener();
-  }
-
-  void _detachPlayerListener() {
-    final player = _player;
-    final listener = _playerListener;
-    if (player != null && listener != null) {
-      try {
-        player.removeListener(listener);
-      } catch (_) {}
-    }
-    _playerListener = null;
+    });
   }
 
   Future<void> _disposePlayer() async {
-    _detachPlayerListener();
+    _posTimer?.cancel();
+    _posTimer = null;
 
     if (_player != null) {
       try {
@@ -374,11 +328,6 @@ class VideoService extends GetxService {
     await _disposePlayer();
     state.value = VideoPlaybackState.stopped;
     _keepLastItem = false;
-  }
-
-  Future<void> loadSubtitle(SubtitleTrack track) async {
-    // TODO: Render subtitles over the video with timing parser integration.
-    currentSubtitle.value = track;
   }
 
   void clearLastItem() {

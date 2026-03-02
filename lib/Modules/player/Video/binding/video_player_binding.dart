@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:get/get.dart';
 
 import '../../../../app/models/media_item.dart';
@@ -15,7 +13,6 @@ class VideoPlayerBinding extends Bindings {
     var queue = (rawQueue is List)
         ? rawQueue.whereType<MediaItem>().toList()
         : <MediaItem>[];
-    final hasIncomingQueue = rawQueue is List && queue.isNotEmpty;
 
     var index = (args['index'] is int) ? args['index'] as int : 0;
 
@@ -24,32 +21,27 @@ class VideoPlayerBinding extends Bindings {
       Get.put<VideoService>(VideoService(), permanent: true);
     }
 
-    // Reusar controlador existente para evitar reconstrucciones costosas.
-    if (Get.isRegistered<VideoPlayerController>()) {
-      final existing = Get.find<VideoPlayerController>();
-      if (hasIncomingQueue) {
-        unawaited(existing.updateQueue(queue, index));
-        return;
+    // Si llegamos sin argumentos (ej: mini player), reutilizar cola/sesión actual.
+    if (queue.isEmpty) {
+      if (Get.isRegistered<VideoPlayerController>()) {
+        final existing = Get.find<VideoPlayerController>();
+        if (existing.queue.isNotEmpty) {
+          queue = List<MediaItem>.from(existing.queue);
+          index = existing.currentIndex.value;
+        }
       }
 
-      if (existing.queue.isNotEmpty) {
-        return;
+      if (queue.isEmpty) {
+        final current = Get.find<VideoService>().currentItem.value;
+        if (current != null) {
+          queue = [current];
+          index = 0;
+        }
       }
-
-      final current = Get.find<VideoService>().currentItem.value;
-      if (current != null) {
-        unawaited(existing.updateQueue([current], 0, autoPlay: false));
-      }
-      return;
     }
 
-    // Si no hay controlador, construir estado inicial.
-    if (queue.isEmpty) {
-      final current = Get.find<VideoService>().currentItem.value;
-      if (current != null) {
-        queue = [current];
-        index = 0;
-      }
+    if (Get.isRegistered<VideoPlayerController>()) {
+      Get.delete<VideoPlayerController>(force: true);
     }
 
     Get.put<VideoPlayerController>(

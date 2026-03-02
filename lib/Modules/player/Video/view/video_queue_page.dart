@@ -19,7 +19,6 @@ class VideoQueuePage extends GetView<VideoPlayerController> {
         centerTitle: true,
       ),
       body: Obx(() {
-        final _ = controller.queueVersion.value;
         final queue = controller.queue;
         final idx = controller.currentIndex.value;
 
@@ -27,69 +26,28 @@ class VideoQueuePage extends GetView<VideoPlayerController> {
           return const Center(child: Text('La cola está vacía'));
         }
 
-        return ReorderableListView.builder(
+        return ListView.separated(
           padding: const EdgeInsets.all(12),
-          buildDefaultDragHandles: false,
           itemCount: queue.length,
-          onReorder: controller.reorderQueue,
+          separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (context, i) {
             final it = queue[i];
             final selected = i == idx;
-            return Dismissible(
-              key: ValueKey('video_queue_${it.id}_$i'),
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.delete_outline,
-                  color: theme.colorScheme.onErrorContainer,
-                ),
+            return ListTile(
+              selected: selected,
+              leading: _thumb(theme: theme, item: it, selected: selected),
+              title: Text(
+                it.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              direction: DismissDirection.endToStart,
-              onDismissed: (_) async {
-                final removeIndex = controller.queue.indexOf(it);
-                if (removeIndex >= 0) {
-                  await controller.removeFromQueue(removeIndex);
-                }
+              subtitle:
+                  it.subtitle.isNotEmpty ? Text(it.subtitle) : null,
+              onTap: () async {
+                await controller.playAt(i);
+                Get.back();
               },
-              child: Card(
-                margin: const EdgeInsets.only(bottom: 6),
-                child: ListTile(
-                  selected: selected,
-                  leading: _thumb(theme: theme, item: it, selected: selected),
-                  title: Text(
-                    it.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: it.subtitle.isNotEmpty ? Text(it.subtitle) : null,
-                  onTap: () async {
-                    await controller.playAt(i);
-                    Get.back();
-                  },
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (selected)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: Text(
-                            'Reproduciendo',
-                            style: theme.textTheme.bodySmall,
-                          ),
-                        ),
-                      ReorderableDragStartListener(
-                        index: i,
-                        child: const Icon(Icons.drag_handle_rounded),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              trailing: selected ? const Text('Reproduciendo') : null,
             );
           },
         );
