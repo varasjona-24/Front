@@ -24,10 +24,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool _isFullscreen = false;
   Timer? _hideTimer;
   Timer? _speedTimer;
+  Timer? _singleDoubleTapTimer;
+  Timer? _twoFingerTapTimer;
   double? _dragValue;
-  String? _speedToast;
+  String? _toastMessage;
+  Offset? _lastDoubleTapDownPosition;
+  final Map<int, Offset> _pointerDownPositions = <int, Offset>{};
   double _speedGestureOffset = 0;
   bool _speedGestureConsumed = false;
+  double _volumeGestureDelta = 0;
   final Map<String, Uint8List> _previewFrameCache = <String, Uint8List>{};
   Timer? _previewTimer;
   Uint8List? _previewFrameBytes;
@@ -35,6 +40,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool _previewLoading = false;
   bool _captureSaving = false;
   int _previewRequestId = 0;
+  bool _twoFingerTapCandidate = false;
+  int _twoFingerTapCount = 0;
+  bool _isVerticalDragActive = false;
   int _activePointers = 0;
   bool _pipRequested = false;
   final MethodChannel _pipChannel = const MethodChannel('listenfy/pip');
@@ -64,7 +72,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void dispose() {
     _hideTimer?.cancel();
     _speedTimer?.cancel();
+    _singleDoubleTapTimer?.cancel();
     _previewTimer?.cancel();
+    _twoFingerTapTimer?.cancel();
     _pipWorker?.dispose();
     _pipWorker = null;
     _setPipEnabled(false);
@@ -152,7 +162,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               Positioned.fill(child: _buildVideoArea(theme)),
               if (_showControls)
                 Positioned.fill(child: _buildControls(theme, item)),
-              if (_speedToast != null)
+              if (_toastMessage != null)
                 Center(
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -164,7 +174,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      _speedToast!,
+                      _toastMessage!,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
@@ -182,27 +192,75 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget _buildVideoArea(ThemeData theme) {
     return Listener(
       behavior: HitTestBehavior.opaque,
-      onPointerDown: (_) => _activePointers++,
-      onPointerUp: (_) {
+      onPointerDown: (event) {
+        _activePointers++;
+        _pointerDownPositions[event.pointer] = event.localPosition;
+        if (_activePointers == 2) {
+          _cancelPendingSingleDoubleTapSeek();
+          _twoFingerTapCandidate = true;
+        } else if (_activePointers > 2) {
+          _cancelTwoFingerTapCandidate();
+        }
+      },
+      onPointerMove: (event) {
+        if (!_twoFingerTapCandidate) return;
+        final initial = _pointerDownPositions[event.pointer];
+        if (initial == null) return;
+        if ((event.localPosition - initial).distance > 18) {
+          _cancelTwoFingerTapCandidate();
+        }
+      },
+      onPointerUp: (event) {
+        final hadTwoFingerTapCandidate = _twoFingerTapCandidate;
         _activePointers = (_activePointers - 1).clamp(0, 10);
+        _pointerDownPositions.remove(event.pointer);
         if (_activePointers < 2) _resetSpeedGesture();
+        if (_activePointers == 0 && hadTwoFingerTapCandidate) {
+          _registerTwoFingerTap();
+        }
+        if (_activePointers == 0) {
+          _cancelTwoFingerTapCandidate();
+        }
       },
       onPointerCancel: (_) {
         _activePointers = 0;
+        _pointerDownPositions.clear();
         _resetSpeedGesture();
+        _resetVolumeGesture();
+        _isVerticalDragActive = false;
+        _cancelPendingSingleDoubleTapSeek();
+        _cancelTwoFingerTapCandidate();
       },
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: _toggleControls,
-        onDoubleTap: _togglePlayOnDoubleTap,
-        onVerticalDragStart: (_) => _resetSpeedGesture(),
+        onDoubleTapDown: (details) {
+          _lastDoubleTapDownPosition = details.localPosition;
+        },
+        onDoubleTap: _scheduleDoubleTapSeek,
+        onVerticalDragStart: (_) {
+          _isVerticalDragActive = true;
+          _resetSpeedGesture();
+          _resetVolumeGesture();
+          _cancelGestureTapState();
+        },
         onVerticalDragUpdate: (details) {
           if (_activePointers >= 2) {
-            _onVerticalDragUpdate(details);
+            _onSpeedDragUpdate(details);
+          } else if (_activePointers == 1) {
+            _onVolumeDragUpdate(details);
           }
         },
-        onVerticalDragEnd: (_) => _resetSpeedGesture(),
-        onVerticalDragCancel: _resetSpeedGesture,
+        onVerticalDragEnd: (_) {
+          _isVerticalDragActive = false;
+          _resetSpeedGesture();
+          _resetVolumeGesture();
+        },
+        onVerticalDragCancel: () {
+          _isVerticalDragActive = false;
+          _resetSpeedGesture();
+          _resetVolumeGesture();
+        },
         child: Obx(() {
           final _ = controller.state.value;
           final err = controller.error.value;
@@ -518,12 +576,44 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
   }
 
-  void _togglePlayOnDoubleTap() {
-    controller.togglePlay();
+  void _scheduleDoubleTapSeek() {
+    if (_isVerticalDragActive) return;
+    _cancelPendingSingleDoubleTapSeek();
+    final tapPosition = _lastDoubleTapDownPosition;
+    _singleDoubleTapTimer = Timer(const Duration(milliseconds: 220), () {
+      if (!mounted) return;
+      if (_isVerticalDragActive ||
+          _activePointers >= 2 ||
+          _twoFingerTapCount > 0 ||
+          _twoFingerTapCandidate) {
+        return;
+      }
+      _handleDoubleTapSeek(tapPosition);
+    });
+  }
+
+  Future<void> _handleDoubleTapSeek(Offset? tapPosition) async {
+    final width = MediaQuery.sizeOf(context).width;
+    final tapDx = tapPosition?.dx ?? (width / 2);
+    final current =
+        controller.playerController?.value.position ?? controller.position.value;
+    final total =
+        controller.playerController?.value.duration ?? controller.duration.value;
+    final delta = tapDx < width / 2 ? -5 : 5;
+
+    final target = current + Duration(seconds: delta);
+    final clamped = total > Duration.zero
+        ? (target < Duration.zero
+              ? Duration.zero
+              : (target > total ? total : target))
+        : (target < Duration.zero ? Duration.zero : target);
+
+    await controller.seek(clamped);
+    _showToast(delta < 0 ? '-5s' : '+5s');
     _showControlsTemp();
   }
 
-  void _onVerticalDragUpdate(DragUpdateDetails details) {
+  void _onSpeedDragUpdate(DragUpdateDetails details) {
     if (_speedGestureConsumed) return;
     _speedGestureOffset += -details.delta.dy;
     if (_speedGestureOffset.abs() < 24) return;
@@ -537,18 +627,77 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _speedGestureConsumed = false;
   }
 
+  void _onVolumeDragUpdate(DragUpdateDetails details) {
+    _volumeGestureDelta += -details.delta.dy;
+    if (_volumeGestureDelta.abs() < 6) return;
+
+    final current = controller.videoService.volume.value;
+    final next = (current + (_volumeGestureDelta / 220)).clamp(0.0, 1.0);
+    _volumeGestureDelta = 0;
+    controller.videoService.setVolume(next);
+    _showToast('Vol ${(next * 100).round()}%');
+    _showControlsTemp();
+  }
+
+  void _resetVolumeGesture() {
+    _volumeGestureDelta = 0;
+  }
+
+  void _registerTwoFingerTap() {
+    if (_isVerticalDragActive) {
+      _cancelGestureTapState();
+      return;
+    }
+    if (_twoFingerTapCount == 1 && (_twoFingerTapTimer?.isActive ?? false)) {
+      _cancelPendingSingleDoubleTapSeek();
+      _twoFingerTapTimer?.cancel();
+      _twoFingerTapCount = 0;
+      unawaited(_togglePlayOnTwoFingerDoubleTap());
+      return;
+    }
+
+    _twoFingerTapCount = 1;
+    _twoFingerTapTimer?.cancel();
+    _twoFingerTapTimer = Timer(const Duration(milliseconds: 320), () {
+      _twoFingerTapCount = 0;
+    });
+  }
+
+  void _cancelTwoFingerTapCandidate() {
+    _twoFingerTapCandidate = false;
+  }
+
+  void _cancelPendingSingleDoubleTapSeek() {
+    _singleDoubleTapTimer?.cancel();
+    _singleDoubleTapTimer = null;
+  }
+
+  void _cancelGestureTapState() {
+    _cancelPendingSingleDoubleTapSeek();
+    _twoFingerTapTimer?.cancel();
+    _twoFingerTapCount = 0;
+    _cancelTwoFingerTapCandidate();
+  }
+
+  Future<void> _togglePlayOnTwoFingerDoubleTap() async {
+    final wasPlaying = controller.isPlaying.value;
+    await controller.togglePlay();
+    _showToast(wasPlaying ? 'Pausa' : 'Play');
+    _showControlsTemp();
+  }
+
   void _adjustSpeed(double delta) {
     final current = controller.videoService.speed.value;
     final next = (current + delta).clamp(0.5, 2.0);
     controller.videoService.setSpeed(next);
-    _showSpeedToast('${next.toStringAsFixed(1)}x');
+    _showToast('${next.toStringAsFixed(1)}x');
   }
 
-  void _showSpeedToast(String text) {
-    setState(() => _speedToast = text);
+  void _showToast(String text) {
+    setState(() => _toastMessage = text);
     _speedTimer?.cancel();
     _speedTimer = Timer(const Duration(milliseconds: 900), () {
-      if (mounted) setState(() => _speedToast = null);
+      if (mounted) setState(() => _toastMessage = null);
     });
   }
 
