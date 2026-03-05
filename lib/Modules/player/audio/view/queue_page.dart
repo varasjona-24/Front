@@ -1,13 +1,10 @@
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../audio/controller/audio_player_controller.dart';
 import '../../../../app/models/media_item.dart';
-import '../../../../Modules/sources/domain/source_origin.dart';
 
 class QueuePage extends GetView<AudioPlayerController> {
   const QueuePage({super.key});
@@ -34,54 +31,12 @@ class QueuePage extends GetView<AudioPlayerController> {
           (s, it) => s + (it.effectiveDurationSeconds ?? 0),
         );
 
-        Future<void> exportQueue() async {
-          try {
-            final export = queue
-                .map(
-                  (it) => {
-                    'id': it.id,
-                    'publicId': it.publicId,
-                    'title': it.title,
-                    'subtitle': it.subtitle,
-                    'origin': it.origin.key,
-                    'durationSeconds': it.effectiveDurationSeconds,
-                    'playableUrl': it.playableUrl, // ✅ útil para depurar
-                  },
-                )
-                .toList();
-
-            final jsonStr = jsonEncode(export);
-
-            await Clipboard.setData(ClipboardData(text: jsonStr));
-
-            final ts = DateTime.now().toIso8601String().replaceAll(':', '-');
-            final fileName = 'listenfy_queue_export_$ts.json';
-            final tmpPath = Directory.systemTemp.path;
-
-            final f = File(_joinPath(tmpPath, fileName));
-            await f.writeAsString(jsonStr);
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  'Cola exportada: copiada al portapapeles y guardada en ${f.path}',
-                ),
-              ),
-            );
-          } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error exportando la cola: $e')),
-            );
-          }
-        }
-
         return Column(
           children: [
             _header(
               theme: theme,
               count: queue.length,
               totalSeconds: totalSeconds,
-              onExport: exportQueue,
             ),
             Expanded(
               child: ReorderableListView.builder(
@@ -139,7 +94,6 @@ class QueuePage extends GetView<AudioPlayerController> {
     required ThemeData theme,
     required int count,
     required int totalSeconds,
-    required VoidCallback onExport,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -150,11 +104,6 @@ class QueuePage extends GetView<AudioPlayerController> {
               '$count pistas • Total: ${_fmtDurationTotal(totalSeconds)}',
               style: theme.textTheme.bodyMedium,
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.save_alt),
-            tooltip: 'Exportar cola',
-            onPressed: onExport,
           ),
         ],
       ),
@@ -257,10 +206,5 @@ class QueuePage extends GetView<AudioPlayerController> {
     final m = s ~/ 60;
     final sec = s % 60;
     return '$m:${sec.toString().padLeft(2, '0')}';
-  }
-
-  String _joinPath(String dir, String file) {
-    final d = dir.endsWith('/') ? dir : '$dir/';
-    return '$d$file';
   }
 }

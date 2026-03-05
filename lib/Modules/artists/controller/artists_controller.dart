@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
+import '../../../app/utils/artist_credit_parser.dart';
 import '../data/artist_store.dart';
 import '../domain/artist_profile.dart';
 
@@ -27,6 +29,18 @@ class ArtistGroup {
     this.thumbnail,
     this.thumbnailLocalPath,
   });
+}
+
+class _ArtistBucket {
+  _ArtistBucket({
+    required this.key,
+    required this.name,
+  });
+
+  final String key;
+  String name;
+  String? fallbackThumb;
+  final List<MediaItem> items = <MediaItem>[];
 }
 
 class ArtistsController extends GetxController {
@@ -62,25 +76,51 @@ class ArtistsController extends GetxController {
         for (final p in profiles) p.key: p,
       };
 
-      final Map<String, List<MediaItem>> grouped = {};
+      final Map<String, _ArtistBucket> grouped = {};
       for (final item in items) {
-        final raw = item.subtitle.trim();
-        final key = ArtistProfile.normalizeKey(raw);
-        grouped.putIfAbsent(key, () => []).add(item);
+        final credits = ArtistCreditParser.parse(item.subtitle);
+        final artistNames = credits.allArtists;
+
+        if (artistNames.isEmpty) {
+          final key = ArtistCreditParser.normalizeKey(item.subtitle);
+          final bucket = grouped.putIfAbsent(
+            key,
+            () => _ArtistBucket(
+              key: key,
+              name: 'Artista desconocido',
+            ),
+          );
+          bucket.items.add(item);
+          bucket.fallbackThumb ??= item.effectiveThumbnail;
+          continue;
+        }
+
+        for (final artistName in artistNames) {
+          final key = ArtistCreditParser.normalizeKey(artistName);
+          final bucket = grouped.putIfAbsent(
+            key,
+            () => _ArtistBucket(
+              key: key,
+              name: artistName,
+            ),
+          );
+          bucket.name = bucket.name.trim().isEmpty ? artistName : bucket.name;
+          bucket.items.add(item);
+          bucket.fallbackThumb ??= item.effectiveThumbnail;
+        }
       }
 
       final list = <ArtistGroup>[];
       for (final entry in grouped.entries) {
-        final key = entry.key;
-        final itemsForArtist = entry.value;
+        final bucket = entry.value;
+        final key = bucket.key;
+        final itemsForArtist = bucket.items;
         final profile = profilesByKey[key];
         final displayName = (profile?.displayName.trim().isNotEmpty == true)
             ? profile!.displayName
-            : (itemsForArtist.first.subtitle.trim().isNotEmpty
-                  ? itemsForArtist.first.subtitle.trim()
+            : (bucket.name.trim().isNotEmpty
+                  ? bucket.name
                   : 'Artista desconocido');
-
-        final fallbackThumb = itemsForArtist.first.effectiveThumbnail;
 
         list.add(
           ArtistGroup(
@@ -88,7 +128,7 @@ class ArtistsController extends GetxController {
             name: displayName,
             count: itemsForArtist.length,
             items: itemsForArtist,
-            thumbnail: profile?.thumbnail ?? fallbackThumb,
+            thumbnail: profile?.thumbnail ?? bucket.fallbackThumb,
             thumbnailLocalPath: profile?.thumbnailLocalPath,
           ),
         );
@@ -97,7 +137,7 @@ class ArtistsController extends GetxController {
       artists.assignAll(_applySort(list));
       _refreshRecentArtists(list);
     } catch (e) {
-      print('Error loading artists: $e');
+      debugPrint('Error loading artists: $e');
     } finally {
       isLoading.value = false;
     }
@@ -172,12 +212,11 @@ class ArtistsController extends GetxController {
     String? thumbnail,
     String? thumbnailLocalPath,
   }) async {
-    final normalizedNewKey = ArtistProfile.normalizeKey(newName);
-    final profiles = await _artistStore.readAll();
-    final existing = profiles.where((p) => p.key == key).toList();
+    final normalizedCurrentKey = ArtistCreditParser.normalizeKey(key);
+    final normalizedNewKey = ArtistCreditParser.normalizeKey(newName);
 
-    if (key != normalizedNewKey) {
-      await _artistStore.remove(key);
+    if (normalizedCurrentKey != normalizedNewKey) {
+      await _artistStore.remove(normalizedCurrentKey);
     }
 
     final profile = ArtistProfile(
@@ -188,25 +227,19 @@ class ArtistsController extends GetxController {
     );
     await _artistStore.upsert(profile);
 
-    if (key != normalizedNewKey || newName.trim().isNotEmpty) {
-      final all = await _store.readAll();
-      for (final item in all) {
-        final itemKey = ArtistProfile.normalizeKey(item.subtitle);
-        if (itemKey != key) continue;
-        final updated = item.copyWith(subtitle: profile.displayName);
-        await _store.upsert(updated);
-      }
-    }
+    final all = await _store.readAll();
+    for (final item in all) {
+      final credits = ArtistCreditParser.parse(item.subtitle);
+      if (!credits.containsArtistKey(normalizedCurrentKey)) continue;
 
-    if (existing.isEmpty && key != normalizedNewKey) {
-      final all = await _store.readAll();
-      for (final item in all) {
-        final itemKey = ArtistProfile.normalizeKey(item.subtitle);
-        if (itemKey == key) {
-          final updated = item.copyWith(subtitle: profile.displayName);
-          await _store.upsert(updated);
-        }
-      }
+      final nextArtistField = ArtistCreditParser.replaceArtistName(
+        item.subtitle,
+        artistKey: normalizedCurrentKey,
+        newName: profile.displayName,
+      );
+
+      if (nextArtistField == item.subtitle.trim()) continue;
+      await _store.upsert(item.copyWith(subtitle: nextArtistField));
     }
 
     await load();
@@ -214,6 +247,8 @@ class ArtistsController extends GetxController {
 
   Future<void> removeLocalArtist(ArtistGroup artist) async {
     for (final item in artist.items) {
+      final credits = ArtistCreditParser.parse(item.subtitle);
+      if (!credits.isPrimaryArtistKey(artist.key)) continue;
       for (final v in item.variants) {
         await _deleteFile(v.localPath);
       }

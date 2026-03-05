@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
 import '../../../app/controllers/media_actions_controller.dart';
+import '../../../app/utils/artist_credit_parser.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../../../app/routes/app_routes.dart';
 import '../controller/artists_controller.dart';
@@ -47,6 +48,18 @@ class ArtistDetailPage extends GetView<ArtistsController> {
       }
 
       final resolved = artist;
+      final primarySongs = resolved.items.where((item) {
+        final credits = ArtistCreditParser.parse(item.subtitle);
+        return credits.isPrimaryArtistKey(resolved.key);
+      }).toList();
+      final collaborationSongs = resolved.items.where((item) {
+        final credits = ArtistCreditParser.parse(item.subtitle);
+        return credits.isCollaborationForArtistKey(resolved.key);
+      }).toList();
+      final displayQueue = <MediaItem>[
+        ...primarySongs,
+        ...collaborationSongs,
+      ];
 
       final thumb = resolved.thumbnailLocalPath ?? resolved.thumbnail;
 
@@ -115,33 +128,93 @@ class ArtistDetailPage extends GetView<ArtistsController> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Canciones',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                _SongSection(
+                  title: 'Canciones',
+                  subtitle: '${primarySongs.length} como artista principal',
+                  items: primarySongs,
+                  onPlay: (item) => home.openMedia(
+                    item,
+                    displayQueue.indexWhere((entry) => entry.id == item.id),
+                    displayQueue,
+                  ),
+                  onMore: (item) => actions.showItemActions(
+                    context,
+                    item,
+                    onChanged: controller.load,
                   ),
                 ),
-                const SizedBox(height: 8),
-                for (int i = 0; i < resolved.items.length; i++)
-                  _SongTile(
-                    item: resolved.items[i],
-                    onPlay: () => home.openMedia(
-                      resolved.items[i],
-                      i,
-                      resolved.items,
+                if (collaborationSongs.isNotEmpty) ...[
+                  const SizedBox(height: 20),
+                  _SongSection(
+                    title: 'Colaboraciones',
+                    subtitle: '${collaborationSongs.length} como invitado',
+                    items: collaborationSongs,
+                    onPlay: (item) => home.openMedia(
+                      item,
+                      displayQueue.indexWhere((entry) => entry.id == item.id),
+                      displayQueue,
                     ),
-                    onMore: () => actions.showItemActions(
+                    onMore: (item) => actions.showItemActions(
                       context,
-                      resolved.items[i],
+                      item,
                       onChanged: controller.load,
                     ),
                   ),
+                ],
               ],
             ),
           ),
         ),
       );
     });
+  }
+}
+
+class _SongSection extends StatelessWidget {
+  const _SongSection({
+    required this.title,
+    required this.subtitle,
+    required this.items,
+    required this.onPlay,
+    required this.onMore,
+  });
+
+  final String title;
+  final String subtitle;
+  final List<MediaItem> items;
+  final ValueChanged<MediaItem> onPlay;
+  final ValueChanged<MediaItem> onMore;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        for (final item in items)
+          _SongTile(
+            item: item,
+            onPlay: () => onPlay(item),
+            onMore: () => onMore(item),
+          ),
+      ],
+    );
   }
 }
 

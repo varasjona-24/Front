@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/models/media_item.dart';
+import '../../../app/utils/artist_credit_parser.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/controllers/navigation_controller.dart';
 import '../../artists/controller/artists_controller.dart';
@@ -273,7 +274,46 @@ class _EditEntityPageState extends State<EditEntityPage> {
     });
   }
 
+  bool _shouldWarnAboutTitleCollaboration() {
+    if (!_isMedia) return false;
+
+    final title = _titleCtrl.text.trim();
+    final artistField = _subtitleCtrl.text.trim();
+
+    if (!ArtistCreditParser.titleSuggestsCollaboration(title)) return false;
+    return !ArtistCreditParser.artistFieldHasCollaborators(artistField);
+  }
+
+  Future<bool> _confirmTitleCollaborationWarning() async {
+    if (!_shouldWarnAboutTitleCollaboration()) return true;
+
+    final result = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('Posible colaboracion'),
+        content: const Text(
+          'Se detecto un posible feat/ft en el titulo. Si quieres que esta cancion aparezca como colaboracion entre artistas, mueve los invitados al campo Artista.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton.tonal(
+            onPressed: () => Get.back(result: true),
+            child: const Text('Guardar igual'),
+          ),
+        ],
+      ),
+      barrierDismissible: true,
+    );
+
+    return result == true;
+  }
+
   Future<void> _save() async {
+    final canContinue = await _confirmTitleCollaborationWarning();
+    if (!canContinue) return;
+
     final ok = _args.type == EditEntityType.media
         ? await _controller.saveMedia(
             item: _media!,
@@ -329,7 +369,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       return Image.network(
         thumb,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackThumb(theme),
+        errorBuilder: (context, error, stackTrace) => _fallbackThumb(theme),
       );
     }
 
@@ -337,7 +377,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       return Image.file(
         File(thumb),
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _fallbackThumb(theme),
+        errorBuilder: (context, error, stackTrace) => _fallbackThumb(theme),
       );
     }
 
@@ -693,7 +733,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
                             ? Color(_colorValue!)
                             : theme.colorScheme.primary,
                         onChanged: (c) => setState(() {
-                          _colorValue = c.value;
+                          _colorValue = c.toARGB32();
                         }),
                       ),
                     ],

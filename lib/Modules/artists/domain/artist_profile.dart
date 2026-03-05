@@ -1,3 +1,5 @@
+import '../../../app/utils/artist_credit_parser.dart';
+
 class ArtistProfile {
   final String key;
   final String displayName;
@@ -42,7 +44,6 @@ class ArtistProfile {
   }
 
   static String normalizeKey(String raw) {
-    final s = raw.trim().toLowerCase();
-    return s.isEmpty ? 'unknown' : s;
+    return ArtistCreditParser.normalizeKey(raw);
   }
 }
