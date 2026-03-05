@@ -18,12 +18,24 @@ class AudioVisualizerService {
 
   StreamSubscription<dynamic>? _eventSub;
   int? _attachedSessionId;
+  int? _attachedBarCount;
+  String? _attachedCaptureMode;
 
   Stream<List<double>> get barsStream => _barsController.stream;
 
-  Future<void> attachToSession(int sessionId, {int barCount = 64}) async {
+  Future<void> attachToSession(
+    int sessionId, {
+    int barCount = 64,
+    String captureMode = 'waveform',
+  }) async {
     if (!Platform.isAndroid || sessionId <= 0) return;
-    if (_attachedSessionId == sessionId) return;
+    final normalizedMode = captureMode == 'fft' ? 'fft' : 'waveform';
+    final desiredBarCount = barCount.clamp(16, 128);
+    if (_attachedSessionId == sessionId &&
+        _attachedBarCount == desiredBarCount &&
+        _attachedCaptureMode == normalizedMode) {
+      return;
+    }
 
     final granted = await _ensureMicrophonePermission();
     if (!granted) {
@@ -34,9 +46,12 @@ class AudioVisualizerService {
 
     await _methodChannel.invokeMethod('attach', {
       'sessionId': sessionId,
-      'barCount': barCount,
+      'barCount': desiredBarCount,
+      'captureMode': normalizedMode,
     });
     _attachedSessionId = sessionId;
+    _attachedBarCount = desiredBarCount;
+    _attachedCaptureMode = normalizedMode;
   }
 
   Future<void> detach() async {
@@ -47,6 +62,8 @@ class AudioVisualizerService {
       debugPrint('audio visualizer detach error: $e');
     } finally {
       _attachedSessionId = null;
+      _attachedBarCount = null;
+      _attachedCaptureMode = null;
     }
   }
 

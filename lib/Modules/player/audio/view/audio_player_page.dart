@@ -24,6 +24,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
       CoverStyle.square => Icons.crop_square_rounded,
       CoverStyle.vinyl => Icons.album_rounded,
       CoverStyle.wave => Icons.graphic_eq_rounded,
+      CoverStyle.miniSpectrum => Icons.equalizer_rounded,
     };
   }
 
@@ -32,6 +33,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
       CoverStyle.square => 'normal',
       CoverStyle.vinyl => 'disco',
       CoverStyle.wave => 'ondas',
+      CoverStyle.miniSpectrum => 'mini espectro',
     };
   }
 

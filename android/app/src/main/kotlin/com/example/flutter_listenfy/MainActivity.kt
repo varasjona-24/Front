@@ -39,6 +39,9 @@ import kotlin.math.log10
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
+import kotlin.math.floor
+import kotlin.math.ceil
+import kotlin.math.pow
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AudioServiceActivity() {
@@ -65,6 +68,7 @@ class MainActivity : AudioServiceActivity() {
     private var audioVisualizer: Visualizer? = null
     private var audioVisualizerSink: EventChannel.EventSink? = null
     private var audioVisualizerSessionId: Int? = null
+    private var audioVisualizerMode: String = "waveform"
     private var audioVisualizerBarCount: Int = 72
     private var audioVisualizerLastBars: DoubleArray = DoubleArray(0)
     private var audioVisualizerLastEmitAtMs: Long = 0L
@@ -582,9 +586,16 @@ class MainActivity : AudioServiceActivity() {
 
                         val barCount = numberAsInt(call.argument<Any>("barCount"), 72)
                             .coerceIn(16, 128)
+                        val captureMode = (call.argument<String>("captureMode") ?: "waveform")
+                            .trim()
+                            .lowercase()
 
                         try {
-                            attachAudioVisualizer(sessionId = sessionId, barCount = barCount)
+                            attachAudioVisualizer(
+                                sessionId = sessionId,
+                                barCount = barCount,
+                                mode = captureMode
+                            )
                             result.success(true)
                         } catch (e: Throwable) {
                             result.error(
@@ -951,9 +962,14 @@ class MainActivity : AudioServiceActivity() {
         )
     }
 
-    private fun attachAudioVisualizer(sessionId: Int, barCount: Int) {
+    private fun attachAudioVisualizer(sessionId: Int, barCount: Int, mode: String) {
         if (sessionId <= 0) throw IllegalArgumentException("sessionId invalido")
-        if (audioVisualizer != null && audioVisualizerSessionId == sessionId) {
+        val normalizedMode = if (mode == "fft") "fft" else "waveform"
+        if (
+            audioVisualizer != null &&
+            audioVisualizerSessionId == sessionId &&
+            audioVisualizerMode == normalizedMode
+        ) {
             audioVisualizerBarCount = barCount
             return
         }
@@ -975,6 +991,9 @@ class MainActivity : AudioServiceActivity() {
         audioVisualizerBarCount = barCount.coerceIn(16, 128)
         audioVisualizerLastBars = DoubleArray(audioVisualizerBarCount) { 0.0 }
         audioVisualizerSessionId = sessionId
+        audioVisualizerMode = normalizedMode
+        val useWaveform = normalizedMode == "waveform"
+        val useFft = normalizedMode == "fft"
 
         val captureRate = (Visualizer.getMaxCaptureRate() / 2).coerceAtLeast(8_000)
         visualizer.setDataCaptureListener(
@@ -984,8 +1003,11 @@ class MainActivity : AudioServiceActivity() {
                     waveform: ByteArray?,
                     samplingRate: Int
                 ) {
-                    if (waveform == null || waveform.isEmpty()) return
-                    val bars = buildRealtimeBars(waveform, audioVisualizerBarCount)
+                    if (!useWaveform || waveform == null || waveform.isEmpty()) return
+                    val bars = buildRealtimeBarsFromWaveform(
+                        waveform = waveform,
+                        barCount = audioVisualizerBarCount
+                    )
                     emitAudioVisualizerBars(bars)
                 }
 
@@ -994,12 +1016,18 @@ class MainActivity : AudioServiceActivity() {
                     fft: ByteArray?,
                     samplingRate: Int
                 ) {
-                    // no-op: usamos waveform para modo ondas.
+                    if (!useFft || fft == null || fft.isEmpty()) return
+                    val bars = buildRealtimeBarsFromFft(
+                        fft = fft,
+                        barCount = audioVisualizerBarCount,
+                        samplingRateMilliHz = samplingRate
+                    )
+                    emitAudioVisualizerBars(bars)
                 }
             },
             captureRate,
-            true,
-            false
+            useWaveform,
+            useFft
         )
 
         visualizer.enabled = true
@@ -1021,6 +1049,7 @@ class MainActivity : AudioServiceActivity() {
         }
         audioVisualizer = null
         audioVisualizerSessionId = null
+        audioVisualizerMode = "waveform"
         audioVisualizerLastBars = DoubleArray(0)
         audioVisualizerLastEmitAtMs = 0L
     }
@@ -1032,10 +1061,10 @@ class MainActivity : AudioServiceActivity() {
         return out
     }
 
-    private fun buildRealtimeBars(waveform: ByteArray, barCount: Int): List<Double> {
+    private fun buildRealtimeBarsFromWaveform(waveform: ByteArray, barCount: Int): List<Double> {
         if (barCount <= 0 || waveform.isEmpty()) return emptyList()
 
-        val count = barCount.coerceAtLeast(1)
+        val count = barCount.coerceIn(16, 128)
         val samplesPerBar = maxOf(1, waveform.size / count)
         val raw = DoubleArray(count) { 0.0 }
 
@@ -1057,10 +1086,104 @@ class MainActivity : AudioServiceActivity() {
 
         val out = MutableList(count) { 0.0 }
         for (i in 0 until count) {
-            val smoothed = audioVisualizerLastBars[i] * 0.70 + raw[i] * 0.30
+            val prev = audioVisualizerLastBars[i]
+            val target = raw[i]
+            val attack = 0.52
+            val release = 0.20
+            val alpha = if (target >= prev) attack else release
+            val smoothed = (prev + (target - prev) * alpha).coerceIn(0.0, 1.0)
             audioVisualizerLastBars[i] = smoothed
-            out[i] = smoothed.coerceIn(0.02, 1.0)
+            out[i] = smoothed.coerceIn(0.0, 1.0)
         }
+
+        return out
+    }
+
+    private fun buildRealtimeBarsFromFft(
+        fft: ByteArray,
+        barCount: Int,
+        samplingRateMilliHz: Int
+    ): List<Double> {
+        if (barCount <= 0 || fft.isEmpty()) return emptyList()
+
+        val count = barCount.coerceIn(16, 128)
+        val n = fft.size
+        if (n < 4) return emptyList()
+
+        val sampleRateHz = if (samplingRateMilliHz > 300_000) {
+            (samplingRateMilliHz / 1000.0).coerceAtLeast(8_000.0)
+        } else {
+            samplingRateMilliHz.toDouble().coerceAtLeast(8_000.0)
+        }
+        val nyquist = (sampleRateHz / 2.0).coerceAtLeast(2_000.0)
+        val fMin = 35.0
+        val fMax = minOf(16_000.0, nyquist)
+        if (fMax <= fMin) return emptyList()
+
+        // Basado en el layout oficial de Visualizer.getFft(): [Rf0, Rf(n/2), Rf1, If1, ...]
+        val magnitudes = DoubleArray(n / 2 + 1) { 0.0 }
+        magnitudes[0] = abs(fft[0].toInt()).toDouble()
+        magnitudes[n / 2] = abs(fft[1].toInt()).toDouble()
+        for (k in 1 until (n / 2)) {
+            val i = k * 2
+            val real = fft[i].toDouble()
+            val imag = fft[i + 1].toDouble()
+            magnitudes[k] = sqrt(real * real + imag * imag)
+        }
+
+        val raw = DoubleArray(count) { 0.0 }
+        for (band in 0 until count) {
+            val t0 = band.toDouble() / count.toDouble()
+            val t1 = (band + 1).toDouble() / count.toDouble()
+            val startHz = fMin * (fMax / fMin).pow(t0)
+            val endHz = fMin * (fMax / fMin).pow(t1)
+
+            val startBin = floor((startHz * n) / sampleRateHz).toInt().coerceIn(1, n / 2)
+            val endBin = ceil((endHz * n) / sampleRateHz).toInt().coerceIn(startBin, n / 2)
+
+            var peak = 0.0
+            var sumSq = 0.0
+            var points = 0
+            for (k in startBin..endBin) {
+                val mag = magnitudes[k].coerceAtLeast(1e-6)
+                val db = 20.0 * log10(mag)
+                val normalized = ((db + 74.0) / 64.0).coerceIn(0.0, 1.0)
+                if (normalized > peak) peak = normalized
+                sumSq += normalized * normalized
+                points += 1
+            }
+
+            val energy = if (points > 0) sqrt(sumSq / points.toDouble()) else 0.0
+            val mixed = (peak * 0.60 + energy * 0.40).coerceIn(0.0, 1.0)
+            raw[band] = sqrt(mixed).coerceIn(0.0, 1.0)
+        }
+
+        if (audioVisualizerLastBars.size != count) {
+            audioVisualizerLastBars = DoubleArray(count) { 0.0 }
+        }
+
+        val envelope = DoubleArray(count) { 0.0 }
+        for (i in 0 until count) {
+            val prev = audioVisualizerLastBars[i]
+            val target = raw[i]
+            val attack = 0.56
+            val release = 0.14
+            val alpha = if (target >= prev) attack else release
+            envelope[i] = (prev + (target - prev) * alpha).coerceIn(0.0, 1.0)
+        }
+
+        val out = MutableList(count) { 0.0 }
+        for (i in 0 until count) {
+            val prev = if (i > 0) envelope[i - 1] else envelope[i]
+            val curr = envelope[i]
+            val next = if (i < count - 1) envelope[i + 1] else envelope[i]
+            val spatial = (prev * 0.18 + curr * 0.64 + next * 0.18).coerceIn(0.0, 1.0)
+            val gated = if (spatial < 0.02) 0.0 else spatial
+            val finalValue = gated.coerceIn(0.0, 1.0)
+            out[i] = finalValue
+            audioVisualizerLastBars[i] = finalValue
+        }
+
         return out
     }
 

@@ -11,7 +11,7 @@ import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
 import '../../../../app/services/spatial_audio_service.dart';
 
-enum CoverStyle { square, vinyl, wave }
+enum CoverStyle { square, vinyl, wave, miniSpectrum }
 
 enum RepeatMode { off, once, loop }
 
