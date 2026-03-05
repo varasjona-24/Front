@@ -3,6 +3,7 @@ import 'package:get_storage/get_storage.dart';
 
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
+import '../../../app/services/audio_cleanup_service.dart';
 import '../../artists/controller/artists_controller.dart';
 import '../../artists/data/artist_store.dart';
 import '../../playlists/controller/playlists_controller.dart';
@@ -25,6 +26,9 @@ class EditEntityBinding extends Bindings {
     }
     if (!Get.isRegistered<MediaRepository>()) {
       Get.put(MediaRepository(), permanent: true);
+    }
+    if (!Get.isRegistered<AudioCleanupService>()) {
+      Get.put(AudioCleanupService(), permanent: true);
     }
     if (!Get.isRegistered<ArtistStore>()) {
       Get.put(ArtistStore(Get.find<GetStorage>()), permanent: true);

@@ -24,15 +24,22 @@ import io.flutter.plugin.common.MethodChannel
 import com.example.flutter_listenfy.widget.PlayerWidgetProvider
 import android.content.Intent
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileOutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.HashMap
 import android.provider.MediaStore
+import kotlin.math.log10
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AudioServiceActivity() {
     private val channel = "listenfy/bluetooth_audio"
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
+    private val audioCleanupChannel = "listenfy/audio_cleanup"
     private val pipChannel = "listenfy/pip"
     private val videoPreviewChannel = "listenfy/video_preview"
     private val widgetChannel = "listenfy/player_widget"
@@ -46,6 +53,18 @@ class MainActivity : AudioServiceActivity() {
     private var reverb: PresetReverb? = null
     private var envReverb: EnvironmentalReverb? = null
     private var loudness: LoudnessEnhancer? = null
+
+    private data class SilenceSegment(
+        val startMs: Int,
+        val endMs: Int,
+        val durationMs: Int,
+        val meanDb: Double
+    )
+
+    private data class FrameRange(
+        val startFrame: Int,
+        val endFrame: Int
+    )
 
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -427,6 +446,82 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, audioCleanupChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "analyzeSilences" -> {
+                        val path = call.argument<String>("path")?.trim().orEmpty()
+                        if (path.isBlank()) {
+                            result.error("NO_PATH", "Path required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val minSilenceMs =
+                            numberAsInt(call.argument<Any>("minSilenceMs"), 4000).coerceAtLeast(500)
+                        val windowMs =
+                            numberAsInt(call.argument<Any>("windowMs"), 50).coerceAtLeast(10)
+                        val thresholdDb =
+                            numberAsDouble(call.argument<Any>("thresholdDb"), -35.0)
+
+                        Thread {
+                            try {
+                                val payload = analyzeSilencesNative(
+                                    path = path,
+                                    minSilenceMs = minSilenceMs,
+                                    windowMs = windowMs,
+                                    thresholdDb = thresholdDb
+                                )
+                                runOnUiThread { result.success(payload) }
+                            } catch (e: Throwable) {
+                                runOnUiThread {
+                                    result.error(
+                                        "ANALYZE_FAIL",
+                                        e.message ?: "Silence analysis failed",
+                                        null
+                                    )
+                                }
+                            }
+                        }.start()
+                    }
+                    "renderCleanedAudio" -> {
+                        val path = call.argument<String>("path")?.trim().orEmpty()
+                        if (path.isBlank()) {
+                            result.error("NO_PATH", "Path required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val fadeMs = numberAsInt(call.argument<Any>("fadeMs"), 20).coerceIn(0, 80)
+                        val rawRanges = call.argument<List<*>>("removeRanges") ?: emptyList<Any>()
+                        val removeRanges = parseRemovalRangesMs(rawRanges)
+
+                        if (removeRanges.isEmpty()) {
+                            result.error("NO_RANGES", "removeRanges required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        Thread {
+                            try {
+                                val payload = renderCleanedAudioNative(
+                                    path = path,
+                                    removeRangesMs = removeRanges,
+                                    fadeMs = fadeMs
+                                )
+                                runOnUiThread { result.success(payload) }
+                            } catch (e: Throwable) {
+                                runOnUiThread {
+                                    result.error(
+                                        "RENDER_FAIL",
+                                        e.message ?: "Audio cleanup failed",
+                                        null
+                                    )
+                                }
+                            }
+                        }.start()
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
     }
 
     override fun onUserLeaveHint() {
@@ -547,6 +642,475 @@ class MainActivity : AudioServiceActivity() {
             .trim()
             .replace(Regex("\\s+"), "_")
         return if (sanitized.isBlank()) "video" else sanitized
+    }
+
+    private fun numberAsInt(value: Any?, fallback: Int): Int {
+        return when (value) {
+            is Int -> value
+            is Long -> value.toInt()
+            is Double -> value.roundToInt()
+            is Float -> value.roundToInt()
+            is String -> value.toDoubleOrNull()?.roundToInt() ?: fallback
+            else -> fallback
+        }
+    }
+
+    private fun numberAsDouble(value: Any?, fallback: Double): Double {
+        return when (value) {
+            is Int -> value.toDouble()
+            is Long -> value.toDouble()
+            is Double -> value
+            is Float -> value.toDouble()
+            is String -> value.toDoubleOrNull() ?: fallback
+            else -> fallback
+        }
+    }
+
+    private fun parseRemovalRangesMs(rawRanges: List<*>): List<Pair<Int, Int>> {
+        val out = mutableListOf<Pair<Int, Int>>()
+        for (entry in rawRanges) {
+            if (entry !is Map<*, *>) continue
+            val startMs = numberAsInt(entry["startMs"], -1)
+            val endMs = numberAsInt(entry["endMs"], -1)
+            if (startMs < 0 || endMs <= startMs) continue
+            out.add(startMs to endMs)
+        }
+        return out
+    }
+
+    private fun normalizePathForMediaExtractor(path: String): String {
+        return path.removePrefix("file://").trim()
+    }
+
+    private fun analyzeSilencesNative(
+        path: String,
+        minSilenceMs: Int,
+        windowMs: Int,
+        thresholdDb: Double
+    ): Map<String, Any> {
+        val normalizedPath = normalizePathForMediaExtractor(path)
+        val pcm = OpenALBridge.decodeToPcm(normalizedPath)
+            ?: throw IllegalStateException("No se pudo decodificar audio.")
+
+        val sampleRate = pcm.sampleRate.coerceAtLeast(1)
+        val channels = pcm.channels.coerceAtLeast(1)
+        val bytes = pcm.bytes
+        val totalFrames = bytes.size / (2 * channels)
+        val durationMs = ((totalFrames * 1000L) / sampleRate).toInt()
+
+        if (totalFrames <= 0) {
+            return mapOf(
+                "durationMs" to 0,
+                "sampleRate" to sampleRate,
+                "channels" to channels,
+                "segments" to emptyList<Map<String, Any>>()
+            )
+        }
+
+        val windowFrames = ((windowMs.toLong() * sampleRate) / 1000L).toInt().coerceAtLeast(1)
+        val rawSegments = mutableListOf<SilenceSegment>()
+
+        var frame = 0
+        var inSilence = false
+        var silenceStartFrame = 0
+        var silenceDbSum = 0.0
+        var silenceWindowCount = 0
+
+        while (frame < totalFrames) {
+            val endFrame = minOf(totalFrames, frame + windowFrames)
+            val windowDb = computeWindowDb(bytes, frame, endFrame, channels)
+            val isSilence = windowDb <= thresholdDb
+
+            if (isSilence) {
+                if (!inSilence) {
+                    inSilence = true
+                    silenceStartFrame = frame
+                    silenceDbSum = 0.0
+                    silenceWindowCount = 0
+                }
+                silenceDbSum += windowDb
+                silenceWindowCount += 1
+            } else if (inSilence) {
+                finalizeSilenceSegment(
+                    startFrame = silenceStartFrame,
+                    endFrame = frame,
+                    sampleRate = sampleRate,
+                    dbSum = silenceDbSum,
+                    windowCount = silenceWindowCount,
+                    minSilenceMs = minSilenceMs
+                )?.let(rawSegments::add)
+                inSilence = false
+            }
+
+            frame = endFrame
+        }
+
+        if (inSilence) {
+            finalizeSilenceSegment(
+                startFrame = silenceStartFrame,
+                endFrame = totalFrames,
+                sampleRate = sampleRate,
+                dbSum = silenceDbSum,
+                windowCount = silenceWindowCount,
+                minSilenceMs = minSilenceMs
+            )?.let(rawSegments::add)
+        }
+
+        val merged = mergeCloseSilenceSegments(
+            rawSegments,
+            maxGapMs = (windowMs * 2).coerceAtLeast(20)
+        )
+
+        return mapOf(
+            "durationMs" to durationMs,
+            "sampleRate" to sampleRate,
+            "channels" to channels,
+            "segments" to merged.map { seg ->
+                mapOf(
+                    "startMs" to seg.startMs,
+                    "endMs" to seg.endMs,
+                    "durationMs" to seg.durationMs,
+                    "meanDb" to seg.meanDb
+                )
+            }
+        )
+    }
+
+    private fun renderCleanedAudioNative(
+        path: String,
+        removeRangesMs: List<Pair<Int, Int>>,
+        fadeMs: Int
+    ): Map<String, Any> {
+        val normalizedPath = normalizePathForMediaExtractor(path)
+        val pcm = OpenALBridge.decodeToPcm(normalizedPath)
+            ?: throw IllegalStateException("No se pudo decodificar audio.")
+
+        val sampleRate = pcm.sampleRate.coerceAtLeast(1)
+        val channels = pcm.channels.coerceAtLeast(1)
+        val sourceBytes = pcm.bytes
+        val totalFrames = sourceBytes.size / (2 * channels)
+        if (totalFrames <= 0) {
+            throw IllegalStateException("Audio vacio.")
+        }
+
+        val originalDurationMs = ((totalFrames * 1000L) / sampleRate).toInt()
+        val removeRanges = normalizeRemovalRanges(
+            rangesMs = removeRangesMs,
+            totalFrames = totalFrames,
+            sampleRate = sampleRate
+        )
+        if (removeRanges.isEmpty()) {
+            throw IllegalStateException("No hay rangos validos para recortar.")
+        }
+
+        val keepRanges = buildKeepRanges(removeRanges, totalFrames)
+        if (keepRanges.isEmpty()) {
+            throw IllegalStateException("No se puede eliminar todo el audio.")
+        }
+
+        val cleanedOutput = ByteArrayOutputStream()
+        val joinFrames = mutableListOf<Int>()
+        var writtenFrames = 0
+
+        for ((idx, range) in keepRanges.withIndex()) {
+            val startByte = range.startFrame * channels * 2
+            val endByte = range.endFrame * channels * 2
+            if (endByte <= startByte) continue
+            if (idx > 0) joinFrames.add(writtenFrames)
+            cleanedOutput.write(sourceBytes, startByte, endByte - startByte)
+            writtenFrames += (range.endFrame - range.startFrame)
+        }
+
+        val cleanedPcm = cleanedOutput.toByteArray()
+        val fadeFrames = ((fadeMs.toLong() * sampleRate) / 1000L).toInt().coerceAtLeast(0)
+        if (cleanedPcm.isNotEmpty() && fadeFrames > 0 && joinFrames.isNotEmpty()) {
+            applyJoinFadesPcm16(
+                pcm = cleanedPcm,
+                joinFrames = joinFrames,
+                channels = channels,
+                fadeFrames = fadeFrames
+            )
+        }
+
+        val cleanedDurationMs = ((writtenFrames * 1000L) / sampleRate).toInt()
+        val removedDurationMs = (originalDurationMs - cleanedDurationMs).coerceAtLeast(0)
+        val outputPath = writePcm16Wav(
+            sourcePath = normalizedPath,
+            pcm = cleanedPcm,
+            sampleRate = sampleRate,
+            channels = channels
+        )
+
+        return mapOf(
+            "outputPath" to outputPath,
+            "originalDurationMs" to originalDurationMs,
+            "cleanedDurationMs" to cleanedDurationMs,
+            "removedDurationMs" to removedDurationMs,
+            "sampleRate" to sampleRate,
+            "channels" to channels,
+            "removedSegmentsCount" to removeRanges.size
+        )
+    }
+
+    private fun finalizeSilenceSegment(
+        startFrame: Int,
+        endFrame: Int,
+        sampleRate: Int,
+        dbSum: Double,
+        windowCount: Int,
+        minSilenceMs: Int
+    ): SilenceSegment? {
+        if (endFrame <= startFrame) return null
+        val startMs = ((startFrame * 1000L) / sampleRate).toInt()
+        val endMs = ((endFrame * 1000L) / sampleRate).toInt()
+        val durationMs = (endMs - startMs).coerceAtLeast(0)
+        if (durationMs < minSilenceMs) return null
+
+        val meanDbRaw = if (windowCount > 0) dbSum / windowCount.toDouble() else -120.0
+        val meanDb = ((meanDbRaw * 100.0).roundToInt()) / 100.0
+        return SilenceSegment(
+            startMs = startMs,
+            endMs = endMs,
+            durationMs = durationMs,
+            meanDb = meanDb
+        )
+    }
+
+    private fun mergeCloseSilenceSegments(
+        segments: List<SilenceSegment>,
+        maxGapMs: Int
+    ): List<SilenceSegment> {
+        if (segments.isEmpty()) return emptyList()
+
+        val sorted = segments.sortedBy { it.startMs }
+        val merged = mutableListOf<SilenceSegment>()
+        var current = sorted.first()
+
+        for (i in 1 until sorted.size) {
+            val next = sorted[i]
+            if (next.startMs - current.endMs <= maxGapMs) {
+                val mergedEnd = maxOf(current.endMs, next.endMs)
+                val mergedDuration = (mergedEnd - current.startMs).coerceAtLeast(0)
+                val dbWeight = (current.durationMs + next.durationMs).coerceAtLeast(1)
+                val weightedDb =
+                    (current.meanDb * current.durationMs + next.meanDb * next.durationMs) /
+                        dbWeight.toDouble()
+                current = SilenceSegment(
+                    startMs = current.startMs,
+                    endMs = mergedEnd,
+                    durationMs = mergedDuration,
+                    meanDb = ((weightedDb * 100.0).roundToInt()) / 100.0
+                )
+            } else {
+                merged.add(current)
+                current = next
+            }
+        }
+
+        merged.add(current)
+        return merged
+    }
+
+    private fun normalizeRemovalRanges(
+        rangesMs: List<Pair<Int, Int>>,
+        totalFrames: Int,
+        sampleRate: Int
+    ): List<FrameRange> {
+        if (rangesMs.isEmpty() || totalFrames <= 0) return emptyList()
+
+        val frameRanges = mutableListOf<FrameRange>()
+        for ((startMs, endMs) in rangesMs) {
+            val startFrame =
+                ((startMs.toLong() * sampleRate) / 1000L).toInt().coerceIn(0, totalFrames)
+            val endFrame =
+                ((endMs.toLong() * sampleRate) / 1000L).toInt().coerceIn(0, totalFrames)
+            if (endFrame > startFrame) {
+                frameRanges.add(FrameRange(startFrame, endFrame))
+            }
+        }
+
+        if (frameRanges.isEmpty()) return emptyList()
+
+        val sorted = frameRanges.sortedBy { it.startFrame }
+        val merged = mutableListOf<FrameRange>()
+        var current = sorted.first()
+
+        for (i in 1 until sorted.size) {
+            val next = sorted[i]
+            if (next.startFrame <= current.endFrame) {
+                current = FrameRange(
+                    startFrame = current.startFrame,
+                    endFrame = maxOf(current.endFrame, next.endFrame)
+                )
+            } else {
+                merged.add(current)
+                current = next
+            }
+        }
+        merged.add(current)
+
+        return merged
+    }
+
+    private fun buildKeepRanges(removeRanges: List<FrameRange>, totalFrames: Int): List<FrameRange> {
+        if (totalFrames <= 0) return emptyList()
+        if (removeRanges.isEmpty()) return listOf(FrameRange(0, totalFrames))
+
+        val keep = mutableListOf<FrameRange>()
+        var cursor = 0
+
+        for (remove in removeRanges) {
+            if (remove.startFrame > cursor) {
+                keep.add(FrameRange(cursor, remove.startFrame))
+            }
+            cursor = maxOf(cursor, remove.endFrame)
+        }
+
+        if (cursor < totalFrames) {
+            keep.add(FrameRange(cursor, totalFrames))
+        }
+
+        return keep.filter { it.endFrame > it.startFrame }
+    }
+
+    private fun computeWindowDb(
+        bytes: ByteArray,
+        startFrame: Int,
+        endFrame: Int,
+        channels: Int
+    ): Double {
+        var sumSquares = 0.0
+        var count = 0
+
+        for (frame in startFrame until endFrame) {
+            val base = frame * channels
+            for (ch in 0 until channels) {
+                val sample = readPcm16Sample(bytes, base + ch).toDouble() / 32768.0
+                sumSquares += sample * sample
+                count += 1
+            }
+        }
+
+        if (count <= 0) return -120.0
+        val rms = sqrt(sumSquares / count.toDouble())
+        if (rms <= 1e-9) return -120.0
+        return (20.0 * log10(rms)).coerceAtLeast(-120.0)
+    }
+
+    private fun readPcm16Sample(bytes: ByteArray, sampleIndex: Int): Int {
+        val offset = sampleIndex * 2
+        if (offset < 0 || offset + 1 >= bytes.size) return 0
+        val low = bytes[offset].toInt() and 0xFF
+        val high = bytes[offset + 1].toInt()
+        return (high shl 8) or low
+    }
+
+    private fun writePcm16Sample(bytes: ByteArray, sampleIndex: Int, value: Int) {
+        val offset = sampleIndex * 2
+        if (offset < 0 || offset + 1 >= bytes.size) return
+        val clamped = value.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+        bytes[offset] = (clamped and 0xFF).toByte()
+        bytes[offset + 1] = ((clamped shr 8) and 0xFF).toByte()
+    }
+
+    private fun applyJoinFadesPcm16(
+        pcm: ByteArray,
+        joinFrames: List<Int>,
+        channels: Int,
+        fadeFrames: Int
+    ) {
+        if (fadeFrames <= 0 || joinFrames.isEmpty()) return
+        val totalFrames = pcm.size / (2 * channels)
+        if (totalFrames <= 1) return
+
+        for (join in joinFrames) {
+            if (join <= 0 || join >= totalFrames) continue
+
+            val leftFrames = minOf(fadeFrames, join)
+            for (i in 0 until leftFrames) {
+                val frame = join - leftFrames + i
+                val t = (i + 1).toDouble() / (leftFrames + 1).toDouble()
+                val gain = (1.0 - t).coerceIn(0.0, 1.0)
+                for (ch in 0 until channels) {
+                    val sampleIndex = frame * channels + ch
+                    val sample = readPcm16Sample(pcm, sampleIndex)
+                    writePcm16Sample(
+                        pcm,
+                        sampleIndex,
+                        (sample.toDouble() * gain).roundToInt()
+                    )
+                }
+            }
+
+            val rightFrames = minOf(fadeFrames, totalFrames - join)
+            for (i in 0 until rightFrames) {
+                val frame = join + i
+                val t = (i + 1).toDouble() / (rightFrames + 1).toDouble()
+                val gain = t.coerceIn(0.0, 1.0)
+                for (ch in 0 until channels) {
+                    val sampleIndex = frame * channels + ch
+                    val sample = readPcm16Sample(pcm, sampleIndex)
+                    writePcm16Sample(
+                        pcm,
+                        sampleIndex,
+                        (sample.toDouble() * gain).roundToInt()
+                    )
+                }
+            }
+        }
+    }
+
+    private fun writePcm16Wav(
+        sourcePath: String,
+        pcm: ByteArray,
+        sampleRate: Int,
+        channels: Int
+    ): String {
+        val sourceFile = File(sourcePath)
+        val safeBaseName = sanitizeFileName(
+            sourceFile.nameWithoutExtension.ifBlank { "audio" }
+        )
+        val mediaDir = File(filesDir, "media")
+        if (!mediaDir.exists() && !mediaDir.mkdirs()) {
+            throw IllegalStateException("No se pudo crear carpeta de salida.")
+        }
+
+        val outputFile = File(
+            mediaDir,
+            "${safeBaseName}_clean_${System.currentTimeMillis()}.wav"
+        )
+
+        val bitsPerSample = 16
+        val byteRate = sampleRate * channels * bitsPerSample / 8
+        val blockAlign = channels * bitsPerSample / 8
+        val dataSize = pcm.size
+        val riffChunkSize = 36 + dataSize
+
+        val header = ByteBuffer.allocate(44)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .apply {
+                put("RIFF".toByteArray(Charsets.US_ASCII))
+                putInt(riffChunkSize)
+                put("WAVE".toByteArray(Charsets.US_ASCII))
+                put("fmt ".toByteArray(Charsets.US_ASCII))
+                putInt(16)
+                putShort(1.toShort())
+                putShort(channels.toShort())
+                putInt(sampleRate)
+                putInt(byteRate)
+                putShort(blockAlign.toShort())
+                putShort(bitsPerSample.toShort())
+                put("data".toByteArray(Charsets.US_ASCII))
+                putInt(dataSize)
+            }
+
+        FileOutputStream(outputFile).use { fos ->
+            fos.write(header.array())
+            fos.write(pcm)
+            fos.flush()
+        }
+
+        return outputFile.absolutePath
     }
 
     private fun releaseSpatial() {

@@ -7,7 +7,9 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
+import '../../../app/models/audio_cleanup.dart';
 import '../../../app/models/media_item.dart';
+import '../../../app/services/audio_cleanup_service.dart';
 import '../../artists/controller/artists_controller.dart';
 import '../../downloads/controller/downloads_controller.dart';
 import '../../home/controller/home_controller.dart';
@@ -28,39 +30,39 @@ class EditEntityArgs {
   final SourceThemeTopicPlaylist? topicPlaylist;
 
   const EditEntityArgs.media(this.media)
-      : type = EditEntityType.media,
-        artist = null,
-        playlist = null,
-        topic = null,
-        topicPlaylist = null;
+    : type = EditEntityType.media,
+      artist = null,
+      playlist = null,
+      topic = null,
+      topicPlaylist = null;
 
   const EditEntityArgs.artist(this.artist)
-      : type = EditEntityType.artist,
-        media = null,
-        playlist = null,
-        topic = null,
-        topicPlaylist = null;
+    : type = EditEntityType.artist,
+      media = null,
+      playlist = null,
+      topic = null,
+      topicPlaylist = null;
 
   const EditEntityArgs.playlist(this.playlist)
-      : type = EditEntityType.playlist,
-        media = null,
-        artist = null,
-        topic = null,
-        topicPlaylist = null;
+    : type = EditEntityType.playlist,
+      media = null,
+      artist = null,
+      topic = null,
+      topicPlaylist = null;
 
   const EditEntityArgs.topic(this.topic)
-      : type = EditEntityType.topic,
-        media = null,
-        artist = null,
-        playlist = null,
-        topicPlaylist = null;
+    : type = EditEntityType.topic,
+      media = null,
+      artist = null,
+      playlist = null,
+      topicPlaylist = null;
 
   const EditEntityArgs.topicPlaylist(this.topicPlaylist)
-      : type = EditEntityType.topicPlaylist,
-        media = null,
-        artist = null,
-        playlist = null,
-        topic = null;
+    : type = EditEntityType.topicPlaylist,
+      media = null,
+      artist = null,
+      playlist = null,
+      topic = null;
 }
 
 enum CreateEntityType { playlist, topicPlaylist }
@@ -76,14 +78,12 @@ class CreateEntityArgs {
   final String? parentId;
   final int? depth;
 
-  const CreateEntityArgs.playlist({
-    required this.storageId,
-    this.initialName,
-  })  : type = CreateEntityType.playlist,
-        topicId = null,
-        parentId = null,
-        depth = null,
-        initialColorValue = null;
+  const CreateEntityArgs.playlist({required this.storageId, this.initialName})
+    : type = CreateEntityType.playlist,
+      topicId = null,
+      parentId = null,
+      depth = null,
+      initialColorValue = null;
 
   const CreateEntityArgs.topicPlaylist({
     required this.storageId,
@@ -95,9 +95,22 @@ class CreateEntityArgs {
   }) : type = CreateEntityType.topicPlaylist;
 }
 
+class MediaCleanupAnalysis {
+  const MediaCleanupAnalysis({
+    required this.media,
+    required this.sourcePath,
+    required this.analysis,
+  });
+
+  final MediaItem media;
+  final String sourcePath;
+  final AudioSilenceAnalysis analysis;
+}
+
 class EditEntityController extends GetxController {
   final MediaRepository _repo = Get.find<MediaRepository>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+  final AudioCleanupService _audioCleanup = Get.find<AudioCleanupService>();
   final ArtistsController _artists = Get.find<ArtistsController>();
   final PlaylistsController _playlists = Get.find<PlaylistsController>();
   final SourcesController _sources = Get.find<SourcesController>();
@@ -122,10 +135,7 @@ class EditEntityController extends GetxController {
             lockAspectRatio: true,
             hideBottomControls: true,
           ),
-          IOSUiSettings(
-            title: 'Recortar',
-            aspectRatioLockEnabled: true,
-          ),
+          IOSUiSettings(title: 'Recortar', aspectRatioLockEnabled: true),
         ],
       );
       return cropped?.path;
@@ -173,6 +183,113 @@ class EditEntityController extends GetxController {
     } catch (_) {}
   }
 
+  Future<MediaItem> resolveLatestMedia(MediaItem fallback) async {
+    final all = await _store.readAll();
+    for (final item in all) {
+      if (item.id == fallback.id) return item;
+    }
+    return fallback;
+  }
+
+  Future<MediaCleanupAnalysis?> analyzeMediaSilences({
+    required MediaItem item,
+    int minSilenceMs = 4000,
+    int windowMs = 50,
+    double thresholdDb = -35,
+  }) async {
+    final latest = await resolveLatestMedia(item);
+    final sourcePath = latest.localAudioVariant?.localPath?.trim() ?? '';
+    if (sourcePath.isEmpty) return null;
+
+    final sourceFile = File(sourcePath);
+    if (!await sourceFile.exists()) return null;
+
+    final analysis = await _audioCleanup.analyzeSilences(
+      localPath: sourcePath,
+      minSilenceMs: minSilenceMs,
+      windowMs: windowMs,
+      thresholdDb: thresholdDb,
+    );
+    if (analysis == null) return null;
+
+    return MediaCleanupAnalysis(
+      media: latest,
+      sourcePath: sourcePath,
+      analysis: analysis,
+    );
+  }
+
+  Future<MediaItem?> applyMediaSilenceCleanup({
+    required MediaItem item,
+    required String sourcePath,
+    required List<AudioSilenceSegment> removeSegments,
+    int fadeMs = 20,
+  }) async {
+    if (removeSegments.isEmpty) return null;
+
+    final latest = await resolveLatestMedia(item);
+    final result = await _audioCleanup.renderCleanedAudio(
+      localPath: sourcePath.trim(),
+      removeSegments: removeSegments,
+      fadeMs: fadeMs,
+    );
+    if (result == null) return null;
+
+    final outputPath = result.outputPath.trim();
+    if (outputPath.isEmpty) return null;
+
+    final outFile = File(outputPath);
+    if (!await outFile.exists()) return null;
+
+    final format = p.extension(outputPath).replaceFirst('.', '').toLowerCase();
+    final cleanedDurationSeconds = result.cleanedDurationMs > 0
+        ? (result.cleanedDurationMs / 1000).round()
+        : null;
+
+    final cleanedVariant = MediaVariant(
+      kind: MediaVariantKind.audio,
+      format: format.isEmpty ? 'wav' : format,
+      fileName: p.basename(outputPath),
+      localPath: outputPath,
+      createdAt: DateTime.now().millisecondsSinceEpoch,
+      size: await outFile.length(),
+      durationSeconds: cleanedDurationSeconds,
+    );
+
+    final existing = latest.variants.where((v) {
+      final path = v.localPath?.trim();
+      if (path == null || path.isEmpty) return true;
+      return path != outputPath;
+    });
+
+    final updated = latest.copyWith(
+      variants: [cleanedVariant, ...existing],
+      durationSeconds: cleanedDurationSeconds ?? latest.durationSeconds,
+    );
+
+    await _store.upsert(updated);
+    await _refreshDependentControllers();
+    return updated;
+  }
+
+  Future<void> _refreshDependentControllers() async {
+    if (Get.isRegistered<DownloadsController>()) {
+      await Get.find<DownloadsController>().load();
+    }
+    if (Get.isRegistered<HomeController>()) {
+      await Get.find<HomeController>().loadHome();
+    }
+    if (Get.isRegistered<ArtistsController>()) {
+      await Get.find<ArtistsController>().load();
+    }
+    if (Get.isRegistered<PlaylistsController>()) {
+      await Get.find<PlaylistsController>().load();
+    }
+    if (Get.isRegistered<SourcesController>()) {
+      await Get.find<SourcesController>().refreshAll();
+    }
+  }
+
   Future<bool> saveMedia({
     required MediaItem item,
     required String title,
@@ -203,31 +320,17 @@ class EditEntityController extends GetxController {
       }
     }
 
-    final updated = item.copyWith(
+    final latest = await resolveLatestMedia(item);
+    final updated = latest.copyWith(
       title: trimmedTitle,
       subtitle: subtitle.trim(),
       thumbnail: thumbRemoteUpdate,
       thumbnailLocalPath: thumbLocalUpdate,
-      durationSeconds: item.durationSeconds,
+      durationSeconds: latest.durationSeconds,
     );
 
     await _store.upsert(updated);
-
-    if (Get.isRegistered<DownloadsController>()) {
-      await Get.find<DownloadsController>().load();
-    }
-    if (Get.isRegistered<HomeController>()) {
-      await Get.find<HomeController>().loadHome();
-    }
-    if (Get.isRegistered<ArtistsController>()) {
-      await Get.find<ArtistsController>().load();
-    }
-    if (Get.isRegistered<PlaylistsController>()) {
-      await Get.find<PlaylistsController>().load();
-    }
-    if (Get.isRegistered<SourcesController>()) {
-      await Get.find<SourcesController>().refreshAll();
-    }
+    await _refreshDependentControllers();
 
     return true;
   }

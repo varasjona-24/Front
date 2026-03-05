@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../app/models/audio_cleanup.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/utils/artist_credit_parser.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
@@ -38,8 +39,10 @@ class _EditEntityPageState extends State<EditEntityPage> {
   bool _thumbTouched = false;
   bool _thumbCleared = false;
   int? _colorValue;
+  bool _audioCleanupBusy = false;
+  MediaItem? _mediaDraft;
 
-  MediaItem? get _media => _args.media;
+  MediaItem? get _media => _mediaDraft;
   ArtistGroup? get _artist => _args.artist;
   Playlist? get _playlist => _args.playlist;
   SourceThemeTopic? get _topic => _args.topic;
@@ -58,7 +61,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
     }
 
     if (_args.type == EditEntityType.media) {
-      final item = _media!;
+      final item = _args.media!;
+      _mediaDraft = item;
       _titleCtrl = TextEditingController(text: item.title);
       _subtitleCtrl = TextEditingController(text: item.subtitle);
       _durationCtrl = TextEditingController(
@@ -255,9 +259,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
   }
 
   Future<void> _deleteCurrentThumbnail() async {
-    final paths = <String>{
-      if (_localThumbPath != null) _localThumbPath!.trim(),
-    }..removeWhere((e) => e.isEmpty);
+    final paths = <String>{if (_localThumbPath != null) _localThumbPath!.trim()}
+      ..removeWhere((e) => e.isEmpty);
 
     for (final pth in paths) {
       _evictFileImage(pth);
@@ -310,6 +313,246 @@ class _EditEntityPageState extends State<EditEntityPage> {
     return result == true;
   }
 
+  String _formatClockFromMs(int ms) {
+    final safeMs = ms.clamp(0, 24 * 60 * 60 * 1000);
+    final totalSeconds = (safeMs / 1000).floor();
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  String _formatSecondsFromMs(int ms) {
+    final secs = (ms / 1000);
+    return '${secs.toStringAsFixed(secs >= 10 ? 0 : 1)} s';
+  }
+
+  Future<List<AudioSilenceSegment>?> _showAudioCleanupSheet(
+    AudioSilenceAnalysis analysis,
+  ) async {
+    final segments = analysis.segments;
+    if (segments.isEmpty) return null;
+
+    final selected = List<bool>.filled(segments.length, true);
+
+    return showModalBottomSheet<List<AudioSilenceSegment>>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final selectedCount = selected.where((v) => v).length;
+
+            return Padding(
+              padding: EdgeInsets.fromLTRB(
+                16,
+                12,
+                16,
+                16 + MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: SizedBox(
+                height: MediaQuery.of(context).size.height * 0.82,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 42,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Sonido limpio',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Se detectaron silencios mayores a 4 segundos. Marca los que deseas recortar.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    _AudioSilenceTimeline(
+                      durationMs: analysis.durationMs,
+                      segments: segments,
+                      selected: selected,
+                      startLabel: _formatClockFromMs(0),
+                      endLabel: _formatClockFromMs(analysis.durationMs),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Detectados: ${segments.length} - Seleccionados: $selectedCount',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Expanded(
+                      child: ListView.separated(
+                        itemCount: segments.length,
+                        separatorBuilder: (context, _) => Divider(
+                          height: 1,
+                          color: theme.colorScheme.outlineVariant,
+                        ),
+                        itemBuilder: (context, index) {
+                          final segment = segments[index];
+                          return CheckboxListTile(
+                            value: selected[index],
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            onChanged: (v) {
+                              setModalState(() {
+                                selected[index] = v ?? false;
+                              });
+                            },
+                            title: Text(
+                              '${_formatClockFromMs(segment.startMs)} - ${_formatClockFromMs(segment.endMs)}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Duracion: ${_formatSecondsFromMs(segment.durationMs)} - Nivel medio: ${segment.meanDb.toStringAsFixed(1)} dB',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Cancelar'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: selectedCount == 0
+                                ? null
+                                : () {
+                                    final picked = <AudioSilenceSegment>[];
+                                    for (int i = 0; i < segments.length; i++) {
+                                      if (selected[i]) picked.add(segments[i]);
+                                    }
+                                    Navigator.of(context).pop(picked);
+                                  },
+                            child: const Text('Aplicar limpieza'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _runAudioCleanupFlow() async {
+    if (!_isMedia || _media == null || _audioCleanupBusy) return;
+
+    setState(() {
+      _audioCleanupBusy = true;
+    });
+
+    try {
+      final analysisBundle = await _controller.analyzeMediaSilences(
+        item: _media!,
+      );
+      if (!mounted) return;
+
+      if (analysisBundle == null) {
+        Get.snackbar(
+          'Sonido limpio',
+          'Solo funciona con audio local disponible.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      if (analysisBundle.analysis.segments.isEmpty) {
+        Get.snackbar(
+          'Sonido limpio',
+          'No se detectaron silencios mayores a 4 segundos.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final picked = await _showAudioCleanupSheet(analysisBundle.analysis);
+      if (!mounted || picked == null) return;
+
+      if (picked.isEmpty) {
+        Get.snackbar(
+          'Sonido limpio',
+          'No seleccionaste silencios para recortar.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final updated = await _controller.applyMediaSilenceCleanup(
+        item: analysisBundle.media,
+        sourcePath: analysisBundle.sourcePath,
+        removeSegments: picked,
+      );
+      if (!mounted) return;
+
+      if (updated == null) {
+        Get.snackbar(
+          'Sonido limpio',
+          'No se pudo generar el audio limpio.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      setState(() {
+        _mediaDraft = updated;
+        _durationCtrl.text = updated.durationSeconds?.toString() ?? '';
+      });
+
+      Get.snackbar(
+        'Sonido limpio',
+        'Se guardo una variante limpia del audio.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e.toString().replaceFirst('Exception: ', '').trim();
+      Get.snackbar(
+        'Sonido limpio',
+        message.isEmpty ? 'Ocurrio un error al limpiar el audio.' : message,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _audioCleanupBusy = false;
+        });
+      }
+    }
+  }
+
   Future<void> _save() async {
     final canContinue = await _confirmTitleCollaborationWarning();
     if (!canContinue) return;
@@ -323,34 +566,34 @@ class _EditEntityPageState extends State<EditEntityPage> {
             localThumbPath: _localThumbPath,
           )
         : (_args.type == EditEntityType.artist
-            ? await _controller.saveArtist(
-                artist: _artist!,
-                name: _titleCtrl.text,
-                thumbTouched: _thumbTouched,
-                localThumbPath: _localThumbPath,
-              )
-            : (_args.type == EditEntityType.playlist
-                ? await _controller.savePlaylist(
-                    playlist: _playlist!,
-                    name: _titleCtrl.text,
-                    thumbTouched: _thumbTouched,
-                    localThumbPath: _localThumbPath,
-                  )
-                : (_args.type == EditEntityType.topic
-                    ? await _controller.saveTopic(
-                        topic: _topic!,
+              ? await _controller.saveArtist(
+                  artist: _artist!,
+                  name: _titleCtrl.text,
+                  thumbTouched: _thumbTouched,
+                  localThumbPath: _localThumbPath,
+                )
+              : (_args.type == EditEntityType.playlist
+                    ? await _controller.savePlaylist(
+                        playlist: _playlist!,
                         name: _titleCtrl.text,
                         thumbTouched: _thumbTouched,
                         localThumbPath: _localThumbPath,
-                        colorValue: _colorValue,
                       )
-                    : await _controller.saveTopicPlaylist(
-                        playlist: _topicPlaylist!,
-                        name: _titleCtrl.text,
-                        thumbTouched: _thumbTouched,
-                        localThumbPath: _localThumbPath,
-                        colorValue: _colorValue,
-                      ))));
+                    : (_args.type == EditEntityType.topic
+                          ? await _controller.saveTopic(
+                              topic: _topic!,
+                              name: _titleCtrl.text,
+                              thumbTouched: _thumbTouched,
+                              localThumbPath: _localThumbPath,
+                              colorValue: _colorValue,
+                            )
+                          : await _controller.saveTopicPlaylist(
+                              playlist: _topicPlaylist!,
+                              name: _titleCtrl.text,
+                              thumbTouched: _thumbTouched,
+                              localThumbPath: _localThumbPath,
+                              colorValue: _colorValue,
+                            ))));
 
     if (ok && mounted) {
       Get.back(result: true);
@@ -457,7 +700,9 @@ class _EditEntityPageState extends State<EditEntityPage> {
         Card(
           elevation: 0,
           color: theme.colorScheme.surfaceContainer,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: songs.isEmpty
               ? Padding(
                   padding: const EdgeInsets.all(16),
@@ -498,11 +743,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
             ? Icons.videocam_rounded
             : Icons.music_note_rounded,
       ),
-      title: Text(
-        item.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(
         '$kind · $fmt · $size',
         maxLines: 1,
@@ -531,7 +772,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: FilledButton(
-            onPressed: _save,
+            onPressed: _audioCleanupBusy ? null : _save,
             child: const Text('Guardar cambios'),
           ),
         ),
@@ -566,8 +807,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
                           Text(
                             _titleCtrl.text.isEmpty
                                 ? (_args.type == EditEntityType.playlist
-                                    ? 'Sin titulo'
-                                    : 'Sin nombre')
+                                      ? 'Sin titulo'
+                                      : 'Sin nombre')
                                 : _titleCtrl.text,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -634,8 +875,9 @@ class _EditEntityPageState extends State<EditEntityPage> {
                     TextField(
                       controller: _titleCtrl,
                       decoration: InputDecoration(
-                        labelText:
-                            _args.type == EditEntityType.media ? 'Titulo' : 'Nombre',
+                        labelText: _args.type == EditEntityType.media
+                            ? 'Titulo'
+                            : 'Nombre',
                         prefixIcon: Icon(
                           _args.type == EditEntityType.media
                               ? Icons.music_note_rounded
@@ -758,14 +1000,48 @@ class _EditEntityPageState extends State<EditEntityPage> {
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
-                  child: TextField(
-                    controller: _durationCtrl,
-                    readOnly: true,
-                    enableInteractiveSelection: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Duracion detectada automaticamente (s)',
-                      prefixIcon: Icon(Icons.timer_rounded),
-                    ),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _durationCtrl,
+                        readOnly: true,
+                        enableInteractiveSelection: false,
+                        decoration: const InputDecoration(
+                          labelText: 'Duracion detectada automaticamente (s)',
+                          prefixIcon: Icon(Icons.timer_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.tonalIcon(
+                          onPressed: _audioCleanupBusy
+                              ? null
+                              : _runAudioCleanupFlow,
+                          icon: _audioCleanupBusy
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.auto_fix_high_rounded),
+                          label: Text(
+                            _audioCleanupBusy
+                                ? 'Procesando...'
+                                : 'Sonido limpio',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Detecta silencios mayores a 4 segundos y te permite elegir cuales recortar.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -777,6 +1053,88 @@ class _EditEntityPageState extends State<EditEntityPage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AudioSilenceTimeline extends StatelessWidget {
+  const _AudioSilenceTimeline({
+    required this.durationMs,
+    required this.segments,
+    required this.selected,
+    required this.startLabel,
+    required this.endLabel,
+  });
+
+  final int durationMs;
+  final List<AudioSilenceSegment> segments;
+  final List<bool> selected;
+  final String startLabel;
+  final String endLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final totalMs = durationMs > 0 ? durationMs : 1;
+
+    return Column(
+      children: [
+        Container(
+          height: 34,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              return Stack(
+                children: [
+                  for (int i = 0; i < segments.length; i++)
+                    Positioned(
+                      left: width * (segments[i].startMs / totalMs),
+                      width:
+                          (width *
+                                  ((segments[i].endMs - segments[i].startMs) /
+                                      totalMs))
+                              .clamp(2.0, width),
+                      top: 0,
+                      bottom: 0,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: selected[i]
+                              ? theme.colorScheme.error.withValues(alpha: 0.72)
+                              : theme.colorScheme.error.withValues(alpha: 0.28),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              startLabel,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            Text(
+              endLabel,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
