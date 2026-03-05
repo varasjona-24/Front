@@ -19,6 +19,22 @@ class AudioPlayerPage extends StatefulWidget {
 class _AudioPlayerPageState extends State<AudioPlayerPage> {
   late final AudioPlayerController controller;
 
+  IconData _coverStyleIcon(CoverStyle style) {
+    return switch (style) {
+      CoverStyle.square => Icons.crop_square_rounded,
+      CoverStyle.vinyl => Icons.album_rounded,
+      CoverStyle.wave => Icons.graphic_eq_rounded,
+    };
+  }
+
+  String _coverStyleLabel(CoverStyle style) {
+    return switch (style) {
+      CoverStyle.square => 'normal',
+      CoverStyle.vinyl => 'disco',
+      CoverStyle.wave => 'ondas',
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +55,7 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
           child: Obx(() {
             final queue = controller.queue;
             final idx = controller.currentIndex.value;
+            final coverStyle = controller.coverStyle.value;
             final item = (queue.isNotEmpty && idx >= 0 && idx < queue.length)
                 ? queue[idx]
                 : null;
@@ -68,8 +85,9 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Cambiar estilo de portada',
-                        icon: const Icon(Icons.checkroom),
+                        tooltip:
+                            'Visualizador: ${_coverStyleLabel(coverStyle)}',
+                        icon: Icon(_coverStyleIcon(coverStyle)),
                         onPressed: controller.toggleCoverStyle,
                       ),
                       IconButton(

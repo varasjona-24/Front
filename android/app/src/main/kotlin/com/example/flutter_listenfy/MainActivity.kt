@@ -8,6 +8,9 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.util.Rational
 import android.app.PictureInPictureParams
 import android.media.AudioDeviceInfo
@@ -17,9 +20,11 @@ import android.media.audiofx.BassBoost
 import android.media.audiofx.EnvironmentalReverb
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.PresetReverb
+import android.media.audiofx.Visualizer
 import android.media.audiofx.Virtualizer
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import com.example.flutter_listenfy.widget.PlayerWidgetProvider
 import android.content.Intent
@@ -31,6 +36,7 @@ import java.nio.ByteOrder
 import java.util.HashMap
 import android.provider.MediaStore
 import kotlin.math.log10
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 import java.util.concurrent.atomic.AtomicBoolean
@@ -40,6 +46,9 @@ class MainActivity : AudioServiceActivity() {
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
     private val audioCleanupChannel = "listenfy/audio_cleanup"
+    private val audioWaveformChannel = "listenfy/audio_waveform"
+    private val audioVisualizerChannel = "listenfy/audio_visualizer"
+    private val audioVisualizerEventsChannel = "listenfy/audio_visualizer/events"
     private val pipChannel = "listenfy/pip"
     private val videoPreviewChannel = "listenfy/video_preview"
     private val widgetChannel = "listenfy/player_widget"
@@ -53,6 +62,13 @@ class MainActivity : AudioServiceActivity() {
     private var reverb: PresetReverb? = null
     private var envReverb: EnvironmentalReverb? = null
     private var loudness: LoudnessEnhancer? = null
+    private var audioVisualizer: Visualizer? = null
+    private var audioVisualizerSink: EventChannel.EventSink? = null
+    private var audioVisualizerSessionId: Int? = null
+    private var audioVisualizerBarCount: Int = 72
+    private var audioVisualizerLastBars: DoubleArray = DoubleArray(0)
+    private var audioVisualizerLastEmitAtMs: Long = 0L
+    private val uiHandler = Handler(Looper.getMainLooper())
 
     private data class SilenceSegment(
         val startMs: Int,
@@ -522,6 +538,88 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, audioWaveformChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "extractWaveform" -> {
+                        val path = call.argument<String>("path")?.trim().orEmpty()
+                        if (path.isBlank()) {
+                            result.error("NO_PATH", "Path required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val buckets = numberAsInt(call.argument<Any>("buckets"), 72)
+                            .coerceIn(16, 256)
+
+                        Thread {
+                            try {
+                                val payload = extractWaveformNative(path, buckets)
+                                runOnUiThread { result.success(payload) }
+                            } catch (e: Throwable) {
+                                runOnUiThread {
+                                    result.error(
+                                        "WAVEFORM_FAIL",
+                                        e.message ?: "Waveform extraction failed",
+                                        null
+                                    )
+                                }
+                            }
+                        }.start()
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, audioVisualizerChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "attach" -> {
+                        val sessionId = numberAsInt(call.argument<Any>("sessionId"), -1)
+                        if (sessionId <= 0) {
+                            result.error("NO_SESSION", "Valid sessionId required", null)
+                            return@setMethodCallHandler
+                        }
+
+                        val barCount = numberAsInt(call.argument<Any>("barCount"), 72)
+                            .coerceIn(16, 128)
+
+                        try {
+                            attachAudioVisualizer(sessionId = sessionId, barCount = barCount)
+                            result.success(true)
+                        } catch (e: Throwable) {
+                            result.error(
+                                "VISUALIZER_ATTACH_FAIL",
+                                e.message ?: "No se pudo activar visualizador",
+                                null
+                            )
+                        }
+                    }
+                    "detach" -> {
+                        detachAudioVisualizer()
+                        result.success(true)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, audioVisualizerEventsChannel)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    audioVisualizerSink = events
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    audioVisualizerSink = null
+                    detachAudioVisualizer()
+                }
+            })
+
+    }
+
+    override fun onDestroy() {
+        detachAudioVisualizer()
+        releaseSpatial()
+        super.onDestroy()
     }
 
     override fun onUserLeaveHint() {
@@ -774,6 +872,211 @@ class MainActivity : AudioServiceActivity() {
                 )
             }
         )
+    }
+
+    private fun extractWaveformNative(
+        path: String,
+        buckets: Int
+    ): Map<String, Any> {
+        val normalizedPath = normalizePathForMediaExtractor(path)
+        val pcm = OpenALBridge.decodeToPcm(normalizedPath)
+            ?: throw IllegalStateException("No se pudo decodificar audio.")
+
+        val sampleRate = pcm.sampleRate.coerceAtLeast(1)
+        val channels = pcm.channels.coerceAtLeast(1)
+        val bytes = pcm.bytes
+        val totalFrames = bytes.size / (2 * channels)
+        if (totalFrames <= 0) {
+            return mapOf(
+                "durationMs" to 0,
+                "sampleRate" to sampleRate,
+                "channels" to channels,
+                "buckets" to emptyList<Double>()
+            )
+        }
+
+        val durationMs = ((totalFrames * 1000L) / sampleRate).toInt()
+        val bucketCount = buckets.coerceAtLeast(1)
+        val framesPerBucket = maxOf(1, totalFrames / bucketCount)
+        val raw = DoubleArray(bucketCount)
+
+        for (bucket in 0 until bucketCount) {
+            val startFrame = bucket * framesPerBucket
+            val endFrame = if (bucket == bucketCount - 1) {
+                totalFrames
+            } else {
+                minOf(totalFrames, startFrame + framesPerBucket)
+            }
+            if (endFrame <= startFrame) {
+                raw[bucket] = 0.0
+                continue
+            }
+
+            var peak = 0.0
+            for (frame in startFrame until endFrame) {
+                val base = frame * channels
+                for (ch in 0 until channels) {
+                    val sample = abs(readPcm16Sample(bytes, base + ch)) / 32768.0
+                    if (sample > peak) peak = sample
+                }
+            }
+            raw[bucket] = peak
+        }
+
+        var maxValue = 0.0
+        for (v in raw) {
+            if (v > maxValue) maxValue = v
+        }
+
+        val normalized = MutableList(bucketCount) { index ->
+            val value = raw[index]
+            val ratio = if (maxValue > 1e-9) value / maxValue else 0.0
+            ratio.coerceIn(0.0, 1.0)
+        }
+
+        val smoothed = MutableList(bucketCount) { 0.0 }
+        for (i in 0 until bucketCount) {
+            val prev = if (i > 0) normalized[i - 1] else normalized[i]
+            val curr = normalized[i]
+            val next = if (i < bucketCount - 1) normalized[i + 1] else normalized[i]
+            val avg = (prev + curr * 2.0 + next) / 4.0
+            smoothed[i] = avg.coerceIn(0.02, 1.0)
+        }
+
+        return mapOf(
+            "durationMs" to durationMs,
+            "sampleRate" to sampleRate,
+            "channels" to channels,
+            "buckets" to smoothed
+        )
+    }
+
+    private fun attachAudioVisualizer(sessionId: Int, barCount: Int) {
+        if (sessionId <= 0) throw IllegalArgumentException("sessionId invalido")
+        if (audioVisualizer != null && audioVisualizerSessionId == sessionId) {
+            audioVisualizerBarCount = barCount
+            return
+        }
+
+        detachAudioVisualizer()
+
+        val visualizer = Visualizer(sessionId)
+        val range = Visualizer.getCaptureSizeRange()
+        var captureSize = highestPowerOfTwoAtMost(1024).coerceAtLeast(128)
+        captureSize = captureSize.coerceIn(range[0], range[1])
+        captureSize = highestPowerOfTwoAtMost(captureSize).coerceAtLeast(range[0])
+
+        visualizer.captureSize = captureSize
+        try {
+            visualizer.scalingMode = Visualizer.SCALING_MODE_NORMALIZED
+        } catch (_: Throwable) {
+        }
+
+        audioVisualizerBarCount = barCount.coerceIn(16, 128)
+        audioVisualizerLastBars = DoubleArray(audioVisualizerBarCount) { 0.0 }
+        audioVisualizerSessionId = sessionId
+
+        val captureRate = (Visualizer.getMaxCaptureRate() / 2).coerceAtLeast(8_000)
+        visualizer.setDataCaptureListener(
+            object : Visualizer.OnDataCaptureListener {
+                override fun onWaveFormDataCapture(
+                    visualizer: Visualizer?,
+                    waveform: ByteArray?,
+                    samplingRate: Int
+                ) {
+                    if (waveform == null || waveform.isEmpty()) return
+                    val bars = buildRealtimeBars(waveform, audioVisualizerBarCount)
+                    emitAudioVisualizerBars(bars)
+                }
+
+                override fun onFftDataCapture(
+                    visualizer: Visualizer?,
+                    fft: ByteArray?,
+                    samplingRate: Int
+                ) {
+                    // no-op: usamos waveform para modo ondas.
+                }
+            },
+            captureRate,
+            true,
+            false
+        )
+
+        visualizer.enabled = true
+        audioVisualizer = visualizer
+    }
+
+    private fun detachAudioVisualizer() {
+        try {
+            audioVisualizer?.setDataCaptureListener(null, 0, false, false)
+        } catch (_: Throwable) {
+        }
+        try {
+            audioVisualizer?.enabled = false
+        } catch (_: Throwable) {
+        }
+        try {
+            audioVisualizer?.release()
+        } catch (_: Throwable) {
+        }
+        audioVisualizer = null
+        audioVisualizerSessionId = null
+        audioVisualizerLastBars = DoubleArray(0)
+        audioVisualizerLastEmitAtMs = 0L
+    }
+
+    private fun highestPowerOfTwoAtMost(value: Int): Int {
+        if (value <= 1) return 1
+        var out = 1
+        while (out * 2 <= value) out *= 2
+        return out
+    }
+
+    private fun buildRealtimeBars(waveform: ByteArray, barCount: Int): List<Double> {
+        if (barCount <= 0 || waveform.isEmpty()) return emptyList()
+
+        val count = barCount.coerceAtLeast(1)
+        val samplesPerBar = maxOf(1, waveform.size / count)
+        val raw = DoubleArray(count) { 0.0 }
+
+        for (i in 0 until count) {
+            val start = i * samplesPerBar
+            val end = if (i == count - 1) waveform.size else minOf(waveform.size, start + samplesPerBar)
+            var peak = 0.0
+            for (j in start until end) {
+                val centered = (waveform[j].toInt() and 0xFF) - 128
+                val amplitude = abs(centered) / 128.0
+                if (amplitude > peak) peak = amplitude
+            }
+            raw[i] = peak.coerceIn(0.0, 1.0)
+        }
+
+        if (audioVisualizerLastBars.size != count) {
+            audioVisualizerLastBars = DoubleArray(count) { 0.0 }
+        }
+
+        val out = MutableList(count) { 0.0 }
+        for (i in 0 until count) {
+            val smoothed = audioVisualizerLastBars[i] * 0.70 + raw[i] * 0.30
+            audioVisualizerLastBars[i] = smoothed
+            out[i] = smoothed.coerceIn(0.02, 1.0)
+        }
+        return out
+    }
+
+    private fun emitAudioVisualizerBars(bars: List<Double>) {
+        if (bars.isEmpty()) return
+        val now = SystemClock.uptimeMillis()
+        if (now - audioVisualizerLastEmitAtMs < 30L) return
+        audioVisualizerLastEmitAtMs = now
+
+        val payload = mapOf(
+            "bars" to bars,
+            "sessionId" to (audioVisualizerSessionId ?: 0)
+        )
+        uiHandler.post {
+            audioVisualizerSink?.success(payload)
+        }
     }
 
     private fun renderCleanedAudioNative(

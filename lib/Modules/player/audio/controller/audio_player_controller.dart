@@ -11,7 +11,7 @@ import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
 import '../../../../app/services/spatial_audio_service.dart';
 
-enum CoverStyle { square, vinyl }
+enum CoverStyle { square, vinyl, wave }
 
 enum RepeatMode { off, once, loop }
 
@@ -378,9 +378,10 @@ class AudioPlayerController extends GetxController {
   }
 
   void toggleCoverStyle() {
-    coverStyle.value = coverStyle.value == CoverStyle.square
-        ? CoverStyle.vinyl
-        : CoverStyle.square;
+    final all = CoverStyle.values;
+    final idx = all.indexOf(coverStyle.value);
+    final next = (idx + 1) % all.length;
+    coverStyle.value = all[next];
   }
 
   Future<void> toggleShuffle() async {
