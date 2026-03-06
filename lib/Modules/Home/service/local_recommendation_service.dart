@@ -330,7 +330,8 @@ class LocalRecommendationService {
         : (artistMap.isNotEmpty ? artistMap.values.first : '');
     final primaryArtistKey = ArtistCreditParser.normalizeKey(primaryArtistName);
 
-    final mergedText = '${item.title} ${item.subtitle} $sourceText';
+    final mergedText =
+        '${item.title} ${item.subtitle} ${item.country ?? ''} $sourceText';
     final normalized = _normalizeText(mergedText);
     final tokens = _tokenize(normalized);
     final genres = _extractLexiconMatches(
@@ -338,11 +339,24 @@ class LocalRecommendationService {
       tokens: tokens,
       lexicon: _genreLexicon,
     );
-    final regions = _extractLexiconMatches(
+    final regionMatches = _extractLexiconMatches(
       normalizedText: normalized,
       tokens: tokens,
       lexicon: _regionLexicon,
     );
+    final countryDisplay = _normalizedCountryDisplay(item.country);
+    final countryKey = _normalizedCountryKey(countryDisplay);
+    final regions = <String>[
+      if (countryKey != null) countryKey,
+      ...regionMatches.where((entry) => entry != countryKey),
+    ];
+    final regionDisplayByKey = <String, String>{};
+    for (final region in regions) {
+      regionDisplayByKey[region] = _regionLabel(region);
+    }
+    if (countryKey != null) {
+      regionDisplayByKey[countryKey] = countryDisplay!;
+    }
     final dominantTag = genres.isNotEmpty
         ? 'genre:${genres.first}'
         : (regions.isNotEmpty
@@ -360,6 +374,8 @@ class LocalRecommendationService {
       artistNameByKey: artistMap,
       genres: genres,
       regions: regions,
+      countryKey: countryKey,
+      regionDisplayByKey: regionDisplayByKey,
       dominantTag: dominantTag,
       originKey: item.origin.key,
     );
@@ -397,7 +413,11 @@ class LocalRecommendationService {
         genre[tag] = (genre[tag] ?? 0) + (weight * 1.15);
       }
       for (final tag in candidate.regions) {
-        region[tag] = (region[tag] ?? 0) + weight;
+        final boost =
+            candidate.countryKey != null && candidate.countryKey == tag
+            ? 1.35
+            : 1.0;
+        region[tag] = (region[tag] ?? 0) + (weight * boost);
       }
       for (final artistKey in candidate.artistKeys) {
         artist[artistKey] = (artist[artistKey] ?? 0) + (weight * 0.9);
@@ -538,9 +558,11 @@ class LocalRecommendationService {
 
     if (regionMatch >= 0.5 && candidate.regions.isNotEmpty) {
       final region = candidate.regions.first;
+      final regionLabel =
+          candidate.regionDisplayByKey[region] ?? _regionLabel(region);
       return _ReasonResult(
         code: RecommendationReasonCode.regionMatch,
-        text: 'Por ${_regionLabel(region)}',
+        text: 'Por $regionLabel',
       );
     }
 
@@ -830,6 +852,18 @@ class LocalRecommendationService {
     return normalized;
   }
 
+  String? _normalizedCountryDisplay(String? raw) {
+    final value = (raw ?? '').trim();
+    if (value.isEmpty) return null;
+    return value.replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String? _normalizedCountryKey(String? rawDisplay) {
+    if (rawDisplay == null) return null;
+    final key = _normalizeText(rawDisplay);
+    return key.isEmpty ? null : key;
+  }
+
   static const Map<String, String> _accentReplace = {
     'á': 'a',
     'é': 'e',
@@ -949,6 +983,8 @@ class _RecommendationCandidate {
     required this.artistNameByKey,
     required this.genres,
     required this.regions,
+    required this.countryKey,
+    required this.regionDisplayByKey,
     required this.dominantTag,
     required this.originKey,
   });
@@ -961,6 +997,8 @@ class _RecommendationCandidate {
   final Map<String, String> artistNameByKey;
   final List<String> genres;
   final List<String> regions;
+  final String? countryKey;
+  final Map<String, String> regionDisplayByKey;
   final String dominantTag;
   final String originKey;
 }

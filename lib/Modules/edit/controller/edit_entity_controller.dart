@@ -295,6 +295,7 @@ class EditEntityController extends GetxController {
     required MediaItem item,
     required String title,
     required String subtitle,
+    required String country,
     required bool thumbTouched,
     required String? localThumbPath,
     required String lyrics,
@@ -329,6 +330,7 @@ class EditEntityController extends GetxController {
     final updated = latest.copyWith(
       title: trimmedTitle,
       subtitle: subtitle.trim(),
+      country: country.trim(),
       thumbnail: thumbRemoteUpdate,
       thumbnailLocalPath: thumbLocalUpdate,
       durationSeconds: latest.durationSeconds,

@@ -231,6 +231,65 @@ void main() {
       );
     });
 
+    test(
+      'usa el campo pais como señal regional para recomendaciones',
+      () async {
+        final now = DateTime(2026, 3, 6, 18, 0);
+        final items = <MediaItem>[
+          _buildItem(
+            id: 'seed-col',
+            publicId: 'seed-col',
+            title: 'Session de noche',
+            subtitle: 'Artista Uno',
+            country: 'Colombia',
+            hasAudio: true,
+            hasVideo: true,
+            isFavorite: true,
+            playCount: 38,
+            lastPlayedAt:
+                now.millisecondsSinceEpoch -
+                const Duration(hours: 4).inMilliseconds,
+          ),
+          _buildItem(
+            id: 'match-col',
+            publicId: 'match-col',
+            title: 'Tema nuevo',
+            subtitle: 'Artista Dos',
+            country: 'Colombia',
+            hasAudio: true,
+            hasVideo: false,
+          ),
+          ...List.generate(
+            20,
+            (i) => _buildItem(
+              id: 'other-$i',
+              publicId: 'other-$i',
+              title: 'Tema otro $i',
+              subtitle: 'Artista otro $i',
+              country: i.isEven ? 'Chile' : 'Argentina',
+              hasAudio: true,
+              hasVideo: true,
+            ),
+          ),
+        ];
+
+        final service = LocalRecommendationService(
+          store: RecommendationStore.memory(),
+          libraryLoader: () async => items,
+          now: () => now,
+        );
+
+        final set = await service.getOrBuildForDay(
+          mode: RecommendationMode.audio,
+        );
+        final reasons = set.entries
+            .map((entry) => entry.reasonText.toLowerCase())
+            .toList();
+
+        expect(reasons.any((reason) => reason.contains('colombia')), isTrue);
+      },
+    );
+
     test('cold start devuelve hasta 24 items con fallback', () async {
       final now = DateTime(2026, 3, 6, 10, 0);
       final items = List.generate(
@@ -274,6 +333,7 @@ MediaItem _buildItem({
   int playCount = 0,
   bool isFavorite = false,
   int? lastPlayedAt,
+  String? country,
   SourceOrigin origin = SourceOrigin.generic,
 }) {
   final variants = <MediaVariant>[];
@@ -305,6 +365,7 @@ MediaItem _buildItem({
     publicId: publicId,
     title: title,
     subtitle: subtitle,
+    country: country,
     source: MediaSource.local,
     variants: variants,
     origin: origin,

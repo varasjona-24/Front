@@ -35,6 +35,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
   late final EditEntityArgs _args;
   late final TextEditingController _titleCtrl;
   late final TextEditingController _subtitleCtrl;
+  late final TextEditingController _countryCtrl;
   late final TextEditingController _durationCtrl;
   late final TextEditingController _thumbCtrl;
 
@@ -71,6 +72,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _mediaDraft = item;
       _titleCtrl = TextEditingController(text: item.title);
       _subtitleCtrl = TextEditingController(text: item.subtitle);
+      _countryCtrl = TextEditingController(text: item.country ?? '');
       _durationCtrl = TextEditingController(
         text: item.durationSeconds?.toString() ?? '',
       );
@@ -82,6 +84,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       final artist = _artist!;
       _titleCtrl = TextEditingController(text: artist.name);
       _subtitleCtrl = TextEditingController(text: '');
+      _countryCtrl = TextEditingController(text: '');
       _durationCtrl = TextEditingController(text: '');
       _thumbCtrl = TextEditingController(text: artist.thumbnail ?? '');
       _localThumbPath = artist.thumbnailLocalPath;
@@ -96,6 +99,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         final playlist = _playlist!;
         _titleCtrl = TextEditingController(text: playlist.name);
         _subtitleCtrl = TextEditingController(text: '');
+        _countryCtrl = TextEditingController(text: '');
         _durationCtrl = TextEditingController(text: '');
         _thumbCtrl = TextEditingController(text: playlist.coverUrl ?? '');
         _localThumbPath = playlist.coverLocalPath;
@@ -106,6 +110,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         final topic = _topic!;
         _titleCtrl = TextEditingController(text: topic.title);
         _subtitleCtrl = TextEditingController(text: '');
+        _countryCtrl = TextEditingController(text: '');
         _durationCtrl = TextEditingController(text: '');
         _thumbCtrl = TextEditingController(text: topic.coverUrl ?? '');
         _localThumbPath = topic.coverLocalPath;
@@ -115,6 +120,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         final pl = _topicPlaylist!;
         _titleCtrl = TextEditingController(text: pl.name);
         _subtitleCtrl = TextEditingController(text: '');
+        _countryCtrl = TextEditingController(text: '');
         _durationCtrl = TextEditingController(text: '');
         _thumbCtrl = TextEditingController(text: pl.coverUrl ?? '');
         _localThumbPath = pl.coverLocalPath;
@@ -128,6 +134,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
   void dispose() {
     _titleCtrl.dispose();
     _subtitleCtrl.dispose();
+    _countryCtrl.dispose();
     _durationCtrl.dispose();
     _thumbCtrl.dispose();
     if (Get.isRegistered<NavigationController>()) {
@@ -572,6 +579,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
             item: _media!,
             title: _titleCtrl.text,
             subtitle: _subtitleCtrl.text,
+            country: _countryCtrl.text,
             thumbTouched: _thumbTouched,
             localThumbPath: _localThumbPath,
             lyrics: _media?.lyrics ?? '',
@@ -1035,6 +1043,17 @@ class _EditEntityPageState extends State<EditEntityPage> {
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
+                            if (_countryCtrl.text.trim().isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Pais: ${_countryCtrl.text.trim()}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ],
                         ],
                       ),
@@ -1083,6 +1102,15 @@ class _EditEntityPageState extends State<EditEntityPage> {
                         decoration: const InputDecoration(
                           labelText: 'Artista',
                           prefixIcon: Icon(Icons.person_rounded),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _countryCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Pais',
+                          prefixIcon: Icon(Icons.public_rounded),
+                          hintText: 'Ej: Puerto Rico',
                         ),
                       ),
                     ],

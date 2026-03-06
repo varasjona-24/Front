@@ -139,43 +139,15 @@ class HomePage extends GetView<HomeController> {
                                 ],
 
                                 // ---- Para ti hoy ----
-                                if (controller.recommended.isNotEmpty ||
+                                if (controller
+                                        .recommendationCollections
+                                        .isNotEmpty ||
                                     controller
                                         .isRecommendationsLoading
                                         .value) ...[
-                                  MediaHorizontalList(
+                                  _SectionHeader(
                                     title: 'Para ti hoy',
-                                    items: controller.recommended,
-                                    isLoading: controller
-                                        .isRecommendationsLoading
-                                        .value,
-                                    itemHintBuilder:
-                                        controller.recommendationHintFor,
-                                    headerTrailing: Tooltip(
-                                      message:
-                                          controller
-                                              .canRecommendationRefresh
-                                              .value
-                                          ? 'Refresh manual (1 al día)'
-                                          : (controller
-                                                    .recommendationRefreshHint
-                                                    .value ??
-                                                'Refresh no disponible'),
-                                      child: IconButton(
-                                        splashRadius: 18,
-                                        icon: const Icon(
-                                          Icons.refresh_rounded,
-                                          size: 20,
-                                        ),
-                                        onPressed:
-                                            controller
-                                                .canRecommendationRefresh
-                                                .value
-                                            ? controller.refreshRecommendations
-                                            : null,
-                                      ),
-                                    ),
-                                    onHeaderTap: () => Get.toNamed(
+                                    onTap: () => Get.toNamed(
                                       AppRoutes.homeSectionList,
                                       arguments: {
                                         'title': 'Para ti hoy',
@@ -198,26 +170,65 @@ class HomePage extends GetView<HomeController> {
                                             .openMedia(queue.first, 0, queue),
                                       },
                                     ),
-                                    onItemTap: (item, index) {
-                                      final fullQueue =
-                                          controller.fullRecommended;
-                                      final fullIndex = fullQueue.indexWhere(
-                                        (e) => e.id == item.id,
-                                      );
-                                      controller.openMedia(
-                                        item,
-                                        fullIndex < 0 ? 0 : fullIndex,
-                                        fullQueue,
-                                      );
-                                    },
-                                    onItemLongPress: (item, _) {
-                                      actions.showItemActions(
-                                        context,
-                                        item,
-                                        onChanged: controller.loadHome,
-                                      );
-                                    },
+                                    trailing: IconButton(
+                                      splashRadius: 18,
+                                      icon: const Icon(
+                                        Icons.refresh_rounded,
+                                        size: 20,
+                                      ),
+                                      onPressed:
+                                          controller
+                                              .canRecommendationRefresh
+                                              .value
+                                          ? controller.refreshRecommendations
+                                          : null,
+                                    ),
                                   ),
+                                  const SizedBox(height: 10),
+                                  if (controller.isRecommendationsLoading.value)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 18,
+                                      ),
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    )
+                                  else
+                                    _RecommendationCollectionsRow(
+                                      collections:
+                                          controller.recommendationCollections,
+                                      onTap: (collection, _) {
+                                        Get.toNamed(
+                                          AppRoutes.homeSectionList,
+                                          arguments: {
+                                            'title': collection.title,
+                                            'items': collection.items,
+                                            'itemHintBuilder': controller
+                                                .recommendationHintFor,
+                                            'onItemTap': (item, index) =>
+                                                controller.openMedia(
+                                                  item,
+                                                  index,
+                                                  collection.items,
+                                                ),
+                                            'onItemLongPress': (item, _) =>
+                                                actions.showItemActions(
+                                                  context,
+                                                  item,
+                                                  onChanged:
+                                                      controller.loadHome,
+                                                ),
+                                            'onShuffle': (queue) =>
+                                                controller.openMedia(
+                                                  queue.first,
+                                                  0,
+                                                  queue,
+                                                ),
+                                          },
+                                        );
+                                      },
+                                    ),
                                   const SizedBox(height: 18),
                                 ],
 
@@ -544,6 +555,167 @@ class _SectionHeader extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _RecommendationCollectionsRow extends StatelessWidget {
+  const _RecommendationCollectionsRow({
+    required this.collections,
+    required this.onTap,
+  });
+
+  final List<RecommendationCollection> collections;
+  final void Function(RecommendationCollection collection, int index) onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 226,
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+        scrollDirection: Axis.horizontal,
+        itemCount: collections.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final collection = collections[index];
+          return _RecommendationCollectionCard(
+            collection: collection,
+            onTap: () => onTap(collection, index),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _RecommendationCollectionCard extends StatelessWidget {
+  const _RecommendationCollectionCard({
+    required this.collection,
+    required this.onTap,
+  });
+
+  final RecommendationCollection collection;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final preview = collection.items.take(2).map((e) => e.title).join(' • ');
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        width: 232,
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHigh,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: _RecommendationCover(item: collection.items.first),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              collection.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              collection.subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.primary.withOpacity(0.9),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              preview,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${collection.items.length} canciones',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecommendationCover extends StatelessWidget {
+  const _RecommendationCover({required this.item});
+
+  final MediaItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final thumb = item.effectiveThumbnail;
+    if (thumb != null && thumb.isNotEmpty) {
+      final provider = thumb.startsWith('http')
+          ? NetworkImage(thumb)
+          : FileImage(File(thumb)) as ImageProvider;
+      return Stack(
+        children: [
+          Image(
+            image: provider,
+            width: double.infinity,
+            height: 108,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _fallback(scheme),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.black.withOpacity(0.32)],
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return _fallback(scheme);
+  }
+
+  Widget _fallback(ColorScheme scheme) {
+    return Container(
+      width: double.infinity,
+      height: 108,
+      color: scheme.surfaceContainerHighest,
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.music_note_rounded,
+        color: scheme.onSurfaceVariant,
+        size: 34,
       ),
     );
   }

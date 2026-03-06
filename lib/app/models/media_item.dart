@@ -39,6 +39,7 @@ class MediaItem {
   final String publicId; // id “estable” para backend/variantes
   final String title;
   final String subtitle;
+  final String? country;
   final MediaSource source;
 
   /// Thumbnail remoto (URL)
@@ -71,6 +72,7 @@ class MediaItem {
     required this.publicId,
     required this.title,
     required this.subtitle,
+    this.country,
     required this.source,
     required this.variants,
     required this.origin,
@@ -94,6 +96,7 @@ class MediaItem {
     String? publicId,
     String? title,
     String? subtitle,
+    String? country,
     MediaSource? source,
     String? thumbnail,
     String? thumbnailLocalPath,
@@ -113,6 +116,7 @@ class MediaItem {
       publicId: publicId ?? this.publicId,
       title: title ?? this.title,
       subtitle: subtitle ?? this.subtitle,
+      country: country ?? this.country,
       source: source ?? this.source,
       thumbnail: thumbnail ?? this.thumbnail,
       thumbnailLocalPath: thumbnailLocalPath ?? this.thumbnailLocalPath,
@@ -270,6 +274,9 @@ class MediaItem {
         (json['artist'] as String?)?.trim() ??
         (json['subtitle'] as String?)?.trim() ??
         '';
+    final country =
+        (json['country'] as String?)?.trim() ??
+        (json['pais'] as String?)?.trim();
 
     final sourceStr = (json['source'] as String?)?.toLowerCase().trim();
     final source = sourceStr == 'local'
@@ -301,6 +308,7 @@ class MediaItem {
       publicId: publicId,
       title: title,
       subtitle: subtitle,
+      country: country,
       source: source,
       thumbnail: (json['thumbnail'] as String?)?.trim(),
       thumbnailLocalPath: (json['thumbnailLocalPath'] as String?)?.trim(),
@@ -322,6 +330,7 @@ class MediaItem {
     'publicId': publicId,
     'title': title,
     'artist': subtitle,
+    'country': country,
     'source': source == MediaSource.local ? 'local' : 'youtube',
     'origin': origin.key,
     'thumbnail': thumbnail,

@@ -11,6 +11,20 @@ import '../service/local_recommendation_service.dart';
 
 enum HomeMode { audio, video }
 
+class RecommendationCollection {
+  const RecommendationCollection({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.items,
+  });
+
+  final String id;
+  final String title;
+  final String subtitle;
+  final List<MediaItem> items;
+}
+
 class HomeController extends GetxController {
   final MediaRepository _repo = Get.find<MediaRepository>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
@@ -37,6 +51,8 @@ class HomeController extends GetxController {
   final RxnString recommendationRefreshHint = RxnString();
   final RxMap<String, String> recommendationReasonsById =
       <String, String>{}.obs;
+  final RxList<RecommendationCollection> recommendationCollections =
+      <RecommendationCollection>[].obs;
 
   final RxList<MediaItem> _allItems = <MediaItem>[].obs;
 
@@ -332,6 +348,7 @@ class HomeController extends GetxController {
       recommended.clear();
       fullRecommended.clear();
       recommendationReasonsById.clear();
+      recommendationCollections.clear();
       _syncRecommendationRefreshAvailability();
       return;
     }
@@ -372,6 +389,7 @@ class HomeController extends GetxController {
     final seen = <String>{};
     final resolved = <MediaItem>[];
     final reasons = <String, String>{};
+    final resolvedEntries = <_ResolvedRecommendation>[];
 
     for (final entry in set.entries) {
       final item =
@@ -382,6 +400,7 @@ class HomeController extends GetxController {
       seen.add(stableKey);
 
       resolved.add(item);
+      resolvedEntries.add(_ResolvedRecommendation(item: item, entry: entry));
 
       final reason = entry.reasonText.trim().isEmpty
           ? 'Por tu actividad reciente'
@@ -398,6 +417,9 @@ class HomeController extends GetxController {
     fullRecommended.assignAll(resolved.take(24));
     recommended.assignAll(resolved.take(12));
     recommendationReasonsById.assignAll(reasons);
+    recommendationCollections.assignAll(
+      _buildRecommendationCollections(resolvedEntries),
+    );
   }
 
   void _syncRecommendationRefreshAvailability() {
@@ -420,4 +442,157 @@ class HomeController extends GetxController {
     if (publicId.isNotEmpty) return 'p:$publicId';
     return 'i:${item.id.trim()}';
   }
+
+  List<RecommendationCollection> _buildRecommendationCollections(
+    List<_ResolvedRecommendation> entries,
+  ) {
+    if (entries.isEmpty) return const <RecommendationCollection>[];
+
+    final templates = <_RecommendationCollectionTemplate>[
+      const _RecommendationCollectionTemplate(
+        id: 'semantic',
+        title: 'Escena que te gusta',
+        subtitle: 'Por género y región',
+        reasonCodes: {
+          RecommendationReasonCode.genreMatch,
+          RecommendationReasonCode.regionMatch,
+        },
+      ),
+      const _RecommendationCollectionTemplate(
+        id: 'affinity',
+        title: 'Basado en tus hábitos',
+        subtitle: 'Favoritos y escuchas recientes',
+        reasonCodes: {
+          RecommendationReasonCode.favoriteAffinity,
+          RecommendationReasonCode.recentAffinity,
+          RecommendationReasonCode.artistAffinity,
+        },
+      ),
+      const _RecommendationCollectionTemplate(
+        id: 'fresh',
+        title: 'Para descubrir',
+        subtitle: 'Picks frescos del día',
+        reasonCodes: {
+          RecommendationReasonCode.freshPick,
+          RecommendationReasonCode.coldStart,
+        },
+      ),
+      const _RecommendationCollectionTemplate(
+        id: 'origin',
+        title: 'Origen que repites',
+        subtitle: 'Fuentes que más usas',
+        reasonCodes: {RecommendationReasonCode.originAffinity},
+      ),
+    ];
+
+    final targetCollections = entries.length >= 20
+        ? 4
+        : (entries.length >= 14 ? 3 : (entries.length >= 8 ? 2 : 1));
+    final used = <String>{};
+    final collections = <RecommendationCollection>[];
+
+    List<_ResolvedRecommendation> available() => entries.where((entry) {
+      return !used.contains(_itemStableKey(entry.item));
+    }).toList();
+
+    List<_ResolvedRecommendation> pickForTemplate(
+      _RecommendationCollectionTemplate template,
+    ) {
+      final free = available();
+      final preferred = free
+          .where(
+            (entry) => template.reasonCodes.contains(entry.entry.reasonCode),
+          )
+          .toList();
+
+      final picks = <_ResolvedRecommendation>[];
+      for (final entry in preferred) {
+        if (picks.length >= 6) break;
+        picks.add(entry);
+      }
+
+      if (picks.length < 3) {
+        for (final entry in free) {
+          if (picks.length >= 6) break;
+          if (picks.contains(entry)) continue;
+          picks.add(entry);
+        }
+      }
+
+      return picks;
+    }
+
+    for (final template in templates) {
+      if (collections.length >= targetCollections) break;
+      final picks = pickForTemplate(template);
+      if (picks.length < 3) continue;
+
+      for (final pick in picks) {
+        used.add(_itemStableKey(pick.item));
+      }
+
+      collections.add(
+        RecommendationCollection(
+          id: '${template.id}-${collections.length + 1}',
+          title: template.title,
+          subtitle: template.subtitle,
+          items: picks.map((e) => e.item).toList(growable: false),
+        ),
+      );
+    }
+
+    while (collections.length < 2 && available().length >= 3) {
+      final free = available();
+      final chunk = free.take(6).toList();
+      for (final entry in chunk) {
+        used.add(_itemStableKey(entry.item));
+      }
+      collections.add(
+        RecommendationCollection(
+          id: 'mix-${collections.length + 1}',
+          title: 'Mix diario ${collections.length + 1}',
+          subtitle: 'Selección variada de hoy',
+          items: chunk.map((e) => e.item).toList(growable: false),
+        ),
+      );
+    }
+
+    if (collections.isEmpty) {
+      final fallback = entries
+          .take(6)
+          .map((e) => e.item)
+          .toList(growable: false);
+      collections.add(
+        RecommendationCollection(
+          id: 'mix-1',
+          title: 'Mix diario',
+          subtitle: 'Selección recomendada',
+          items: fallback,
+        ),
+      );
+    }
+
+    return collections.take(4).toList(growable: false);
+  }
+}
+
+class _ResolvedRecommendation {
+  const _ResolvedRecommendation({required this.item, required this.entry});
+
+  final MediaItem item;
+  final RecommendationEntry entry;
+}
+
+class _RecommendationCollectionTemplate {
+  const _RecommendationCollectionTemplate({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.reasonCodes,
+  });
+
+  final String id;
+  final String title;
+  final String subtitle;
+  final Set<RecommendationReasonCode> reasonCodes;
 }
