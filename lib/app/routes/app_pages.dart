@@ -83,6 +83,7 @@ abstract class AppPages {
           onItemTap: args['onItemTap'],
           onItemLongPress: args['onItemLongPress'],
           onShuffle: args['onShuffle'],
+          itemHintBuilder: args['itemHintBuilder'],
         );
       },
       transition: Transition.rightToLeft,

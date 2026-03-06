@@ -17,6 +17,7 @@ class SectionListPage extends StatefulWidget {
     required this.onItemTap,
     required this.onItemLongPress,
     this.onShuffle,
+    this.itemHintBuilder,
   });
 
   final String title;
@@ -24,6 +25,7 @@ class SectionListPage extends StatefulWidget {
   final FutureOr<void> Function(MediaItem item, int index) onItemTap;
   final FutureOr<void> Function(MediaItem item, int index) onItemLongPress;
   final void Function(List<MediaItem> queue)? onShuffle;
+  final String? Function(MediaItem item, int index)? itemHintBuilder;
 
   @override
   State<SectionListPage> createState() => _SectionListPageState();
@@ -38,10 +40,7 @@ class _SectionListPageState extends State<SectionListPage> {
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
-        title: ListenfyLogo(
-          size: 28,
-          color: scheme.primary,
-        ),
+        title: ListenfyLogo(size: 28, color: scheme.primary),
         backgroundColor: scheme.surface,
         surfaceTintColor: scheme.surface,
         foregroundColor: scheme.onSurface,
@@ -92,6 +91,7 @@ class _SectionListPageState extends State<SectionListPage> {
             final item = widget.items[index - 1];
             return _MediaRow(
               item: item,
+              hintText: widget.itemHintBuilder?.call(item, index - 1),
               onTap: () async {
                 await widget.onItemTap(item, index - 1);
                 if (mounted) setState(() {});
@@ -111,11 +111,13 @@ class _SectionListPageState extends State<SectionListPage> {
 class _MediaRow extends StatelessWidget {
   const _MediaRow({
     required this.item,
+    required this.hintText,
     required this.onTap,
     required this.onLongPress,
   });
 
   final MediaItem item;
+  final String? hintText;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -159,6 +161,18 @@ class _MediaRow extends StatelessWidget {
                       color: scheme.onSurfaceVariant,
                     ),
                   ),
+                  if ((hintText ?? '').trim().isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      hintText!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.primary.withOpacity(0.9),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -170,10 +184,7 @@ class _MediaRow extends StatelessWidget {
                 color: scheme.surface,
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                Icons.play_arrow_rounded,
-                color: scheme.primary,
-              ),
+              child: Icon(Icons.play_arrow_rounded, color: scheme.primary),
             ),
           ],
         ),

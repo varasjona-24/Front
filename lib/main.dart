@@ -29,6 +29,10 @@ import 'Modules/settings/controller/sleep_timer_controller.dart';
 import 'Modules/settings/controller/equalizer_controller.dart';
 import 'Modules/downloads/controller/downloads_controller.dart';
 import 'Modules/downloads/service/download_task_service.dart';
+import 'Modules/sources/data/source_theme_topic_store.dart';
+import 'Modules/sources/data/source_theme_topic_playlist_store.dart';
+import 'Modules/home/data/recommendation_store.dart';
+import 'Modules/home/service/local_recommendation_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,12 +92,43 @@ Future<void> main() async {
 
   // 💾 Local storage
   Get.put(LocalLibraryStore(Get.find<GetStorage>()), permanent: true);
+  if (!Get.isRegistered<SourceThemeTopicStore>()) {
+    Get.put(SourceThemeTopicStore(Get.find<GetStorage>()), permanent: true);
+  }
+  if (!Get.isRegistered<SourceThemeTopicPlaylistStore>()) {
+    Get.put(
+      SourceThemeTopicPlaylistStore(Get.find<GetStorage>()),
+      permanent: true,
+    );
+  }
 
   // 🧩 Controller global de acciones de media
   Get.put(MediaActionsController(), permanent: true);
 
   // 📦 Repositorio de media
   Get.lazyPut<MediaRepository>(() => MediaRepository(), fenix: true);
+
+  // 🧠 Recomendaciones locales (MVP diario)
+  Get.put(RecommendationStore(Get.find<GetStorage>()), permanent: true);
+  Get.put(
+    LocalRecommendationService(
+      store: Get.find<RecommendationStore>(),
+      libraryLoader: () => Get.find<MediaRepository>().getLibrary(),
+      topicLoader: () async {
+        if (!Get.isRegistered<SourceThemeTopicStore>()) {
+          return const [];
+        }
+        return Get.find<SourceThemeTopicStore>().readAll();
+      },
+      topicPlaylistLoader: () async {
+        if (!Get.isRegistered<SourceThemeTopicPlaylistStore>()) {
+          return const [];
+        }
+        return Get.find<SourceThemeTopicPlaylistStore>().readAll();
+      },
+    ),
+    permanent: true,
+  );
 
   // 🚚 Runtime global de imports/descargas
   Get.put(DownloadTaskService(), permanent: true);

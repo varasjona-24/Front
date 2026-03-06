@@ -28,6 +28,8 @@ import '../../../Modules/sources/domain/source_theme_topic.dart';
 import '../../../Modules/sources/domain/source_theme_topic_playlist.dart';
 import '../../../Modules/downloads/controller/downloads_controller.dart';
 import '../../../Modules/home/controller/home_controller.dart';
+import '../../../Modules/home/data/recommendation_store.dart';
+import '../../../Modules/home/service/local_recommendation_service.dart';
 
 // Función top-level para poder ejecutarse en un Isolate (hilo separado)
 // NOTA: Se pasa la ROTA del archivo (String) y no los bytes (List<int>)
@@ -194,7 +196,9 @@ class BackupRestoreController extends GetxController {
         canPop: false, // Prevenir que cierren el diálogo durante la operación
         child: Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(22),
+          ),
           child: Builder(
             builder: (context) {
               final theme = Theme.of(context);
@@ -252,7 +256,9 @@ class BackupRestoreController extends GetxController {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest.withOpacity(.45),
+                          color: scheme.surfaceContainerHighest.withOpacity(
+                            .45,
+                          ),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: scheme.outlineVariant.withOpacity(.35),
@@ -314,7 +320,9 @@ class BackupRestoreController extends GetxController {
         canPop: false,
         child: Dialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 28),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           child: Builder(
             builder: (context) {
               final theme = Theme.of(context);
@@ -359,8 +367,7 @@ class BackupRestoreController extends GetxController {
                             child: LinearProgressIndicator(
                               minHeight: 8,
                               backgroundColor: scheme.surfaceContainerHighest,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(accent),
+                              valueColor: AlwaysStoppedAnimation<Color>(accent),
                             ),
                           ),
                         ],
@@ -383,9 +390,7 @@ class BackupRestoreController extends GetxController {
     return Get.dialog<Map<String, String>>(
       Dialog(
         insetPadding: const EdgeInsets.symmetric(horizontal: 20),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(22),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         child: Builder(
           builder: (context) {
             final theme = Theme.of(context);
@@ -521,9 +526,9 @@ class BackupRestoreController extends GetxController {
                             child: FilledButton.icon(
                               onPressed: hasInput
                                   ? () => closeWith({
-                                        'action': 'locate',
-                                        'value': inputValue.trim(),
-                                      })
+                                      'action': 'locate',
+                                      'value': inputValue.trim(),
+                                    })
                                   : null,
                               icon: const Icon(Icons.search_rounded),
                               label: const Text('Localizar'),
@@ -568,78 +573,77 @@ class BackupRestoreController extends GetxController {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: accent.withOpacity(.14),
-                          borderRadius: BorderRadius.circular(12),
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: accent.withOpacity(.14),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(icon, color: accent),
                         ),
-                        child: Icon(icon, color: accent),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.25,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      height: 1.25,
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: accent.withOpacity(.07),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: accent.withOpacity(.22)),
-                    ),
-                    child: Column(
-                      children: notes
-                          .map(
-                            (note) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 2),
-                                    child: Icon(
-                                      Icons.circle,
-                                      size: 7,
-                                      color: accent,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      note,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        height: 1.25,
+                    const SizedBox(height: 14),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: accent.withOpacity(.07),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: accent.withOpacity(.22)),
+                      ),
+                      child: Column(
+                        children: notes
+                            .map(
+                              (note) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Icon(
+                                        Icons.circle,
+                                        size: 7,
+                                        color: accent,
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        note,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(height: 1.25),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          )
-                          .toList(),
+                            )
+                            .toList(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                    const SizedBox(height: 14),
                     Row(
                       children: [
                         Expanded(
@@ -697,71 +701,73 @@ class BackupRestoreController extends GetxController {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: accent.withOpacity(.14),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(icon, color: accent),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: accent.withOpacity(.14),
+                            borderRadius: BorderRadius.circular(12),
                           ),
+                          child: Icon(icon, color: accent),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      message,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.25,
+                      ),
+                    ),
+                    if ((detailValue ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest.withOpacity(
+                            .45,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: scheme.outlineVariant.withOpacity(.35),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if ((detailLabel ?? '').trim().isNotEmpty) ...[
+                              Text(
+                                detailLabel!,
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                            ],
+                            SelectableText(
+                              detailValue!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                height: 1.25,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    message,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                      height: 1.25,
-                    ),
-                  ),
-                  if ((detailValue ?? '').trim().isNotEmpty) ...[
                     const SizedBox(height: 14),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest.withOpacity(.45),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: scheme.outlineVariant.withOpacity(.35),
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if ((detailLabel ?? '').trim().isNotEmpty) ...[
-                            Text(
-                              detailLabel!,
-                              style: theme.textTheme.labelMedium?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                          ],
-                          SelectableText(
-                            detailValue!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              height: 1.25,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 14),
                     Row(
                       children: [
                         if (cancelText != null) ...[
@@ -935,6 +941,12 @@ class BackupRestoreController extends GetxController {
       currentOperation.value = 'Comprimiendo archivo ZIP...';
       progress.value = 0.8;
 
+      Map<String, dynamic> recommendationPayload = const {};
+      if (Get.isRegistered<RecommendationStore>()) {
+        recommendationPayload = await Get.find<RecommendationStore>()
+            .exportBackupPayload();
+      }
+
       final manifest = <String, dynamic>{
         'version': 1,
         'createdAt': DateTime.now().toIso8601String(),
@@ -944,6 +956,7 @@ class BackupRestoreController extends GetxController {
         'sourceThemePills': pills.map((e) => e.toJson()).toList(),
         'sourceThemeTopics': topicsJson,
         'sourceThemeTopicPlaylists': topicPlaylistsJson,
+        ...recommendationPayload,
       };
 
       final manifestFile = File(p.join(tempDir.path, 'manifest.json'));
@@ -1206,6 +1219,13 @@ class BackupRestoreController extends GetxController {
         );
       }
 
+      if (Get.isRegistered<RecommendationStore>()) {
+        await Get.find<RecommendationStore>().restoreBackupPayload(manifest);
+        if (Get.isRegistered<LocalRecommendationService>()) {
+          await Get.find<LocalRecommendationService>().reloadFromStore();
+        }
+      }
+
       currentOperation.value =
           'Limpiando temporales y actualizando interfaz...';
       progress.value = 0.95;
@@ -1327,7 +1347,8 @@ class BackupRestoreController extends GetxController {
       }
     }
 
-    final estimatedZipBytes = contentBytes + (1024 * 1024) + (includedFiles * 256);
+    final estimatedZipBytes =
+        contentBytes + (1024 * 1024) + (includedFiles * 256);
 
     return _BackupEstimate(
       contentBytes: contentBytes,
@@ -1448,8 +1469,10 @@ class BackupRestoreController extends GetxController {
     final raw = input.trim();
     if (raw.isEmpty) return '';
 
-    final codeMatch = RegExp(r'(LFB:[^\s]+\.zip)', caseSensitive: false)
-        .firstMatch(raw.replaceAll('\n', ' '));
+    final codeMatch = RegExp(
+      r'(LFB:[^\s]+\.zip)',
+      caseSensitive: false,
+    ).firstMatch(raw.replaceAll('\n', ' '));
     if (codeMatch != null) {
       return codeMatch.group(1)!.trim();
     }
@@ -1472,7 +1495,10 @@ class BackupRestoreController extends GetxController {
     return raw;
   }
 
-  Future<String?> _searchBackupZipInDir(String rootPath, String fileName) async {
+  Future<String?> _searchBackupZipInDir(
+    String rootPath,
+    String fileName,
+  ) async {
     final root = Directory(rootPath);
     try {
       if (!await root.exists()) return null;
@@ -1500,7 +1526,8 @@ class BackupRestoreController extends GetxController {
 
         try {
           if (entity is File) {
-            if (p.basename(entity.path).toLowerCase() == fileName.toLowerCase()) {
+            if (p.basename(entity.path).toLowerCase() ==
+                fileName.toLowerCase()) {
               return p.normalize(entity.path);
             }
             continue;

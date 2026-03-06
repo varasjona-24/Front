@@ -12,6 +12,7 @@ class MediaCard extends StatefulWidget {
   final VoidCallback? onLongPress;
   final double width;
   final bool showPlayBadge;
+  final String? hintText;
 
   const MediaCard({
     super.key,
@@ -20,6 +21,7 @@ class MediaCard extends StatefulWidget {
     this.onLongPress,
     this.width = 130,
     this.showPlayBadge = true,
+    this.hintText,
   });
 
   @override
@@ -163,11 +165,26 @@ class _MediaCardState extends State<MediaCard> {
                 ),
               ),
 
+              if ((widget.hintText ?? '').trim().isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  widget.hintText!.trim(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.primary.withOpacity(0.9),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+
               if (audioFormat != null) ...[
                 const SizedBox(height: AppSpacing.xs),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 1,
+                  ),
                   decoration: BoxDecoration(
                     color: colors.primary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
@@ -189,8 +206,7 @@ class _MediaCardState extends State<MediaCard> {
   }
 
   String? _audioFormat() {
-    if (!widget.item.hasAudioLocal &&
-        widget.item.localAudioVariant == null) {
+    if (!widget.item.hasAudioLocal && widget.item.localAudioVariant == null) {
       return null;
     }
     final local = widget.item.localAudioVariant?.format.trim();

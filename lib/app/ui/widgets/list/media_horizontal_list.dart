@@ -12,6 +12,8 @@ class MediaHorizontalList extends StatelessWidget {
   final void Function(MediaItem item, int index) onItemTap;
   final void Function(MediaItem item, int index)? onItemLongPress;
   final VoidCallback? onHeaderTap;
+  final Widget? headerTrailing;
+  final String? Function(MediaItem item, int index)? itemHintBuilder;
 
   const MediaHorizontalList({
     super.key,
@@ -21,6 +23,8 @@ class MediaHorizontalList extends StatelessWidget {
     this.onItemLongPress,
     this.isLoading = false,
     this.onHeaderTap,
+    this.headerTrailing,
+    this.itemHintBuilder,
   });
 
   @override
@@ -35,15 +39,28 @@ class MediaHorizontalList extends StatelessWidget {
 
     Widget header() => Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: onHeaderTap,
-        child: Row(
-          children: [
-            Expanded(child: Text(title, style: titleStyle)),
-            Icon(Icons.chevron_right_rounded, color: scheme.onSurfaceVariant),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: onHeaderTap,
+              child: Row(
+                children: [
+                  Expanded(child: Text(title, style: titleStyle)),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (headerTrailing != null) ...[
+            const SizedBox(width: 8),
+            headerTrailing!,
           ],
-        ),
+        ],
       ),
     );
 
@@ -75,7 +92,7 @@ class MediaHorizontalList extends StatelessWidget {
         header(),
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
-          height: 200,
+          height: itemHintBuilder == null ? 200 : 216,
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             scrollDirection: Axis.horizontal,
@@ -86,6 +103,7 @@ class MediaHorizontalList extends StatelessWidget {
               return MediaCard(
                 item: item,
                 width: 120,
+                hintText: itemHintBuilder?.call(item, index),
                 onTap: () => onItemTap(item, index),
                 onLongPress: onItemLongPress == null
                     ? null

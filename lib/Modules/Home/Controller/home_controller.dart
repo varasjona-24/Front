@@ -6,12 +6,16 @@ import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
+import '../domain/recommendation_models.dart';
+import '../service/local_recommendation_service.dart';
 
 enum HomeMode { audio, video }
 
 class HomeController extends GetxController {
   final MediaRepository _repo = Get.find<MediaRepository>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
+  final LocalRecommendationService _recommendationService =
+      Get.find<LocalRecommendationService>();
 
   final Rx<HomeMode> mode = HomeMode.audio.obs;
   final RxBool isLoading = false.obs;
@@ -26,6 +30,13 @@ class HomeController extends GetxController {
   final RxList<MediaItem> fullMostPlayed = <MediaItem>[].obs;
   final RxList<MediaItem> fullLatestDownloads = <MediaItem>[].obs;
   final RxList<MediaItem> fullFeatured = <MediaItem>[].obs;
+  final RxList<MediaItem> recommended = <MediaItem>[].obs;
+  final RxList<MediaItem> fullRecommended = <MediaItem>[].obs;
+  final RxBool isRecommendationsLoading = false.obs;
+  final RxBool canRecommendationRefresh = true.obs;
+  final RxnString recommendationRefreshHint = RxnString();
+  final RxMap<String, String> recommendationReasonsById =
+      <String, String>{}.obs;
 
   final RxList<MediaItem> _allItems = <MediaItem>[].obs;
 
@@ -41,6 +52,7 @@ class HomeController extends GetxController {
       final items = await _repo.getLibrary();
       _allItems.assignAll(items);
       _splitHomeSections(_allItems);
+      await _loadRecommendationsForCurrentMode();
     } catch (e) {
       print('Error loading home: $e');
     } finally {
@@ -153,6 +165,51 @@ class HomeController extends GetxController {
   void toggleMode() {
     mode.value = mode.value == HomeMode.audio ? HomeMode.video : HomeMode.audio;
     _splitHomeSections(_allItems);
+    _loadRecommendationsForCurrentMode();
+  }
+
+  Future<void> refreshRecommendations() async {
+    final recommendationMode = _currentRecommendationMode();
+    if (!_recommendationService.canManualRefreshToday(
+      mode: recommendationMode,
+    )) {
+      final hint =
+          _recommendationService.nextRefreshHint(mode: recommendationMode) ??
+          'Ya usaste el refresh manual de hoy';
+      recommendationRefreshHint.value = hint;
+      canRecommendationRefresh.value = false;
+      Get.snackbar('Para ti hoy', hint, snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    isRecommendationsLoading.value = true;
+    try {
+      final set = await _recommendationService.refreshManually(
+        mode: recommendationMode,
+      );
+      _applyRecommendationSet(set);
+    } catch (e) {
+      print('Error refreshing recommendations: $e');
+      Get.snackbar(
+        'Para ti hoy',
+        'No se pudieron actualizar las recomendaciones',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      _syncRecommendationRefreshAvailability();
+      isRecommendationsLoading.value = false;
+    }
+  }
+
+  String? recommendationHintFor(MediaItem item, int index) {
+    final byId = recommendationReasonsById[item.id];
+    if (byId != null && byId.trim().isNotEmpty) return byId;
+    final publicId = item.publicId.trim();
+    if (publicId.isNotEmpty) {
+      final byPublic = recommendationReasonsById['p:$publicId'];
+      if (byPublic != null && byPublic.trim().isNotEmpty) return byPublic;
+    }
+    return 'Por tu actividad reciente';
   }
 
   void onSearch() {
@@ -269,4 +326,98 @@ class HomeController extends GetxController {
   void enterHome() => Get.offAllNamed(AppRoutes.home);
 
   List<MediaItem> get allItems => List<MediaItem>.from(_allItems);
+
+  Future<void> _loadRecommendationsForCurrentMode() async {
+    if (_allItems.isEmpty) {
+      recommended.clear();
+      fullRecommended.clear();
+      recommendationReasonsById.clear();
+      _syncRecommendationRefreshAvailability();
+      return;
+    }
+
+    isRecommendationsLoading.value = true;
+    try {
+      final set = await _recommendationService.getOrBuildForDay(
+        mode: _currentRecommendationMode(),
+      );
+      _applyRecommendationSet(set);
+    } catch (e) {
+      print('Error loading recommendations: $e');
+    } finally {
+      _syncRecommendationRefreshAvailability();
+      isRecommendationsLoading.value = false;
+    }
+  }
+
+  void _applyRecommendationSet(RecommendationDailySet set) {
+    final isAudioMode = mode.value == HomeMode.audio;
+    bool matchesMode(MediaItem item) =>
+        isAudioMode ? item.hasAudioLocal : item.hasVideoLocal;
+
+    final filtered = _allItems.where(matchesMode).toList();
+    final byPublicId = <String, MediaItem>{};
+    final byId = <String, MediaItem>{};
+    for (final item in filtered) {
+      final pid = item.publicId.trim();
+      final id = item.id.trim();
+      if (pid.isNotEmpty) {
+        byPublicId.putIfAbsent(pid, () => item);
+      }
+      if (id.isNotEmpty) {
+        byId.putIfAbsent(id, () => item);
+      }
+    }
+
+    final seen = <String>{};
+    final resolved = <MediaItem>[];
+    final reasons = <String, String>{};
+
+    for (final entry in set.entries) {
+      final item =
+          byPublicId[entry.publicId.trim()] ?? byId[entry.itemId.trim()];
+      if (item == null) continue;
+      final stableKey = _itemStableKey(item);
+      if (seen.contains(stableKey)) continue;
+      seen.add(stableKey);
+
+      resolved.add(item);
+
+      final reason = entry.reasonText.trim().isEmpty
+          ? 'Por tu actividad reciente'
+          : entry.reasonText.trim();
+      reasons[item.id] = reason;
+      final pid = item.publicId.trim();
+      if (pid.isNotEmpty) {
+        reasons['p:$pid'] = reason;
+      }
+
+      if (resolved.length >= 24) break;
+    }
+
+    fullRecommended.assignAll(resolved.take(24));
+    recommended.assignAll(resolved.take(12));
+    recommendationReasonsById.assignAll(reasons);
+  }
+
+  void _syncRecommendationRefreshAvailability() {
+    final mode = _currentRecommendationMode();
+    canRecommendationRefresh.value = _recommendationService
+        .canManualRefreshToday(mode: mode);
+    recommendationRefreshHint.value = _recommendationService.nextRefreshHint(
+      mode: mode,
+    );
+  }
+
+  RecommendationMode _currentRecommendationMode() {
+    return mode.value == HomeMode.audio
+        ? RecommendationMode.audio
+        : RecommendationMode.video;
+  }
+
+  String _itemStableKey(MediaItem item) {
+    final publicId = item.publicId.trim();
+    if (publicId.isNotEmpty) return 'p:$publicId';
+    return 'i:${item.id.trim()}';
+  }
 }

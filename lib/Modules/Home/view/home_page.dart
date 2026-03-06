@@ -138,6 +138,89 @@ class HomePage extends GetView<HomeController> {
                                   const SizedBox(height: 18),
                                 ],
 
+                                // ---- Para ti hoy ----
+                                if (controller.recommended.isNotEmpty ||
+                                    controller
+                                        .isRecommendationsLoading
+                                        .value) ...[
+                                  MediaHorizontalList(
+                                    title: 'Para ti hoy',
+                                    items: controller.recommended,
+                                    isLoading: controller
+                                        .isRecommendationsLoading
+                                        .value,
+                                    itemHintBuilder:
+                                        controller.recommendationHintFor,
+                                    headerTrailing: Tooltip(
+                                      message:
+                                          controller
+                                              .canRecommendationRefresh
+                                              .value
+                                          ? 'Refresh manual (1 al día)'
+                                          : (controller
+                                                    .recommendationRefreshHint
+                                                    .value ??
+                                                'Refresh no disponible'),
+                                      child: IconButton(
+                                        splashRadius: 18,
+                                        icon: const Icon(
+                                          Icons.refresh_rounded,
+                                          size: 20,
+                                        ),
+                                        onPressed:
+                                            controller
+                                                .canRecommendationRefresh
+                                                .value
+                                            ? controller.refreshRecommendations
+                                            : null,
+                                      ),
+                                    ),
+                                    onHeaderTap: () => Get.toNamed(
+                                      AppRoutes.homeSectionList,
+                                      arguments: {
+                                        'title': 'Para ti hoy',
+                                        'items': controller.fullRecommended,
+                                        'itemHintBuilder':
+                                            controller.recommendationHintFor,
+                                        'onItemTap': (item, index) =>
+                                            controller.openMedia(
+                                              item,
+                                              index,
+                                              controller.fullRecommended,
+                                            ),
+                                        'onItemLongPress': (item, _) =>
+                                            actions.showItemActions(
+                                              context,
+                                              item,
+                                              onChanged: controller.loadHome,
+                                            ),
+                                        'onShuffle': (queue) => controller
+                                            .openMedia(queue.first, 0, queue),
+                                      },
+                                    ),
+                                    onItemTap: (item, index) {
+                                      final fullQueue =
+                                          controller.fullRecommended;
+                                      final fullIndex = fullQueue.indexWhere(
+                                        (e) => e.id == item.id,
+                                      );
+                                      controller.openMedia(
+                                        item,
+                                        fullIndex < 0 ? 0 : fullIndex,
+                                        fullQueue,
+                                      );
+                                    },
+                                    onItemLongPress: (item, _) {
+                                      actions.showItemActions(
+                                        context,
+                                        item,
+                                        onChanged: controller.loadHome,
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 18),
+                                ],
+
                                 // ---- Más reproducido ----
                                 if (controller.mostPlayed.isNotEmpty) ...[
                                   _SectionHeader(
