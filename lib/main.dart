@@ -14,6 +14,7 @@ import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/ui/themes/app_theme_factory.dart';
 import 'app/ui/widgets/player/mini_player_bar.dart';
+import 'app/ui/widgets/download/download_progress_banner.dart';
 
 import 'app/data/network/dio_client.dart';
 import 'app/data/repo/media_repository.dart';
@@ -27,6 +28,7 @@ import 'Modules/settings/controller/playback_settings_controller.dart';
 import 'Modules/settings/controller/sleep_timer_controller.dart';
 import 'Modules/settings/controller/equalizer_controller.dart';
 import 'Modules/downloads/controller/downloads_controller.dart';
+import 'Modules/downloads/service/download_task_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -92,6 +94,9 @@ Future<void> main() async {
 
   // 📦 Repositorio de media
   Get.lazyPut<MediaRepository>(() => MediaRepository(), fenix: true);
+
+  // 🚚 Runtime global de imports/descargas
+  Get.put(DownloadTaskService(), permanent: true);
 
   // 📥 Imports/Downloads global (share intent listener)
   Get.put(DownloadsController(), permanent: true);
@@ -168,6 +173,7 @@ class _MyAppState extends State<MyApp> {
           return Stack(
             children: [
               child,
+              const DownloadProgressBanner(),
               Positioned(
                 left: 0,
                 right: 0,

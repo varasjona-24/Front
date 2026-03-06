@@ -3,12 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
-import 'package:dio/dio.dart' as dio;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_custom_tabs/flutter_custom_tabs.dart';
 import 'package:get/get.dart';
-import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 import 'package:path/path.dart' as p;
@@ -18,6 +16,7 @@ import '../../../app/data/local/local_library_store.dart';
 import '../../../app/data/repo/media_repository.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
+import '../service/download_task_service.dart';
 
 import '../../sources/domain/source_origin.dart';
 
@@ -27,7 +26,7 @@ class DownloadsController extends GetxController {
   // ============================
   final MediaRepository _repo = Get.find<MediaRepository>();
   final LocalLibraryStore _store = Get.find<LocalLibraryStore>();
-  final GetStorage _storage = GetStorage();
+  final DownloadTaskService _downloadTask = Get.find<DownloadTaskService>();
 
   // ============================
   // 🧭 ESTADO UI
@@ -35,11 +34,9 @@ class DownloadsController extends GetxController {
   final RxList<MediaItem> downloads = <MediaItem>[].obs;
   final RxBool isLoading = false.obs;
   final RxBool customTabOpening = false.obs;
-  final RxBool isDownloading = false.obs;
-  final RxDouble downloadProgress = (-1.0).obs;
-  final RxString downloadStatus = 'Preparando descarga...'.obs;
-
-  bool _downloadSnackOpen = false;
+  RxBool get isDownloading => _downloadTask.isDownloading;
+  RxDouble get downloadProgress => _downloadTask.downloadProgress;
+  RxString get downloadStatus => _downloadTask.downloadStatus;
 
   // 📁 Archivos locales para importar
   final RxList<MediaItem> localFilesForImport = <MediaItem>[].obs;
@@ -48,67 +45,6 @@ class DownloadsController extends GetxController {
   final RxBool shareDialogOpen = false.obs;
   final RxBool sharedArgConsumed = false.obs;
   StreamSubscription<List<SharedMediaFile>>? _shareSub;
-
-  // ============================
-  // 📊 DESCARGA (PROGRESO GLOBAL)
-  // ============================
-  void _showDownloadSnack() {
-    if (_downloadSnackOpen) return;
-    _downloadSnackOpen = true;
-
-    final theme = Get.theme;
-    final scheme = theme.colorScheme;
-
-    Get.rawSnackbar(
-      snackPosition: SnackPosition.TOP,
-      isDismissible: false,
-      backgroundColor: scheme.surfaceContainerHighest,
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      borderRadius: 16,
-      duration: const Duration(days: 1),
-      messageText: Obx(
-        () => Row(
-          children: [
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    downloadStatus.value,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: scheme.onSurface,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  LinearProgressIndicator(
-                    value: (downloadProgress.value >= 0 &&
-                            downloadProgress.value <= 1)
-                        ? downloadProgress.value
-                        : null,
-                    minHeight: 6,
-                    color: scheme.primary,
-                    backgroundColor: scheme.surfaceContainerHighest,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _hideDownloadSnack() {
-    if (!_downloadSnackOpen) return;
-    _downloadSnackOpen = false;
-    if (Get.isSnackbarOpen) {
-      Get.closeCurrentSnackbar();
-    }
-  }
 
   // ============================
   // 🔁 LIFECYCLE
@@ -307,41 +243,6 @@ class DownloadsController extends GetxController {
     }
   }
 
-  Future<bool> _canDownloadWithCurrentDataPolicy() async {
-    final usage = (_storage.read('dataUsage') ?? 'all').toString();
-    if (usage != 'wifi_only') return true;
-
-    try {
-      final interfaces = await NetworkInterface.list(
-        includeLoopback: false,
-        includeLinkLocal: false,
-      );
-
-      final hasWifi = interfaces.any((iface) {
-        final name = iface.name.toLowerCase();
-        // Android: wlan0 / wifi, Desktop: en0 / en1 / eth
-        return name.contains('wlan') ||
-            name.contains('wifi') ||
-            name == 'en0' ||
-            name == 'en1' ||
-            name.startsWith('eth');
-      });
-
-      if (hasWifi) return true;
-
-      Get.snackbar(
-        'Descargas bloqueadas',
-        'Tienes activado "Solo Wi-Fi". Conéctate a una red Wi-Fi para descargar.',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.orange,
-      );
-      return false;
-    } catch (_) {
-      // Si no se puede verificar red, no bloqueamos para evitar falsos positivos.
-      return true;
-    }
-  }
-
   // ============================
   // ⬇️ DESCARGAR DESDE URL
   // ============================
@@ -351,102 +252,14 @@ class DownloadsController extends GetxController {
     required String kind,
     String? quality,
   }) async {
-    if (url.trim().isEmpty) {
-      Get.snackbar(
-        'Imports',
-        'Por favor ingresa una URL válida',
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-      );
-      return;
-    }
-
-    final allowedByPolicy = await _canDownloadWithCurrentDataPolicy();
-    if (!allowedByPolicy) return;
-
-    final format = kind == 'video' ? 'mp4' : 'mp3';
-    final resolvedQuality = (quality ?? _storage.read('downloadQuality') ?? 'high')
-        .toString()
-        .trim()
-        .toLowerCase();
-
-    try {
-      isDownloading.value = true;
-      downloadProgress.value = -1;
-      downloadStatus.value = 'Preparando descarga...';
-      _showDownloadSnack();
-
-      final ok = await _repo
-          .requestAndFetchMedia(
-            mediaId: mediaId?.trim().isEmpty == true ? null : mediaId,
-            url: url.trim(),
-            kind: kind,
-            format: format,
-            quality: resolvedQuality,
-            onProgress: (received, total) {
-              if (total > 0) {
-                downloadProgress.value = received / total;
-              } else {
-                downloadProgress.value = -1;
-              }
-              downloadStatus.value = 'Descargando...';
-            },
-          )
-          .timeout(
-            const Duration(minutes: 5),
-            onTimeout: () => false,
-          );
-
-      if (ok) {
-        downloadStatus.value = 'Guardando en la librería...';
-        await load();
-        Get.snackbar(
-          'Imports',
-          'Importación completada ✅',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.green,
-        );
-      } else {
-        Get.snackbar(
-          'Imports',
-          'Falló la importación. La web puede ser lenta o no compatible.',
-          snackPosition: SnackPosition.BOTTOM,
-          backgroundColor: Colors.orange,
-        );
-      }
-    } catch (e) {
-
-      String msg = 'Error inesperado';
-
-      if (e is dio.DioException) {
-        switch (e.type) {
-          case dio.DioExceptionType.receiveTimeout:
-            msg =
-                'El servidor tardó demasiado en responder. Intenta nuevamente.';
-            break;
-          case dio.DioExceptionType.connectionTimeout:
-          case dio.DioExceptionType.sendTimeout:
-            msg = 'No se pudo conectar con el servidor.';
-            break;
-          default:
-            msg = e.message ?? 'Error de red';
-        }
-      } else {
-        msg = e.toString();
-      }
-
-      Get.snackbar(
-        'Imports',
-        msg,
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Colors.red,
-      );
-
-      debugPrint('downloadFromUrl error: $e');
-    } finally {
-      isDownloading.value = false;
-      downloadProgress.value = -1;
-      _hideDownloadSnack();
+    final ok = await _downloadTask.downloadFromUrl(
+      mediaId: mediaId,
+      url: url,
+      kind: kind,
+      quality: quality,
+    );
+    if (ok && !isClosed) {
+      await load();
     }
   }
 
@@ -547,7 +360,8 @@ class DownloadsController extends GetxController {
         localPath: destPath,
         createdAt: v.createdAt,
         size: await destFile.length(),
-        durationSeconds: v.durationSeconds ??
+        durationSeconds:
+            v.durationSeconds ??
             (v.kind == MediaVariantKind.audio
                 ? await _probeDurationSeconds(destPath)
                 : null),
