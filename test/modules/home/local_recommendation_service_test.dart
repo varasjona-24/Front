@@ -1,3 +1,4 @@
+import 'package:flutter_listenfy/Modules/artists/domain/artist_profile.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_listenfy/Modules/home/data/recommendation_store.dart';
 import 'package:flutter_listenfy/Modules/home/domain/recommendation_models.dart';
@@ -232,7 +233,7 @@ void main() {
     });
 
     test(
-      'usa el campo pais como señal regional para recomendaciones',
+      'usa el pais del artista como señal regional para recomendaciones',
       () async {
         final now = DateTime(2026, 3, 6, 18, 0);
         final items = <MediaItem>[
@@ -241,7 +242,6 @@ void main() {
             publicId: 'seed-col',
             title: 'Session de noche',
             subtitle: 'Artista Uno',
-            country: 'Colombia',
             hasAudio: true,
             hasVideo: true,
             isFavorite: true,
@@ -255,7 +255,6 @@ void main() {
             publicId: 'match-col',
             title: 'Tema nuevo',
             subtitle: 'Artista Dos',
-            country: 'Colombia',
             hasAudio: true,
             hasVideo: false,
           ),
@@ -266,9 +265,28 @@ void main() {
               publicId: 'other-$i',
               title: 'Tema otro $i',
               subtitle: 'Artista otro $i',
-              country: i.isEven ? 'Chile' : 'Argentina',
               hasAudio: true,
               hasVideo: true,
+            ),
+          ),
+        ];
+        final profiles = <ArtistProfile>[
+          const ArtistProfile(
+            key: 'artista uno',
+            displayName: 'Artista Uno',
+            country: 'Colombia',
+          ),
+          const ArtistProfile(
+            key: 'artista dos',
+            displayName: 'Artista Dos',
+            country: 'Colombia',
+          ),
+          ...List.generate(
+            20,
+            (i) => ArtistProfile(
+              key: 'artista otro $i',
+              displayName: 'Artista otro $i',
+              country: i.isEven ? 'Chile' : 'Argentina',
             ),
           ),
         ];
@@ -276,6 +294,7 @@ void main() {
         final service = LocalRecommendationService(
           store: RecommendationStore.memory(),
           libraryLoader: () async => items,
+          artistProfileLoader: () async => profiles,
           now: () => now,
         );
 
@@ -290,32 +309,38 @@ void main() {
       },
     );
 
-    test('cold start devuelve hasta 24 items con fallback', () async {
-      final now = DateTime(2026, 3, 6, 10, 0);
-      final items = List.generate(
-        50,
-        (i) => _buildItem(
-          id: 'cold-$i',
-          publicId: 'cold-pub-$i',
-          title: 'Tema frio $i',
-          subtitle: 'Artista frio $i',
-          hasAudio: true,
-          hasVideo: true,
-        ),
-      );
+    test(
+      'cold start devuelve todos los items disponibles con fallback',
+      () async {
+        final now = DateTime(2026, 3, 6, 10, 0);
+        final items = List.generate(
+          50,
+          (i) => _buildItem(
+            id: 'cold-$i',
+            publicId: 'cold-pub-$i',
+            title: 'Tema frio $i',
+            subtitle: 'Artista frio $i',
+            hasAudio: true,
+            hasVideo: true,
+          ),
+        );
 
-      final service = LocalRecommendationService(
-        store: RecommendationStore.memory(),
-        libraryLoader: () async => items,
-        now: () => now,
-      );
+        final service = LocalRecommendationService(
+          store: RecommendationStore.memory(),
+          libraryLoader: () async => items,
+          now: () => now,
+        );
 
-      final set = await service.getOrBuildForDay(
-        mode: RecommendationMode.audio,
-      );
-      expect(set.entries.length, 24);
-      expect(set.entries.every((e) => e.reasonText.trim().isNotEmpty), isTrue);
-    });
+        final set = await service.getOrBuildForDay(
+          mode: RecommendationMode.audio,
+        );
+        expect(set.entries.length, items.length);
+        expect(
+          set.entries.every((e) => e.reasonText.trim().isNotEmpty),
+          isTrue,
+        );
+      },
+    );
   });
 }
 

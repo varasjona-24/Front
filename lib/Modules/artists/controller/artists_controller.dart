@@ -17,6 +17,7 @@ class ArtistGroup {
   final String key;
   final String name;
   final int count;
+  final String? country;
   final String? thumbnail;
   final String? thumbnailLocalPath;
   final ArtistProfileKind kind;
@@ -29,6 +30,7 @@ class ArtistGroup {
     required this.count,
     required this.items,
     required this.kind,
+    this.country,
     this.memberKeys = const <String>[],
     this.thumbnail,
     this.thumbnailLocalPath,
@@ -167,6 +169,7 @@ class ArtistsController extends GetxController {
             count: itemsForArtist.length,
             items: itemsForArtist,
             kind: profile?.kind ?? ArtistProfileKind.singer,
+            country: profile?.country,
             memberKeys: _normalizeMemberKeysForOwner(
               ownerKey: key,
               members: profile?.memberKeys ?? const <String>[],
@@ -189,7 +192,11 @@ class ArtistsController extends GetxController {
   List<ArtistGroup> get filtered {
     final q = query.value.trim().toLowerCase();
     if (q.isEmpty) return artists.toList();
-    return artists.where((a) => a.name.toLowerCase().contains(q)).toList();
+    return artists.where((a) {
+      final name = a.name.toLowerCase();
+      final country = (a.country ?? '').trim().toLowerCase();
+      return name.contains(q) || country.contains(q);
+    }).toList();
   }
 
   void setQuery(String value) {
@@ -249,6 +256,7 @@ class ArtistsController extends GetxController {
   Future<void> updateArtist({
     required String key,
     required String newName,
+    required String country,
     required ArtistProfileKind kind,
     required List<String> memberKeys,
     String? thumbnail,
@@ -272,6 +280,7 @@ class ArtistsController extends GetxController {
       displayName: newName.trim().isEmpty
           ? 'Artista desconocido'
           : newName.trim(),
+      country: country.trim(),
       thumbnail: thumbnail,
       thumbnailLocalPath: thumbnailLocalPath,
       kind: kind,

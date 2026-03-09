@@ -295,7 +295,6 @@ class EditEntityController extends GetxController {
     required MediaItem item,
     required String title,
     required String subtitle,
-    required String country,
     required bool thumbTouched,
     required String? localThumbPath,
     required String lyrics,
@@ -330,7 +329,6 @@ class EditEntityController extends GetxController {
     final updated = latest.copyWith(
       title: trimmedTitle,
       subtitle: subtitle.trim(),
-      country: country.trim(),
       thumbnail: thumbRemoteUpdate,
       thumbnailLocalPath: thumbLocalUpdate,
       durationSeconds: latest.durationSeconds,
@@ -349,6 +347,7 @@ class EditEntityController extends GetxController {
   Future<bool> saveArtist({
     required ArtistGroup artist,
     required String name,
+    required String country,
     required ArtistProfileKind kind,
     required List<String> memberKeys,
     required bool thumbTouched,
@@ -381,6 +380,7 @@ class EditEntityController extends GetxController {
     await _artists.updateArtist(
       key: artist.key,
       newName: trimmed,
+      country: country,
       kind: kind,
       memberKeys: memberKeys,
       thumbnail: nextThumb,

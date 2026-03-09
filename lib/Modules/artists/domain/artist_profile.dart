@@ -18,6 +18,7 @@ extension ArtistProfileKindX on ArtistProfileKind {
 class ArtistProfile {
   final String key;
   final String displayName;
+  final String? country;
   final String? thumbnail;
   final String? thumbnailLocalPath;
   final ArtistProfileKind kind;
@@ -26,6 +27,7 @@ class ArtistProfile {
   const ArtistProfile({
     required this.key,
     required this.displayName,
+    this.country,
     this.thumbnail,
     this.thumbnailLocalPath,
     this.kind = ArtistProfileKind.singer,
@@ -35,6 +37,7 @@ class ArtistProfile {
   ArtistProfile copyWith({
     String? key,
     String? displayName,
+    String? country,
     String? thumbnail,
     String? thumbnailLocalPath,
     ArtistProfileKind? kind,
@@ -43,6 +46,7 @@ class ArtistProfile {
     return ArtistProfile(
       key: key ?? this.key,
       displayName: displayName ?? this.displayName,
+      country: country ?? this.country,
       thumbnail: thumbnail ?? this.thumbnail,
       thumbnailLocalPath: thumbnailLocalPath ?? this.thumbnailLocalPath,
       kind: kind ?? this.kind,
@@ -53,6 +57,7 @@ class ArtistProfile {
   Map<String, dynamic> toJson() => {
     'key': key,
     'displayName': displayName,
+    'country': country,
     'thumbnail': thumbnail,
     'thumbnailLocalPath': thumbnailLocalPath,
     'kind': kind.key,
@@ -72,6 +77,9 @@ class ArtistProfile {
     return ArtistProfile(
       key: (json['key'] as String?)?.trim() ?? '',
       displayName: (json['displayName'] as String?)?.trim() ?? '',
+      country:
+          (json['country'] as String?)?.trim() ??
+          (json['pais'] as String?)?.trim(),
       thumbnail: (json['thumbnail'] as String?)?.trim(),
       thumbnailLocalPath: (json['thumbnailLocalPath'] as String?)?.trim(),
       kind: ArtistProfileKindX.fromRaw(json['kind']),

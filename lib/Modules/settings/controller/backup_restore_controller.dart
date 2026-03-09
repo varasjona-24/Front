@@ -34,22 +34,11 @@ import '../../../Modules/home/service/local_recommendation_service.dart';
 // Función top-level para poder ejecutarse en un Isolate (hilo separado)
 // NOTA: Se pasa la ROTA del archivo (String) y no los bytes (List<int>)
 // para evitar que Dart congele la UI clonando megabytes en memoria entre Isolates.
-void _extractZipIsolate(Map<String, dynamic> params) {
+Future<void> _extractZipIsolate(Map<String, dynamic> params) async {
   final path = params['path'] as String;
   final outDir = params['outDir'] as String;
-
-  final bytes = File(path).readAsBytesSync();
-  final archive = ZipDecoder().decodeBytes(bytes);
-
-  for (final archivedFile in archive) {
-    if (archivedFile.isFile) {
-      final outFile = File(p.join(outDir, archivedFile.name));
-      outFile.parent.createSync(recursive: true);
-      outFile.writeAsBytesSync(archivedFile.content as List<int>, flush: true);
-    } else {
-      Directory(p.join(outDir, archivedFile.name)).createSync(recursive: true);
-    }
-  }
+  // Extrae en modo stream para evitar cargar el ZIP completo en memoria.
+  await extractFileToDisk(path, outDir);
 }
 
 // Comprime un directorio en ZIP fuera del hilo principal para evitar ANR.

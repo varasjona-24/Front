@@ -61,6 +61,8 @@ class ArtistsPage extends GetView<ArtistsController> {
                                 const SizedBox(height: AppSpacing.md),
                                 _recentArtists(theme),
                                 const SizedBox(height: AppSpacing.lg),
+                                _searchField(theme),
+                                const SizedBox(height: AppSpacing.md),
                                 _summaryRow(theme, context),
                                 const SizedBox(height: AppSpacing.md),
                                 _artistList(),
@@ -134,6 +136,19 @@ class ArtistsPage extends GetView<ArtistsController> {
     );
   }
 
+  Widget _searchField(ThemeData theme) {
+    return TextField(
+      onChanged: controller.setQuery,
+      decoration: InputDecoration(
+        labelText: 'Buscar artista',
+        hintText: 'Nombre o país',
+        prefixIcon: const Icon(Icons.search_rounded),
+        filled: true,
+        fillColor: theme.colorScheme.surfaceContainer,
+      ),
+    );
+  }
+
   Widget _recentArtists(ThemeData theme) {
     return Obx(() {
       final list = controller.recentArtists;
@@ -150,7 +165,7 @@ class ArtistsPage extends GetView<ArtistsController> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 124,
+            height: 162,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: list.length,
@@ -376,6 +391,13 @@ class _ArtistCard extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final thumb = artist.thumbnailLocalPath ?? artist.thumbnail;
+    final country = (artist.country ?? '').trim();
+    final typeLabel = artist.kind == ArtistProfileKind.band
+        ? 'Banda'
+        : 'Cantante';
+    final subtitle = country.isEmpty
+        ? '$typeLabel · ${artist.count} canciones'
+        : '$typeLabel · $country · ${artist.count} canciones';
 
     return Card(
       elevation: 0,
@@ -384,9 +406,7 @@ class _ArtistCard extends StatelessWidget {
       child: ListTile(
         leading: ArtistAvatar(thumb: thumb, radius: 24),
         title: Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(
-          '${artist.kind == ArtistProfileKind.band ? 'Banda' : 'Cantante'} · ${artist.count} canciones',
-        ),
+        subtitle: Text(subtitle),
         trailing: IconButton(
           icon: const Icon(Icons.edit_rounded),
           onPressed: onEdit,
@@ -407,6 +427,7 @@ class _ArtistCoverCard extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final thumb = artist.thumbnailLocalPath ?? artist.thumbnail;
+    final country = (artist.country ?? '').trim();
 
     final imageProvider = (thumb != null && thumb.isNotEmpty)
         ? (thumb.startsWith('http')
@@ -453,6 +474,15 @@ class _ArtistCoverCard extends StatelessWidget {
                 color: scheme.onSurfaceVariant,
               ),
             ),
+            if (country.isNotEmpty)
+              Text(
+                country,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
           ],
         ),
       ),

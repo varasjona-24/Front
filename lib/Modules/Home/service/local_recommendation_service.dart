@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import '../../artists/domain/artist_profile.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/utils/artist_credit_parser.dart';
 import '../../sources/domain/source_origin.dart';
@@ -12,22 +13,30 @@ class LocalRecommendationService {
   LocalRecommendationService({
     required RecommendationStore store,
     required Future<List<MediaItem>> Function() libraryLoader,
+    Future<List<ArtistProfile>> Function()? artistProfileLoader,
     Future<List<SourceThemeTopic>> Function()? topicLoader,
     Future<List<SourceThemeTopicPlaylist>> Function()? topicPlaylistLoader,
     DateTime Function()? now,
   }) : _store = store,
        _libraryLoader = libraryLoader,
+       _artistProfileLoader = artistProfileLoader ?? _emptyArtistProfileLoader,
        _topicLoader = topicLoader ?? _emptyTopicLoader,
        _topicPlaylistLoader = topicPlaylistLoader ?? _emptyTopicPlaylistLoader,
        _now = now ?? DateTime.now;
 
   final RecommendationStore _store;
   final Future<List<MediaItem>> Function() _libraryLoader;
+  final Future<List<ArtistProfile>> Function() _artistProfileLoader;
   final Future<List<SourceThemeTopic>> Function() _topicLoader;
   final Future<List<SourceThemeTopicPlaylist>> Function() _topicPlaylistLoader;
   final DateTime Function() _now;
 
   RecommendationState? _stateCache;
+  static const int _dailySetTargetSize = 80;
+
+  static Future<List<ArtistProfile>> _emptyArtistProfileLoader() async {
+    return const <ArtistProfile>[];
+  }
 
   static Future<List<SourceThemeTopic>> _emptyTopicLoader() async {
     return const <SourceThemeTopic>[];
@@ -185,9 +194,12 @@ class LocalRecommendationService {
     }
 
     final sourceLabels = await _buildSourceLabelMap();
+    final artistCountryByKey = await _buildArtistCountryMap();
     final nowMs = _now().millisecondsSinceEpoch;
     final candidates = candidatesPool
-        .map((item) => _candidateFromItem(item, sourceLabels))
+        .map(
+          (item) => _candidateFromItem(item, sourceLabels, artistCountryByKey),
+        )
         .whereType<_RecommendationCandidate>()
         .toList();
 
@@ -220,7 +232,10 @@ class LocalRecommendationService {
     }
 
     scored.sort((a, b) => b.score.compareTo(a.score));
-    final selected = _selectDiverse(scored, limit: 24);
+    final selected = _selectDiverse(
+      scored,
+      limit: min(_dailySetTargetSize, scored.length),
+    );
     final generatedAt = _now().millisecondsSinceEpoch;
     final entries = selected
         .map(
@@ -286,9 +301,30 @@ class LocalRecommendationService {
     return labels;
   }
 
+  Future<Map<String, String>> _buildArtistCountryMap() async {
+    List<ArtistProfile> profiles;
+    try {
+      profiles = await _artistProfileLoader();
+    } catch (_) {
+      profiles = const <ArtistProfile>[];
+    }
+
+    final map = <String, String>{};
+    for (final profile in profiles) {
+      final key = ArtistCreditParser.normalizeKey(profile.key);
+      if (key.isEmpty || key == 'unknown') continue;
+      final countryDisplay = _normalizedCountryDisplay(profile.country);
+      final countryKey = _normalizedCountryKey(countryDisplay);
+      if (countryKey == null) continue;
+      map[key] = countryDisplay!;
+    }
+    return map;
+  }
+
   _RecommendationCandidate? _candidateFromItem(
     MediaItem item,
     Map<String, _SourceLabels> sourceLabels,
+    Map<String, String> artistCountryByKey,
   ) {
     final publicId = item.publicId.trim();
     final id = item.id.trim();
@@ -330,8 +366,37 @@ class LocalRecommendationService {
         : (artistMap.isNotEmpty ? artistMap.values.first : '');
     final primaryArtistKey = ArtistCreditParser.normalizeKey(primaryArtistName);
 
+    final artistCountries = <String>[];
+    final countrySeen = <String>{};
+
+    void addCountryByArtistKey(String key) {
+      final countryDisplay = artistCountryByKey[key];
+      if (countryDisplay == null) return;
+      final countryKey = _normalizedCountryKey(countryDisplay);
+      if (countryKey == null) return;
+      if (!countrySeen.add(countryKey)) return;
+      artistCountries.add(countryDisplay);
+    }
+
+    if (primaryArtistKey.isNotEmpty && primaryArtistKey != 'unknown') {
+      addCountryByArtistKey(primaryArtistKey);
+    }
+    for (final artistKey in artistMap.keys) {
+      if (artistKey == primaryArtistKey) continue;
+      addCountryByArtistKey(artistKey);
+    }
+
+    // Backward compatibility for existing backups/libraries that still have
+    // country at song level before migrating to artist profiles.
+    if (artistCountries.isEmpty) {
+      final fallback = _normalizedCountryDisplay(item.country);
+      if (fallback != null) {
+        artistCountries.add(fallback);
+      }
+    }
+
     final mergedText =
-        '${item.title} ${item.subtitle} ${item.country ?? ''} $sourceText';
+        '${item.title} ${item.subtitle} ${artistCountries.join(' ')} $sourceText';
     final normalized = _normalizeText(mergedText);
     final tokens = _tokenize(normalized);
     final genres = _extractLexiconMatches(
@@ -344,7 +409,9 @@ class LocalRecommendationService {
       tokens: tokens,
       lexicon: _regionLexicon,
     );
-    final countryDisplay = _normalizedCountryDisplay(item.country);
+    final countryDisplay = artistCountries.isNotEmpty
+        ? artistCountries.first
+        : null;
     final countryKey = _normalizedCountryKey(countryDisplay);
     final regions = <String>[
       if (countryKey != null) countryKey,

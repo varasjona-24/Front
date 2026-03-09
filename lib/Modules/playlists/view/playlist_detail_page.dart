@@ -97,6 +97,8 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
                       entry.value,
                       entry.key,
                       items,
+                      playlist,
+                      isSmart,
                       actions,
                     ),
                   ),
@@ -205,6 +207,8 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
     MediaItem item,
     int index,
     List<MediaItem> queue,
+    Playlist? playlist,
+    bool isSmartPlaylist,
     MediaActionsController actions,
   ) {
     final scheme = theme.colorScheme;
@@ -215,6 +219,8 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
           ? NetworkImage(thumb)
           : FileImage(File(thumb));
     }
+
+    final canRemoveFromPlaylist = !isSmartPlaylist && playlist != null;
 
     return ListTile(
       onTap: () => _play(queue, index),
@@ -235,13 +241,49 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: IconButton(
+      trailing: PopupMenuButton<_TrackAction>(
         icon: const Icon(Icons.more_vert),
-        onPressed: () => actions.showItemActions(
-          context,
-          item,
-          onChanged: controller.load,
-        ),
+        onSelected: (action) async {
+          switch (action) {
+            case _TrackAction.removeFromPlaylist:
+              if (playlist == null) return;
+              await controller.removeItemFromPlaylist(playlist.id, item);
+              if (context.mounted) {
+                Get.snackbar(
+                  'Playlist',
+                  'Canción eliminada de la lista',
+                  snackPosition: SnackPosition.BOTTOM,
+                );
+              }
+              break;
+            case _TrackAction.moreActions:
+              await actions.showItemActions(
+                context,
+                item,
+                onChanged: controller.load,
+              );
+              break;
+          }
+        },
+        itemBuilder: (ctx) => [
+          if (canRemoveFromPlaylist)
+            const PopupMenuItem<_TrackAction>(
+              value: _TrackAction.removeFromPlaylist,
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.remove_circle_outline_rounded),
+                title: Text('Quitar de esta playlist'),
+              ),
+            ),
+          const PopupMenuItem<_TrackAction>(
+            value: _TrackAction.moreActions,
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.tune_rounded),
+              title: Text('Más acciones'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -263,9 +305,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
   ImageProvider? _resolveCover(Playlist? playlist, List<MediaItem> items) {
     if (playlist != null) {
       final local = playlist.coverLocalPath?.trim();
-      if (local != null &&
-          local.isNotEmpty &&
-          File(local).existsSync()) {
+      if (local != null && local.isNotEmpty && File(local).existsSync()) {
         return FileImage(File(local));
       }
       final url = playlist.coverUrl?.trim();
@@ -385,5 +425,6 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
       },
     );
   }
-
 }
+
+enum _TrackAction { removeFromPlaylist, moreActions }

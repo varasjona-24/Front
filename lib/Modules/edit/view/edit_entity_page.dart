@@ -36,6 +36,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _subtitleCtrl;
   late final TextEditingController _countryCtrl;
+  late final TextEditingController _memberSearchCtrl;
   late final TextEditingController _durationCtrl;
   late final TextEditingController _thumbCtrl;
 
@@ -72,7 +73,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _mediaDraft = item;
       _titleCtrl = TextEditingController(text: item.title);
       _subtitleCtrl = TextEditingController(text: item.subtitle);
-      _countryCtrl = TextEditingController(text: item.country ?? '');
+      _countryCtrl = TextEditingController(text: '');
       _durationCtrl = TextEditingController(
         text: item.durationSeconds?.toString() ?? '',
       );
@@ -84,7 +85,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       final artist = _artist!;
       _titleCtrl = TextEditingController(text: artist.name);
       _subtitleCtrl = TextEditingController(text: '');
-      _countryCtrl = TextEditingController(text: '');
+      _countryCtrl = TextEditingController(text: artist.country ?? '');
       _durationCtrl = TextEditingController(text: '');
       _thumbCtrl = TextEditingController(text: artist.thumbnail ?? '');
       _localThumbPath = artist.thumbnailLocalPath;
@@ -128,6 +129,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
         _colorValue = pl.colorValue;
       }
     }
+
+    _memberSearchCtrl = TextEditingController();
   }
 
   @override
@@ -135,6 +138,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
     _titleCtrl.dispose();
     _subtitleCtrl.dispose();
     _countryCtrl.dispose();
+    _memberSearchCtrl.dispose();
     _durationCtrl.dispose();
     _thumbCtrl.dispose();
     if (Get.isRegistered<NavigationController>()) {
@@ -579,7 +583,6 @@ class _EditEntityPageState extends State<EditEntityPage> {
             item: _media!,
             title: _titleCtrl.text,
             subtitle: _subtitleCtrl.text,
-            country: _countryCtrl.text,
             thumbTouched: _thumbTouched,
             localThumbPath: _localThumbPath,
             lyrics: _media?.lyrics ?? '',
@@ -592,6 +595,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
               ? await _controller.saveArtist(
                   artist: _artist!,
                   name: _titleCtrl.text,
+                  country: _countryCtrl.text,
                   kind: _artistKind,
                   memberKeys: _artistMemberKeys.toList(growable: false),
                   thumbTouched: _thumbTouched,
@@ -824,6 +828,15 @@ class _EditEntityPageState extends State<EditEntityPage> {
   Widget _artistClassificationSection(ThemeData theme) {
     if (!_isArtist) return const SizedBox.shrink();
     final candidates = _artistMemberCandidates();
+    final query = _memberSearchCtrl.text.trim().toLowerCase();
+    final filteredCandidates = query.isEmpty
+        ? const <ArtistGroup>[]
+        : candidates
+              .where((artist) => artist.name.toLowerCase().contains(query))
+              .toList(growable: false);
+    final selectedMembers = candidates
+        .where((artist) => _artistMemberKeys.contains(artist.key))
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -869,6 +882,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
                       _artistKind = value;
                       if (_artistKind != ArtistProfileKind.band) {
                         _artistMemberKeys.clear();
+                        _memberSearchCtrl.clear();
                       }
                     });
                   },
@@ -883,11 +897,48 @@ class _EditEntityPageState extends State<EditEntityPage> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Selecciona los cantantes/artistas que pertenecen a esta banda.',
+                    'Busca integrantes por nombre y selecciónalos para esta banda.',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _memberSearchCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      labelText: 'Buscar integrante',
+                      hintText: 'Escribe un nombre',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                  ),
+                  if (selectedMembers.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Seleccionados',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: selectedMembers
+                          .map(
+                            (entry) => InputChip(
+                              label: Text(entry.name),
+                              selected: true,
+                              onDeleted: () {
+                                setState(() {
+                                  _artistMemberKeys.remove(entry.key);
+                                });
+                              },
+                            ),
+                          )
+                          .toList(growable: false),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   if (candidates.isEmpty)
                     Text(
@@ -896,27 +947,66 @@ class _EditEntityPageState extends State<EditEntityPage> {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     )
+                  else if (query.isEmpty)
+                    Text(
+                      'Escribe en el buscador para ver resultados.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  else if (filteredCandidates.isEmpty)
+                    Text(
+                      'No se encontraron artistas con ese nombre.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
                   else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: candidates
-                          .map(
-                            (entry) => FilterChip(
-                              label: Text(entry.name),
-                              selected: _artistMemberKeys.contains(entry.key),
-                              onSelected: (selected) {
-                                setState(() {
-                                  if (selected) {
-                                    _artistMemberKeys.add(entry.key);
-                                  } else {
-                                    _artistMemberKeys.remove(entry.key);
-                                  }
-                                });
-                              },
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxHeight: 240),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: filteredCandidates.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 2),
+                        itemBuilder: (context, index) {
+                          final entry = filteredCandidates[index];
+                          final isSelected = _artistMemberKeys.contains(
+                            entry.key,
+                          );
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              isSelected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.circle_outlined,
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
-                          )
-                          .toList(growable: false),
+                            title: Text(
+                              entry.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              entry.kind == ArtistProfileKind.band
+                                  ? 'Banda'
+                                  : 'Cantante',
+                            ),
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  _artistMemberKeys.remove(entry.key);
+                                } else {
+                                  _artistMemberKeys.add(entry.key);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
                     ),
                 ],
               ],
@@ -1043,17 +1133,18 @@ class _EditEntityPageState extends State<EditEntityPage> {
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
-                            if (_countryCtrl.text.trim().isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'Pais: ${_countryCtrl.text.trim()}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
+                          ],
+                          if (_isArtist &&
+                              _countryCtrl.text.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Pais: ${_countryCtrl.text.trim()}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
                               ),
-                            ],
+                            ),
                           ],
                         ],
                       ),
@@ -1104,6 +1195,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
                           prefixIcon: Icon(Icons.person_rounded),
                         ),
                       ),
+                    ],
+                    if (_isArtist) ...[
                       const SizedBox(height: 12),
                       TextField(
                         controller: _countryCtrl,

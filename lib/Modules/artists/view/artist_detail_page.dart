@@ -192,6 +192,7 @@ class ArtistDetailPage extends GetView<ArtistsController> {
                     onOpen: (member) => Get.toNamed(
                       AppRoutes.artistDetail,
                       arguments: member.key,
+                      preventDuplicates: false,
                     ),
                   ),
                   const SizedBox(height: 20),

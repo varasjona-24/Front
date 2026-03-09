@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'dart:io';
 
 import 'package:get/get.dart';
@@ -55,6 +56,10 @@ class HomeController extends GetxController {
       <RecommendationCollection>[].obs;
 
   final RxList<MediaItem> _allItems = <MediaItem>[].obs;
+  static const int _recommendedPreviewLimit = 12;
+  static const int _recommendedFullLimit = 80;
+  static const int _collectionMinItems = 15;
+  static const int _collectionMaxCount = 4;
 
   @override
   void onInit() {
@@ -411,11 +416,11 @@ class HomeController extends GetxController {
         reasons['p:$pid'] = reason;
       }
 
-      if (resolved.length >= 24) break;
+      if (resolved.length >= _recommendedFullLimit) break;
     }
 
-    fullRecommended.assignAll(resolved.take(24));
-    recommended.assignAll(resolved.take(12));
+    fullRecommended.assignAll(resolved.take(_recommendedFullLimit));
+    recommended.assignAll(resolved.take(_recommendedPreviewLimit));
     recommendationReasonsById.assignAll(reasons);
     recommendationCollections.assignAll(
       _buildRecommendationCollections(resolvedEntries),
@@ -485,9 +490,15 @@ class HomeController extends GetxController {
       ),
     ];
 
-    final targetCollections = entries.length >= 20
-        ? 4
-        : (entries.length >= 14 ? 3 : (entries.length >= 8 ? 2 : 1));
+    final targetCollections = min(
+      _collectionMaxCount,
+      max(1, min(_collectionMaxCount, entries.length)),
+    );
+    final enoughForMinPerCollection =
+        entries.length >= (targetCollections * _collectionMinItems);
+    final perCollectionTarget = enoughForMinPerCollection
+        ? max(_collectionMinItems, (entries.length / targetCollections).ceil())
+        : max(1, (entries.length / targetCollections).ceil());
     final used = <String>{};
     final collections = <RecommendationCollection>[];
 
@@ -499,6 +510,7 @@ class HomeController extends GetxController {
       _RecommendationCollectionTemplate template,
     ) {
       final free = available();
+      if (free.isEmpty) return const <_ResolvedRecommendation>[];
       final preferred = free
           .where(
             (entry) => template.reasonCodes.contains(entry.entry.reasonCode),
@@ -506,14 +518,15 @@ class HomeController extends GetxController {
           .toList();
 
       final picks = <_ResolvedRecommendation>[];
+
       for (final entry in preferred) {
-        if (picks.length >= 6) break;
+        if (picks.length >= perCollectionTarget) break;
         picks.add(entry);
       }
 
-      if (picks.length < 3) {
+      if (picks.length < perCollectionTarget) {
         for (final entry in free) {
-          if (picks.length >= 6) break;
+          if (picks.length >= perCollectionTarget) break;
           if (picks.contains(entry)) continue;
           picks.add(entry);
         }
@@ -525,7 +538,7 @@ class HomeController extends GetxController {
     for (final template in templates) {
       if (collections.length >= targetCollections) break;
       final picks = pickForTemplate(template);
-      if (picks.length < 3) continue;
+      if (picks.isEmpty) continue;
 
       for (final pick in picks) {
         used.add(_itemStableKey(pick.item));
@@ -541,9 +554,9 @@ class HomeController extends GetxController {
       );
     }
 
-    while (collections.length < 2 && available().length >= 3) {
+    while (collections.length < targetCollections && available().isNotEmpty) {
       final free = available();
-      final chunk = free.take(6).toList();
+      final chunk = free.take(perCollectionTarget).toList();
       for (final entry in chunk) {
         used.add(_itemStableKey(entry.item));
       }
@@ -559,7 +572,7 @@ class HomeController extends GetxController {
 
     if (collections.isEmpty) {
       final fallback = entries
-          .take(6)
+          .take(perCollectionTarget)
           .map((e) => e.item)
           .toList(growable: false);
       collections.add(
@@ -572,7 +585,7 @@ class HomeController extends GetxController {
       );
     }
 
-    return collections.take(4).toList(growable: false);
+    return collections.take(_collectionMaxCount).toList(growable: false);
   }
 }
 
