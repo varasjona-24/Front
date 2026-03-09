@@ -8,6 +8,7 @@ import '../../../app/models/audio_cleanup.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../app/utils/artist_credit_parser.dart';
+import '../../../app/utils/country_catalog.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/controllers/navigation_controller.dart';
 import '../../player/Video/view/lyrics_entry_page.dart';
@@ -48,6 +49,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
   bool _audioCleanupBusy = false;
   MediaItem? _mediaDraft;
   ArtistProfileKind _artistKind = ArtistProfileKind.singer;
+  ArtistMainRegion _artistMainRegion = ArtistMainRegion.none;
+  String? _artistCountryCode;
   final Set<String> _artistMemberKeys = <String>{};
 
   MediaItem? get _media => _mediaDraft;
@@ -81,6 +84,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _localThumbPath = item.thumbnailLocalPath;
       _remoteThumbUrl = item.thumbnail;
       _colorValue = null;
+      _artistCountryCode = null;
     } else if (_args.type == EditEntityType.artist) {
       final artist = _artist!;
       _titleCtrl = TextEditingController(text: artist.name);
@@ -92,6 +96,22 @@ class _EditEntityPageState extends State<EditEntityPage> {
       _remoteThumbUrl = artist.thumbnail;
       _colorValue = null;
       _artistKind = artist.kind;
+      _artistMainRegion = artist.mainRegion;
+      _artistCountryCode = artist.countryCode;
+      if (_countryCtrl.text.trim().isEmpty &&
+          (_artistCountryCode ?? '').isNotEmpty) {
+        _countryCtrl.text =
+            CountryCatalog.countryNameFromCode(_artistCountryCode) ?? '';
+      }
+      if ((_artistCountryCode ?? '').isEmpty) {
+        _artistCountryCode = CountryCatalog.findByName(artist.country)?.code;
+      }
+      if (_artistMainRegion == ArtistMainRegion.none) {
+        final inferred = CountryCatalog.regionKeyFromCode(_artistCountryCode);
+        if (inferred != null) {
+          _artistMainRegion = ArtistMainRegionX.fromRaw(inferred);
+        }
+      }
       _artistMemberKeys
         ..clear()
         ..addAll(artist.memberKeys);
@@ -107,6 +127,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         _remoteThumbUrl = playlist.coverUrl;
         _thumbCleared = playlist.coverCleared;
         _colorValue = null;
+        _artistCountryCode = null;
       } else if (_args.type == EditEntityType.topic) {
         final topic = _topic!;
         _titleCtrl = TextEditingController(text: topic.title);
@@ -117,6 +138,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         _localThumbPath = topic.coverLocalPath;
         _remoteThumbUrl = topic.coverUrl;
         _colorValue = topic.colorValue;
+        _artistCountryCode = null;
       } else {
         final pl = _topicPlaylist!;
         _titleCtrl = TextEditingController(text: pl.name);
@@ -127,6 +149,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         _localThumbPath = pl.coverLocalPath;
         _remoteThumbUrl = pl.coverUrl;
         _colorValue = pl.colorValue;
+        _artistCountryCode = null;
       }
     }
 
@@ -332,6 +355,50 @@ class _EditEntityPageState extends State<EditEntityPage> {
     );
 
     return result == true;
+  }
+
+  String _countryLabelWithFlag() {
+    final country = _countryCtrl.text.trim();
+    if (country.isEmpty) return '';
+    final flag = CountryCatalog.flagFromIso(_artistCountryCode);
+    if (flag.isEmpty) return country;
+    return '$flag $country';
+  }
+
+  Future<void> _pickArtistCountry() async {
+    if (!_isArtist) return;
+
+    final region = _artistMainRegion == ArtistMainRegion.none
+        ? ArtistMainRegion.latino
+        : _artistMainRegion;
+
+    final selected = await showModalBottomSheet<CountryOption>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (_) => _CountryPickerSheet(
+        initialRegion: region,
+        selectedCode: _artistCountryCode,
+      ),
+    );
+
+    if (!mounted || selected == null) return;
+
+    setState(() {
+      _artistCountryCode = selected.code;
+      _countryCtrl.text = selected.name;
+      final nextRegion = ArtistMainRegionX.fromRaw(selected.regionKey);
+      if (nextRegion != ArtistMainRegion.none) {
+        _artistMainRegion = nextRegion;
+      }
+    });
+  }
+
+  void _clearArtistCountry() {
+    setState(() {
+      _countryCtrl.clear();
+      _artistCountryCode = null;
+    });
   }
 
   String _formatClockFromMs(int ms) {
@@ -596,6 +663,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
                   artist: _artist!,
                   name: _titleCtrl.text,
                   country: _countryCtrl.text,
+                  countryCode: _artistCountryCode,
+                  mainRegion: _artistMainRegion,
                   kind: _artistKind,
                   memberKeys: _artistMemberKeys.toList(growable: false),
                   thumbTouched: _thumbTouched,
@@ -1138,7 +1207,19 @@ class _EditEntityPageState extends State<EditEntityPage> {
                               _countryCtrl.text.trim().isNotEmpty) ...[
                             const SizedBox(height: 6),
                             Text(
-                              'Pais: ${_countryCtrl.text.trim()}',
+                              'Pais: ${_countryLabelWithFlag()}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                          if (_isArtist &&
+                              _artistMainRegion != ArtistMainRegion.none) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Region: ${_artistMainRegion.simpleLabel}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -1198,12 +1279,50 @@ class _EditEntityPageState extends State<EditEntityPage> {
                     ],
                     if (_isArtist) ...[
                       const SizedBox(height: 12),
+                      DropdownButtonFormField<ArtistMainRegion>(
+                        key: ValueKey(_artistMainRegion),
+                        initialValue: _artistMainRegion,
+                        decoration: const InputDecoration(
+                          labelText: 'Region principal',
+                          prefixIcon: Icon(Icons.language_rounded),
+                        ),
+                        items: ArtistMainRegion.values
+                            .map((region) {
+                              return DropdownMenuItem<ArtistMainRegion>(
+                                value: region,
+                                child: Text(region.simpleLabel),
+                              );
+                            })
+                            .toList(growable: false),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setState(() {
+                            _artistMainRegion = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
                       TextField(
                         controller: _countryCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Pais',
-                          prefixIcon: Icon(Icons.public_rounded),
-                          hintText: 'Ej: Puerto Rico',
+                        readOnly: true,
+                        onTap: _pickArtistCountry,
+                        decoration: InputDecoration(
+                          labelText: 'Pais (opcional)',
+                          prefixIcon: const Icon(Icons.public_rounded),
+                          hintText: 'Selecciona region y pais',
+                          suffixIcon: IconButton(
+                            tooltip: _countryCtrl.text.trim().isNotEmpty
+                                ? 'Limpiar pais'
+                                : 'Seleccionar pais',
+                            onPressed: _countryCtrl.text.trim().isNotEmpty
+                                ? _clearArtistCountry
+                                : _pickArtistCountry,
+                            icon: Icon(
+                              _countryCtrl.text.trim().isNotEmpty
+                                  ? Icons.close_rounded
+                                  : Icons.arrow_drop_down_rounded,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -1467,6 +1586,197 @@ class _AudioSilenceTimeline extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _CountryPickerSheet extends StatefulWidget {
+  const _CountryPickerSheet({
+    required this.initialRegion,
+    required this.selectedCode,
+  });
+
+  final ArtistMainRegion initialRegion;
+  final String? selectedCode;
+
+  @override
+  State<_CountryPickerSheet> createState() => _CountryPickerSheetState();
+}
+
+class _CountryPickerSheetState extends State<_CountryPickerSheet> {
+  late ArtistMainRegion _region;
+  late final TextEditingController _searchCtrl;
+
+  static const List<ArtistMainRegion> _regions = [
+    ArtistMainRegion.latino,
+    ArtistMainRegion.anglo,
+    ArtistMainRegion.europeo,
+    ArtistMainRegion.asiatico,
+    ArtistMainRegion.africano,
+    ArtistMainRegion.medioOriente,
+    ArtistMainRegion.oceania,
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _region = _regions.contains(widget.initialRegion)
+        ? widget.initialRegion
+        : ArtistMainRegion.latino;
+    _searchCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  static String _normalize(String value) {
+    var text = value.trim().toLowerCase();
+    const accents = {
+      'á': 'a',
+      'é': 'e',
+      'í': 'i',
+      'ó': 'o',
+      'ú': 'u',
+      'ü': 'u',
+      'ñ': 'n',
+    };
+    accents.forEach((raw, clean) {
+      text = text.replaceAll(raw, clean);
+    });
+    text = text.replaceAll(RegExp(r'[^a-z0-9\s]'), ' ');
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return text;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final query = _normalize(_searchCtrl.text);
+    final countries = CountryCatalog.byRegion(_region.key)
+        .where((entry) {
+          if (query.isEmpty) return true;
+          final name = _normalize(entry.name);
+          final code = entry.code.toLowerCase();
+          return name.contains(query) || code.contains(query);
+        })
+        .toList(growable: false);
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          12,
+          16,
+          16 + MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * 0.82,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 42,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Seleccionar pais',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Primero elige una region y luego un pais.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                height: 40,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _regions.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final option = _regions[index];
+                    return ChoiceChip(
+                      label: Text(option.simpleLabel),
+                      selected: _region == option,
+                      onSelected: (_) {
+                        setState(() {
+                          _region = option;
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _searchCtrl,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  labelText: 'Buscar pais',
+                  hintText: 'Nombre o codigo ISO',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: countries.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No hay paises para esa busqueda.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: countries.length,
+                        separatorBuilder: (_, _) => Divider(
+                          height: 1,
+                          color: theme.colorScheme.outlineVariant,
+                        ),
+                        itemBuilder: (context, index) {
+                          final country = countries[index];
+                          final flag = CountryCatalog.flagFromIso(country.code);
+                          final selected =
+                              country.code == (widget.selectedCode ?? '');
+
+                          return ListTile(
+                            leading: Text(
+                              flag.isEmpty ? '•' : flag,
+                              style: theme.textTheme.titleMedium,
+                            ),
+                            title: Text(country.name),
+                            subtitle: Text(country.code),
+                            trailing: selected
+                                ? Icon(
+                                    Icons.check_rounded,
+                                    color: theme.colorScheme.primary,
+                                  )
+                                : null,
+                            onTap: () => Navigator.of(context).pop(country),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

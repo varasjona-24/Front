@@ -8,6 +8,7 @@ import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
+import '../../../app/utils/country_catalog.dart';
 import '../../../app/routes/app_routes.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../controller/artists_controller.dart';
@@ -141,7 +142,7 @@ class ArtistsPage extends GetView<ArtistsController> {
       onChanged: controller.setQuery,
       decoration: InputDecoration(
         labelText: 'Buscar artista',
-        hintText: 'Nombre o país',
+        hintText: 'Nombre, pais o region',
         prefixIcon: const Icon(Icons.search_rounded),
         filled: true,
         fillColor: theme.colorScheme.surfaceContainer,
@@ -392,12 +393,13 @@ class _ArtistCard extends StatelessWidget {
 
     final thumb = artist.thumbnailLocalPath ?? artist.thumbnail;
     final country = (artist.country ?? '').trim();
+    final flag = CountryCatalog.flagFromIso(artist.countryCode);
     final typeLabel = artist.kind == ArtistProfileKind.band
         ? 'Banda'
         : 'Cantante';
-    final subtitle = country.isEmpty
-        ? '$typeLabel · ${artist.count} canciones'
-        : '$typeLabel · $country · ${artist.count} canciones';
+    final typeCountryLine = country.isNotEmpty
+        ? '$typeLabel - ${flag.isEmpty ? country : '$flag $country'}'
+        : typeLabel;
 
     return Card(
       elevation: 0,
@@ -406,7 +408,18 @@ class _ArtistCard extends StatelessWidget {
       child: ListTile(
         leading: ArtistAvatar(thumb: thumb, radius: 24),
         title: Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(subtitle),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(typeCountryLine, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(
+              '${artist.count} canciones',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
         trailing: IconButton(
           icon: const Icon(Icons.edit_rounded),
           onPressed: onEdit,
@@ -428,6 +441,13 @@ class _ArtistCoverCard extends StatelessWidget {
     final scheme = theme.colorScheme;
     final thumb = artist.thumbnailLocalPath ?? artist.thumbnail;
     final country = (artist.country ?? '').trim();
+    final flag = CountryCatalog.flagFromIso(artist.countryCode);
+    final typeLabel = artist.kind == ArtistProfileKind.band
+        ? 'Banda'
+        : 'Cantante';
+    final typeCountryLine = country.isNotEmpty
+        ? '$typeLabel - ${flag.isEmpty ? country : '$flag $country'}'
+        : typeLabel;
 
     final imageProvider = (thumb != null && thumb.isNotEmpty)
         ? (thumb.startsWith('http')
@@ -467,22 +487,21 @@ class _ArtistCoverCard extends StatelessWidget {
               ),
             ),
             Text(
-              artist.kind == ArtistProfileKind.band ? 'Banda' : 'Cantante',
+              typeCountryLine,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
             ),
-            if (country.isNotEmpty)
-              Text(
-                country,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: scheme.onSurfaceVariant,
-                ),
+            Text(
+              '${artist.count} canciones',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
               ),
+            ),
           ],
         ),
       ),

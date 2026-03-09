@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/controllers/media_actions_controller.dart';
 import '../../../app/utils/artist_credit_parser.dart';
+import '../../../app/utils/country_catalog.dart';
 import 'package:flutter_listenfy/Modules/home/controller/home_controller.dart';
 import '../../../app/routes/app_routes.dart';
 import '../controller/artists_controller.dart';
@@ -114,6 +115,12 @@ class ArtistDetailPage extends GetView<ArtistsController> {
       ]);
 
       final thumb = resolved.thumbnailLocalPath ?? resolved.thumbnail;
+      final country = (resolved.country ?? '').trim();
+      final countryFlag = CountryCatalog.flagFromIso(resolved.countryCode);
+      final typeLabel = isBand ? 'Banda' : 'Cantante';
+      final typeCountryLine = country.isNotEmpty
+          ? '$typeLabel - ${countryFlag.isEmpty ? country : '$countryFlag $country'}'
+          : typeLabel;
 
       return Scaffold(
         backgroundColor: Colors.transparent,
@@ -164,7 +171,13 @@ class ArtistDetailPage extends GetView<ArtistsController> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${isBand ? 'Banda' : 'Cantante'} · ${resolved.count} canciones',
+                                typeCountryLine,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Text(
+                                '${resolved.count} canciones',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),

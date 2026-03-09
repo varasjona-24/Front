@@ -60,6 +60,18 @@ class MediaItem {
   /// Timestamp (ms) última reproducción
   final int? lastPlayedAt;
 
+  /// Conteo de saltos de pista (skip manual o cambio temprano)
+  final int skipCount;
+
+  /// Conteo de reproducciones completadas
+  final int fullListenCount;
+
+  /// Progreso promedio de escucha [0..1]
+  final double avgListenProgress;
+
+  /// Timestamp (ms) de última reproducción completada
+  final int? lastCompletedAt;
+
   /// Duración base del media (si viene del backend/metadata)
   final int? durationSeconds;
   final String? lyrics;
@@ -86,6 +98,10 @@ class MediaItem {
     this.isFavorite = false,
     this.playCount = 0,
     this.lastPlayedAt,
+    this.skipCount = 0,
+    this.fullListenCount = 0,
+    this.avgListenProgress = 0,
+    this.lastCompletedAt,
   });
 
   // ============================
@@ -110,6 +126,10 @@ class MediaItem {
     bool? isFavorite,
     int? playCount,
     int? lastPlayedAt,
+    int? skipCount,
+    int? fullListenCount,
+    double? avgListenProgress,
+    int? lastCompletedAt,
   }) {
     return MediaItem(
       id: id ?? this.id,
@@ -130,6 +150,10 @@ class MediaItem {
       isFavorite: isFavorite ?? this.isFavorite,
       playCount: playCount ?? this.playCount,
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      skipCount: skipCount ?? this.skipCount,
+      fullListenCount: fullListenCount ?? this.fullListenCount,
+      avgListenProgress: avgListenProgress ?? this.avgListenProgress,
+      lastCompletedAt: lastCompletedAt ?? this.lastCompletedAt,
     );
   }
 
@@ -294,6 +318,15 @@ class MediaItem {
     final isFavorite = (json['isFavorite'] as bool?) ?? false;
     final playCount = (json['playCount'] as num?)?.toInt() ?? 0;
     final lastPlayedAt = (json['lastPlayedAt'] as num?)?.toInt();
+    final skipCount = (json['skipCount'] as num?)?.toInt() ?? 0;
+    final fullListenCount = (json['fullListenCount'] as num?)?.toInt() ?? 0;
+    final avgListenProgress = _parseProgress(
+      json['avgListenProgress'],
+      fallback: (json['averageListenProgress'] is num)
+          ? (json['averageListenProgress'] as num).toDouble()
+          : null,
+    );
+    final lastCompletedAt = (json['lastCompletedAt'] as num?)?.toInt();
 
     final lyrics = json['lyrics'] as String?;
     final lyricsLanguage = json['lyricsLanguage'] as String?;
@@ -322,6 +355,10 @@ class MediaItem {
       isFavorite: isFavorite,
       playCount: playCount,
       lastPlayedAt: lastPlayedAt,
+      skipCount: skipCount < 0 ? 0 : skipCount,
+      fullListenCount: fullListenCount < 0 ? 0 : fullListenCount,
+      avgListenProgress: avgListenProgress,
+      lastCompletedAt: lastCompletedAt,
     );
   }
 
@@ -339,12 +376,31 @@ class MediaItem {
     'isFavorite': isFavorite,
     'playCount': playCount,
     'lastPlayedAt': lastPlayedAt,
+    'skipCount': skipCount,
+    'fullListenCount': fullListenCount,
+    'avgListenProgress': avgListenProgress,
+    'lastCompletedAt': lastCompletedAt,
     'lyrics': lyrics,
     'lyricsLanguage': lyricsLanguage,
     'translations': translations,
     'timedLyrics': _timedLyricsToJson(timedLyrics),
     'variants': variants.map((v) => v.toJson()).toList(),
   };
+}
+
+double _parseProgress(dynamic raw, {double? fallback}) {
+  double? value;
+  if (raw is num) {
+    value = raw.toDouble();
+  } else if (raw is String) {
+    value = double.tryParse(raw.trim());
+  } else {
+    value = fallback;
+  }
+
+  if (value == null || value.isNaN || value.isInfinite) return 0;
+  if (value > 1 && value <= 100) value = value / 100;
+  return value.clamp(0, 1).toDouble();
 }
 
 int _parseMilliseconds(dynamic raw) {

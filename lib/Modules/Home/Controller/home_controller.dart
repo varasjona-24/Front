@@ -453,40 +453,39 @@ class HomeController extends GetxController {
   ) {
     if (entries.isEmpty) return const <RecommendationCollection>[];
 
+    final now = DateTime.now();
+    final nowMs = now.millisecondsSinceEpoch;
+    final momentTemplate = _momentTemplate(now.hour);
+
     final templates = <_RecommendationCollectionTemplate>[
-      const _RecommendationCollectionTemplate(
-        id: 'semantic',
+      _RecommendationCollectionTemplate(
+        id: 'scene',
         title: 'Escena que te gusta',
-        subtitle: 'Por género y región',
-        reasonCodes: {
-          RecommendationReasonCode.genreMatch,
-          RecommendationReasonCode.regionMatch,
+        subtitle: 'Por género, región y artistas',
+        matcher: (entry) {
+          return entry.entry.reasonCode ==
+                  RecommendationReasonCode.genreMatch ||
+              entry.entry.reasonCode == RecommendationReasonCode.regionMatch ||
+              entry.entry.reasonCode == RecommendationReasonCode.artistAffinity;
         },
       ),
-      const _RecommendationCollectionTemplate(
-        id: 'affinity',
-        title: 'Basado en tus hábitos',
-        subtitle: 'Favoritos y escuchas recientes',
-        reasonCodes: {
-          RecommendationReasonCode.favoriteAffinity,
-          RecommendationReasonCode.recentAffinity,
-          RecommendationReasonCode.artistAffinity,
-        },
+      _RecommendationCollectionTemplate(
+        id: momentTemplate.id,
+        title: momentTemplate.title,
+        subtitle: momentTemplate.subtitle,
+        matcher: (entry) => _matchesMoment(entry.item, nowMs, now.hour),
       ),
-      const _RecommendationCollectionTemplate(
-        id: 'fresh',
+      _RecommendationCollectionTemplate(
+        id: 'rediscovery',
+        title: 'Redescubiertas',
+        subtitle: 'Lo que vale la pena retomar',
+        matcher: (entry) => _isRediscovery(entry.item, nowMs),
+      ),
+      _RecommendationCollectionTemplate(
+        id: 'discovery',
         title: 'Para descubrir',
-        subtitle: 'Picks frescos del día',
-        reasonCodes: {
-          RecommendationReasonCode.freshPick,
-          RecommendationReasonCode.coldStart,
-        },
-      ),
-      const _RecommendationCollectionTemplate(
-        id: 'origin',
-        title: 'Origen que repites',
-        subtitle: 'Fuentes que más usas',
-        reasonCodes: {RecommendationReasonCode.originAffinity},
+        subtitle: 'Nuevas para rotar hoy',
+        matcher: _isDiscoveryCandidate,
       ),
     ];
 
@@ -511,24 +510,23 @@ class HomeController extends GetxController {
     ) {
       final free = available();
       if (free.isEmpty) return const <_ResolvedRecommendation>[];
-      final preferred = free
-          .where(
-            (entry) => template.reasonCodes.contains(entry.entry.reasonCode),
-          )
-          .toList();
+      final preferred = free.where(template.matcher).toList();
 
       final picks = <_ResolvedRecommendation>[];
+      final pickedKeys = <String>{};
 
       for (final entry in preferred) {
         if (picks.length >= perCollectionTarget) break;
         picks.add(entry);
+        pickedKeys.add(_itemStableKey(entry.item));
       }
 
       if (picks.length < perCollectionTarget) {
         for (final entry in free) {
           if (picks.length >= perCollectionTarget) break;
-          if (picks.contains(entry)) continue;
+          if (pickedKeys.contains(_itemStableKey(entry.item))) continue;
           picks.add(entry);
+          pickedKeys.add(_itemStableKey(entry.item));
         }
       }
 
@@ -587,6 +585,104 @@ class HomeController extends GetxController {
 
     return collections.take(_collectionMaxCount).toList(growable: false);
   }
+
+  _MomentTemplate _momentTemplate(int hour) {
+    if (hour >= 22 || hour < 6) {
+      return const _MomentTemplate(
+        id: 'night',
+        title: 'Mix nocturno',
+        subtitle: 'Retención alta para esta hora',
+      );
+    }
+    if (hour >= 6 && hour < 12) {
+      return const _MomentTemplate(
+        id: 'morning',
+        title: 'Mix para arrancar',
+        subtitle: 'Recientes con buena respuesta',
+      );
+    }
+    if (hour >= 12 && hour < 18) {
+      return const _MomentTemplate(
+        id: 'afternoon',
+        title: 'Mix en movimiento',
+        subtitle: 'Lo más activo de tu biblioteca',
+      );
+    }
+    return const _MomentTemplate(
+      id: 'evening',
+      title: 'Mix de tarde',
+      subtitle: 'Favoritas y buen avance',
+    );
+  }
+
+  bool _matchesMoment(MediaItem item, int nowMs, int hour) {
+    final retention = _retentionSignal(item);
+    final recentSignal = _recentSignal(item, nowMs);
+    final playSignal = (item.playCount / 30).clamp(0.0, 1.0);
+    final favoriteSignal = item.isFavorite ? 1.0 : 0.0;
+
+    if (hour >= 22 || hour < 6) {
+      return retention >= 0.58 && _skipRate(item) <= 0.6;
+    }
+    if (hour >= 6 && hour < 12) {
+      return recentSignal >= 0.45 || (playSignal >= 0.2 && retention >= 0.45);
+    }
+    if (hour >= 12 && hour < 18) {
+      return playSignal >= 0.35 || recentSignal >= 0.55;
+    }
+    return favoriteSignal >= 0.9 || (retention >= 0.52 && recentSignal >= 0.3);
+  }
+
+  bool _isRediscovery(MediaItem item, int nowMs) {
+    final hasHistory = item.playCount > 0 || item.fullListenCount > 0;
+    if (!hasHistory) return false;
+    final ts = item.lastPlayedAt ?? 0;
+    if (ts <= 0) return true;
+    final ageDays = (nowMs - ts) / const Duration(days: 1).inMilliseconds;
+    return ageDays >= 21;
+  }
+
+  bool _isDiscoveryCandidate(_ResolvedRecommendation entry) {
+    final item = entry.item;
+    final reason = entry.entry.reasonCode;
+    final lowHistory = (item.playCount + item.fullListenCount) <= 2;
+    final lowSkip = _skipRate(item) <= 0.7;
+    final freshReason =
+        reason == RecommendationReasonCode.freshPick ||
+        reason == RecommendationReasonCode.coldStart;
+    return freshReason || (lowHistory && lowSkip && !item.isFavorite);
+  }
+
+  double _recentSignal(MediaItem item, int nowMs) {
+    final ts = item.lastPlayedAt ?? 0;
+    if (ts <= 0) return 0;
+    final ageHours = max(
+      0,
+      ((nowMs - ts) / const Duration(hours: 1).inMilliseconds).round(),
+    );
+    if (ageHours <= 24) return 1;
+    if (ageHours <= 24 * 3) return 0.85;
+    if (ageHours <= 24 * 7) return 0.65;
+    if (ageHours <= 24 * 14) return 0.45;
+    return 0.2;
+  }
+
+  double _skipRate(MediaItem item) {
+    final denominator = item.fullListenCount + item.skipCount;
+    if (denominator <= 0) return 0;
+    return (item.skipCount / denominator).clamp(0.0, 1.0).toDouble();
+  }
+
+  double _retentionSignal(MediaItem item) {
+    final progress = item.avgListenProgress.clamp(0.0, 1.0).toDouble();
+    final completionRate = item.fullListenCount + item.skipCount <= 0
+        ? progress
+        : (item.fullListenCount / (item.fullListenCount + item.skipCount))
+              .clamp(0.0, 1.0)
+              .toDouble();
+    return ((completionRate * 0.6) + (progress * 0.4)) *
+        (1 - (_skipRate(item) * 0.55));
+  }
 }
 
 class _ResolvedRecommendation {
@@ -597,15 +693,27 @@ class _ResolvedRecommendation {
 }
 
 class _RecommendationCollectionTemplate {
-  const _RecommendationCollectionTemplate({
+  _RecommendationCollectionTemplate({
     required this.id,
     required this.title,
     required this.subtitle,
-    required this.reasonCodes,
+    required this.matcher,
   });
 
   final String id;
   final String title;
   final String subtitle;
-  final Set<RecommendationReasonCode> reasonCodes;
+  final bool Function(_ResolvedRecommendation entry) matcher;
+}
+
+class _MomentTemplate {
+  const _MomentTemplate({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String id;
+  final String title;
+  final String subtitle;
 }

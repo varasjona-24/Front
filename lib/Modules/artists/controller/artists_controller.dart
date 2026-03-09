@@ -18,6 +18,8 @@ class ArtistGroup {
   final String name;
   final int count;
   final String? country;
+  final String? countryCode;
+  final ArtistMainRegion mainRegion;
   final String? thumbnail;
   final String? thumbnailLocalPath;
   final ArtistProfileKind kind;
@@ -31,6 +33,8 @@ class ArtistGroup {
     required this.items,
     required this.kind,
     this.country,
+    this.countryCode,
+    this.mainRegion = ArtistMainRegion.none,
     this.memberKeys = const <String>[],
     this.thumbnail,
     this.thumbnailLocalPath,
@@ -57,6 +61,12 @@ class ArtistsController extends GetxController {
   final RxString query = ''.obs;
   final Rx<ArtistSort> sort = ArtistSort.name.obs;
   final RxBool sortAscending = true.obs;
+
+  String? _normalizeCountryCode(String? raw) {
+    final value = (raw ?? '').trim().toUpperCase();
+    if (!RegExp(r'^[A-Z]{2}$').hasMatch(value)) return null;
+    return value;
+  }
 
   List<String> _normalizeMemberKeysForOwner({
     required String ownerKey,
@@ -170,6 +180,8 @@ class ArtistsController extends GetxController {
             items: itemsForArtist,
             kind: profile?.kind ?? ArtistProfileKind.singer,
             country: profile?.country,
+            countryCode: profile?.countryCode,
+            mainRegion: profile?.mainRegion ?? ArtistMainRegion.none,
             memberKeys: _normalizeMemberKeysForOwner(
               ownerKey: key,
               members: profile?.memberKeys ?? const <String>[],
@@ -195,7 +207,12 @@ class ArtistsController extends GetxController {
     return artists.where((a) {
       final name = a.name.toLowerCase();
       final country = (a.country ?? '').trim().toLowerCase();
-      return name.contains(q) || country.contains(q);
+      final countryCode = (a.countryCode ?? '').trim().toLowerCase();
+      final region = a.mainRegion.label.toLowerCase();
+      return name.contains(q) ||
+          country.contains(q) ||
+          countryCode.contains(q) ||
+          region.contains(q);
     }).toList();
   }
 
@@ -257,6 +274,8 @@ class ArtistsController extends GetxController {
     required String key,
     required String newName,
     required String country,
+    String? countryCode,
+    required ArtistMainRegion mainRegion,
     required ArtistProfileKind kind,
     required List<String> memberKeys,
     String? thumbnail,
@@ -281,6 +300,8 @@ class ArtistsController extends GetxController {
           ? 'Artista desconocido'
           : newName.trim(),
       country: country.trim(),
+      countryCode: _normalizeCountryCode(countryCode),
+      mainRegion: mainRegion,
       thumbnail: thumbnail,
       thumbnailLocalPath: thumbnailLocalPath,
       kind: kind,

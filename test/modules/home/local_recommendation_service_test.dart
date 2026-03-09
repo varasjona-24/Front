@@ -341,6 +341,82 @@ void main() {
         );
       },
     );
+
+    test('penaliza alta tasa de skip y premia retencion alta', () async {
+      final now = DateTime(2026, 3, 6, 21, 0);
+      final nowMs = now.millisecondsSinceEpoch;
+      final items = <MediaItem>[
+        _buildItem(
+          id: 'seed',
+          publicId: 'seed',
+          title: 'Trap Latino Seed',
+          subtitle: 'Artista Seed',
+          hasAudio: true,
+          hasVideo: true,
+          playCount: 40,
+          fullListenCount: 24,
+          skipCount: 3,
+          avgListenProgress: 0.92,
+          isFavorite: true,
+          lastPlayedAt: nowMs - const Duration(hours: 2).inMilliseconds,
+          country: 'Puerto Rico',
+        ),
+        _buildItem(
+          id: 'good',
+          publicId: 'good',
+          title: 'Trap Puerto Rico Good',
+          subtitle: 'Artista Bueno',
+          hasAudio: true,
+          hasVideo: false,
+          playCount: 20,
+          fullListenCount: 14,
+          skipCount: 2,
+          avgListenProgress: 0.9,
+          lastPlayedAt: nowMs - const Duration(days: 2).inMilliseconds,
+          country: 'Puerto Rico',
+        ),
+        _buildItem(
+          id: 'bad',
+          publicId: 'bad',
+          title: 'Trap Puerto Rico Bad',
+          subtitle: 'Artista Malo',
+          hasAudio: true,
+          hasVideo: false,
+          playCount: 20,
+          fullListenCount: 1,
+          skipCount: 15,
+          avgListenProgress: 0.24,
+          lastPlayedAt: nowMs - const Duration(days: 2).inMilliseconds,
+          country: 'Puerto Rico',
+        ),
+        ...List.generate(
+          20,
+          (i) => _buildItem(
+            id: 'extra-$i',
+            publicId: 'extra-$i',
+            title: 'Tema extra $i',
+            subtitle: 'Artista extra $i',
+            hasAudio: true,
+            hasVideo: true,
+          ),
+        ),
+      ];
+
+      final service = LocalRecommendationService(
+        store: RecommendationStore.memory(),
+        libraryLoader: () async => items,
+        now: () => now,
+      );
+
+      final set = await service.getOrBuildForDay(
+        mode: RecommendationMode.audio,
+      );
+      final ids = _entryIds(set);
+
+      expect(ids.contains('good'), isTrue);
+      expect(ids.contains('bad'), isTrue);
+      expect(ids.indexOf('good'), lessThan(ids.indexOf('bad')));
+    });
   });
 }
 
@@ -358,6 +434,10 @@ MediaItem _buildItem({
   int playCount = 0,
   bool isFavorite = false,
   int? lastPlayedAt,
+  int skipCount = 0,
+  int fullListenCount = 0,
+  double avgListenProgress = 0,
+  int? lastCompletedAt,
   String? country,
   SourceOrigin origin = SourceOrigin.generic,
 }) {
@@ -397,5 +477,9 @@ MediaItem _buildItem({
     isFavorite: isFavorite,
     playCount: playCount,
     lastPlayedAt: lastPlayedAt,
+    skipCount: skipCount,
+    fullListenCount: fullListenCount,
+    avgListenProgress: avgListenProgress,
+    lastCompletedAt: lastCompletedAt,
   );
 }

@@ -194,11 +194,11 @@ class LocalRecommendationService {
     }
 
     final sourceLabels = await _buildSourceLabelMap();
-    final artistCountryByKey = await _buildArtistCountryMap();
+    final artistLocaleByKey = await _buildArtistLocaleMap();
     final nowMs = _now().millisecondsSinceEpoch;
     final candidates = candidatesPool
         .map(
-          (item) => _candidateFromItem(item, sourceLabels, artistCountryByKey),
+          (item) => _candidateFromItem(item, sourceLabels, artistLocaleByKey),
         )
         .whereType<_RecommendationCandidate>()
         .toList();
@@ -301,7 +301,7 @@ class LocalRecommendationService {
     return labels;
   }
 
-  Future<Map<String, String>> _buildArtistCountryMap() async {
+  Future<Map<String, _ArtistLocale>> _buildArtistLocaleMap() async {
     List<ArtistProfile> profiles;
     try {
       profiles = await _artistProfileLoader();
@@ -309,14 +309,21 @@ class LocalRecommendationService {
       profiles = const <ArtistProfile>[];
     }
 
-    final map = <String, String>{};
+    final map = <String, _ArtistLocale>{};
     for (final profile in profiles) {
       final key = ArtistCreditParser.normalizeKey(profile.key);
       if (key.isEmpty || key == 'unknown') continue;
       final countryDisplay = _normalizedCountryDisplay(profile.country);
       final countryKey = _normalizedCountryKey(countryDisplay);
-      if (countryKey == null) continue;
-      map[key] = countryDisplay!;
+      final mainRegionKey = profile.mainRegion == ArtistMainRegion.none
+          ? _inferMainRegionKeyFromCountry(countryKey)
+          : profile.mainRegion.key;
+      if (countryKey == null && mainRegionKey == null) continue;
+      map[key] = _ArtistLocale(
+        countryDisplay: countryDisplay,
+        mainRegionKey: mainRegionKey,
+        isMainRegionExplicit: profile.mainRegion != ArtistMainRegion.none,
+      );
     }
     return map;
   }
@@ -324,7 +331,7 @@ class LocalRecommendationService {
   _RecommendationCandidate? _candidateFromItem(
     MediaItem item,
     Map<String, _SourceLabels> sourceLabels,
-    Map<String, String> artistCountryByKey,
+    Map<String, _ArtistLocale> artistLocaleByKey,
   ) {
     final publicId = item.publicId.trim();
     final id = item.id.trim();
@@ -368,9 +375,25 @@ class LocalRecommendationService {
 
     final artistCountries = <String>[];
     final countrySeen = <String>{};
+    final explicitArtistRegions = <String>[];
+    final inferredArtistRegions = <String>[];
+    final explicitRegionSeen = <String>{};
+    final inferredRegionSeen = <String>{};
 
     void addCountryByArtistKey(String key) {
-      final countryDisplay = artistCountryByKey[key];
+      final locale = artistLocaleByKey[key];
+      if (locale == null) return;
+      final regionKey = locale.mainRegionKey?.trim() ?? '';
+      if (regionKey.isNotEmpty && locale.isMainRegionExplicit) {
+        if (explicitRegionSeen.add(regionKey)) {
+          explicitArtistRegions.add(regionKey);
+        }
+      } else if (regionKey.isNotEmpty) {
+        if (inferredRegionSeen.add(regionKey)) {
+          inferredArtistRegions.add(regionKey);
+        }
+      }
+      final countryDisplay = locale.countryDisplay;
       if (countryDisplay == null) return;
       final countryKey = _normalizedCountryKey(countryDisplay);
       if (countryKey == null) return;
@@ -414,8 +437,15 @@ class LocalRecommendationService {
         : null;
     final countryKey = _normalizedCountryKey(countryDisplay);
     final regions = <String>[
+      ...explicitArtistRegions,
       if (countryKey != null) countryKey,
-      ...regionMatches.where((entry) => entry != countryKey),
+      ...inferredArtistRegions.where((entry) => entry != countryKey),
+      ...regionMatches.where(
+        (entry) =>
+            entry != countryKey &&
+            !explicitArtistRegions.contains(entry) &&
+            !inferredArtistRegions.contains(entry),
+      ),
     ];
     final regionDisplayByKey = <String, String>{};
     for (final region in regions) {
@@ -510,7 +540,11 @@ class LocalRecommendationService {
       (c) =>
           c.item.isFavorite ||
           c.item.playCount > 0 ||
-          ((c.item.lastPlayedAt ?? 0) > 0),
+          c.item.fullListenCount > 0 ||
+          c.item.skipCount > 0 ||
+          c.item.avgListenProgress >= 0.2 ||
+          ((c.item.lastPlayedAt ?? 0) > 0) ||
+          ((c.item.lastCompletedAt ?? 0) > 0),
     );
 
     final profileStrength = [
@@ -531,12 +565,22 @@ class LocalRecommendationService {
     final item = candidate.item;
     final playSignal = min(item.playCount / 30, 1.0);
     final favoriteSignal = item.isFavorite ? 1.0 : 0.0;
+    final fullListenSignal = min(item.fullListenCount / 24, 1.0);
+    final skipSignal = min(item.skipCount / 24, 1.0);
+    final progressSignal = _clampedProgress(item);
+    final completionRate = _completionRate(item);
+    final retentionSignal =
+        ((completionRate * 0.6) + (progressSignal * 0.4)) *
+        (1 - (skipSignal * 0.7));
     final recentSignal = _recentScore(
       item.lastPlayedAt,
       _now().millisecondsSinceEpoch,
     );
     final affinitySignals =
-        (favoriteSignal * 0.5) + (playSignal * 0.35) + (recentSignal * 0.15);
+        (favoriteSignal * 0.42) +
+        (playSignal * 0.28) +
+        (recentSignal * 0.12) +
+        (retentionSignal * 0.18);
 
     final genreMatch = _bestWeight(candidate.genres, profile.genreWeights);
     final regionMatch = _bestWeight(candidate.regions, profile.regionWeights);
@@ -552,16 +596,24 @@ class LocalRecommendationService {
         (originMatch * 0.1);
 
     final engagement =
-        (playSignal * 0.45) + (favoriteSignal * 0.35) + (recentSignal * 0.2);
+        (playSignal * 0.30) +
+        (favoriteSignal * 0.25) +
+        (recentSignal * 0.20) +
+        (fullListenSignal * 0.15) +
+        (progressSignal * 0.10);
 
-    final noveltyBase = 1 - min(item.playCount / 24, 1.0);
-    final novelty = (noveltyBase + ((item.lastPlayedAt ?? 0) <= 0 ? 0.15 : 0))
-        .clamp(0, 1);
+    final noveltyBase =
+        1 - min((item.playCount + item.fullListenCount) / 30, 1.0);
+    final novelty =
+        (noveltyBase +
+                ((item.lastPlayedAt ?? 0) <= 0 ? 0.15 : 0) +
+                (skipSignal > 0.6 ? 0.05 : 0))
+            .clamp(0, 1);
 
     var score =
-        (0.35 * affinitySignals) +
-        (0.35 * semanticMatch) +
-        (0.20 * engagement) +
+        (0.33 * affinitySignals) +
+        (0.34 * semanticMatch) +
+        (0.23 * engagement) +
         (0.10 * novelty);
 
     final recencyPenalty = _recencyPenalty(
@@ -569,6 +621,7 @@ class LocalRecommendationService {
       _now().millisecondsSinceEpoch,
     );
     score *= recencyPenalty;
+    score *= (1 - (skipSignal * 0.35)).clamp(0.45, 1.0);
 
     if (coldStart) {
       score = (score * 0.65) + (novelty * 0.35);
@@ -778,7 +831,35 @@ class LocalRecommendationService {
     final favoriteWeight = item.isFavorite ? 3.0 : 0.0;
     final playWeight = min(item.playCount, 60) * 0.14;
     final recentWeight = _recentScore(item.lastPlayedAt, nowMs) * 1.8;
-    return favoriteWeight + playWeight + recentWeight;
+    final fullListenWeight = min(item.fullListenCount, 40) * 0.12;
+    final progressWeight = _clampedProgress(item) * 1.2;
+    final skipRate = item.skipCount <= 0
+        ? 0.0
+        : (item.skipCount /
+                  max(
+                    1,
+                    item.fullListenCount + item.skipCount + item.playCount,
+                  ))
+              .clamp(0.0, 1.0);
+    final skipPenalty = (1 - (skipRate * 0.65)).clamp(0.35, 1.0).toDouble();
+    return (favoriteWeight +
+            playWeight +
+            recentWeight +
+            fullListenWeight +
+            progressWeight) *
+        skipPenalty;
+  }
+
+  double _clampedProgress(MediaItem item) {
+    return item.avgListenProgress.clamp(0.0, 1.0).toDouble();
+  }
+
+  double _completionRate(MediaItem item) {
+    final completed = item.fullListenCount;
+    final skipped = item.skipCount;
+    final total = completed + skipped;
+    if (total <= 0) return _clampedProgress(item);
+    return (completed / total).clamp(0.0, 1.0).toDouble();
   }
 
   double _recentScore(int? lastPlayedAt, int nowMs) {
@@ -931,6 +1012,144 @@ class LocalRecommendationService {
     return key.isEmpty ? null : key;
   }
 
+  String? _inferMainRegionKeyFromCountry(String? countryKey) {
+    final key = (countryKey ?? '').trim();
+    if (key.isEmpty) return null;
+
+    const latino = {
+      'puerto rico',
+      'mexico',
+      'argentina',
+      'colombia',
+      'chile',
+      'peru',
+      'venezuela',
+      'ecuador',
+      'uruguay',
+      'paraguay',
+      'bolivia',
+      'republica dominicana',
+      'cuba',
+      'panama',
+      'costa rica',
+      'el salvador',
+      'guatemala',
+      'honduras',
+      'nicaragua',
+      'españa',
+      'espana',
+    };
+    if (latino.contains(key)) return 'latino';
+
+    const anglo = {
+      'estados unidos',
+      'usa',
+      'united states',
+      'canada',
+      'reino unido',
+      'uk',
+      'inglaterra',
+      'australia',
+      'nueva zelanda',
+      'new zealand',
+      'irlanda',
+    };
+    if (anglo.contains(key)) return 'anglo';
+
+    const asia = {
+      'japon',
+      'japón',
+      'corea del sur',
+      'korea',
+      'corea',
+      'china',
+      'taiwan',
+      'tailandia',
+      'india',
+      'filipinas',
+      'indonesia',
+      'malasia',
+      'singapur',
+      'vietnam',
+    };
+    if (asia.contains(key)) return 'asiatico';
+
+    const europa = {
+      'francia',
+      'alemania',
+      'italia',
+      'portugal',
+      'holanda',
+      'paises bajos',
+      'belgica',
+      'suiza',
+      'austria',
+      'noruega',
+      'suecia',
+      'dinamarca',
+      'finlandia',
+      'polonia',
+      'ucrania',
+      'rumania',
+      'grecia',
+      'turquia',
+      'turquía',
+      'rusia',
+    };
+    if (europa.contains(key)) return 'europeo';
+
+    const africa = {
+      'sudafrica',
+      'sudáfrica',
+      'nigeria',
+      'ghana',
+      'kenia',
+      'egipto',
+      'marruecos',
+      'argelia',
+      'tunez',
+      'túnez',
+      'senegal',
+      'camerun',
+      'camerún',
+      'etiopia',
+      'etiopía',
+    };
+    if (africa.contains(key)) return 'africano';
+
+    const medioOriente = {
+      'arabia saudita',
+      'israel',
+      'libano',
+      'líbano',
+      'jordania',
+      'qatar',
+      'emiratos arabes unidos',
+      'iran',
+      'irak',
+      'siria',
+      'palestina',
+      'oman',
+      'yemen',
+      'kuwait',
+      'barein',
+      'baréin',
+    };
+    if (medioOriente.contains(key)) return 'medio_oriente';
+
+    const oceania = {
+      'australia',
+      'nueva zelanda',
+      'new zealand',
+      'fiyi',
+      'fiji',
+      'papua nueva guinea',
+    };
+    if (oceania.contains(key)) return 'oceania';
+
+    return null;
+  }
+
   static const Map<String, String> _accentReplace = {
     'á': 'a',
     'é': 'e',
@@ -971,6 +1190,13 @@ class LocalRecommendationService {
 
   static const Map<String, List<String>> _regionLexicon = {
     'latino': ['latino', 'latina', 'latin'],
+    'asiatico': ['asiatico', 'asiatica', 'kpop', 'jpop', 'asian'],
+    'anglo': ['anglo', 'english', 'ingles', 'uk', 'usa'],
+    'europeo': ['euro', 'europe', 'europeo', 'europea'],
+    'africano': ['afro', 'african', 'africano', 'africa'],
+    'medio_oriente': ['middle east', 'medio oriente', 'arabic'],
+    'oceania': ['oceania', 'australia', 'new zealand'],
+    'global': ['global', 'world'],
     'puerto rico': ['puerto rico', 'boricua', 'pr'],
     'mexico': ['mexico', 'mexicano'],
     'argentina': ['argentina', 'argentino'],
@@ -1003,7 +1229,14 @@ class LocalRecommendationService {
   };
 
   static const Map<String, String> _regionLabels = {
-    'latino': 'música latina',
+    'latino': 'mix latino',
+    'asiatico': 'mix asiatico',
+    'anglo': 'mix anglo',
+    'europeo': 'mix euro',
+    'africano': 'mix africano',
+    'medio_oriente': 'mix medio oriente',
+    'oceania': 'mix oceania',
+    'global': 'mix global',
     'puerto rico': 'Puerto Rico',
     'mexico': 'México',
     'argentina': 'Argentina',
@@ -1038,6 +1271,18 @@ class _BuildResult {
 class _SourceLabels {
   final List<String> topics = <String>[];
   final List<String> playlists = <String>[];
+}
+
+class _ArtistLocale {
+  const _ArtistLocale({
+    required this.countryDisplay,
+    required this.mainRegionKey,
+    required this.isMainRegionExplicit,
+  });
+
+  final String? countryDisplay;
+  final String? mainRegionKey;
+  final bool isMainRegionExplicit;
 }
 
 class _RecommendationCandidate {

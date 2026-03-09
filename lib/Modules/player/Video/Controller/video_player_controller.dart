@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:video_player/video_player.dart' as vp;
@@ -24,6 +26,10 @@ class VideoPlayerController extends GetxController {
   Worker? _completedWorker;
   Worker? _queueWorker;
   Worker? _indexWorker;
+  Worker? _progressWorker;
+  double _sessionMaxProgress = 0;
+  String _sessionTrackKey = '';
+  String _completionLoggedTrackKey = '';
 
   static const queueStorageKey = 'video_queue_items';
   static const queueIndexStorageKey = 'video_queue_index';
@@ -95,10 +101,19 @@ class VideoPlayerController extends GetxController {
       (p) => _persistPosition(p),
       time: const Duration(seconds: 2),
     );
+    _progressWorker = ever<Duration>(
+      position,
+      (_) => _captureSessionProgress(),
+    );
 
     _completedWorker = ever<int>(videoService.completedTick, (_) async {
+      await _recordSessionForCurrent(
+        markCompleted: true,
+        forceProgress: 1.0,
+        resetSessionAfterRecord: true,
+      );
       if (!_settings.autoPlayNext.value) return;
-      await next();
+      await next(recordSkip: false);
     });
     _queueWorker = ever<List<MediaItem>>(queue, (_) => _persistQueue());
     _indexWorker = ever<int>(currentIndex, (_) => _persistQueue());
@@ -212,26 +227,7 @@ class VideoPlayerController extends GetxController {
   }
 
   Future<void> _trackPlay(MediaItem item) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final all = await _store.readAll();
-
-    MediaItem updated = item.copyWith(
-      playCount: item.playCount + 1,
-      lastPlayedAt: now,
-    );
-
-    for (final existing in all) {
-      if (existing.id == item.id ||
-          (item.publicId.isNotEmpty && existing.publicId == item.publicId)) {
-        updated = existing.copyWith(
-          playCount: existing.playCount + 1,
-          lastPlayedAt: now,
-        );
-        break;
-      }
-    }
-
-    await _store.upsert(updated);
+    await _applyPlaybackMetrics(item, incrementPlay: true);
   }
 
   Future<void> togglePlay() async {
@@ -242,22 +238,32 @@ class VideoPlayerController extends GetxController {
     await videoService.seek(value);
   }
 
-  Future<void> next() async {
+  Future<void> next({bool recordSkip = true}) async {
     if (currentIndex.value < queue.length - 1) {
+      if (recordSkip) {
+        await _recordTransitionSkipIfNeeded();
+      }
       currentIndex.value++;
       await _playCurrent();
     }
   }
 
-  Future<void> previous() async {
+  Future<void> previous({bool recordSkip = true}) async {
     if (currentIndex.value > 0) {
+      if (recordSkip) {
+        await _recordTransitionSkipIfNeeded();
+      }
       currentIndex.value--;
       await _playCurrent();
     }
   }
 
-  Future<void> playAt(int index) async {
+  Future<void> playAt(int index, {bool recordSkip = true}) async {
     if (index < 0 || index >= queue.length) return;
+    if (index == currentIndex.value) return;
+    if (recordSkip) {
+      await _recordTransitionSkipIfNeeded();
+    }
     currentIndex.value = index;
     await _playCurrent();
   }
@@ -353,12 +359,170 @@ class VideoPlayerController extends GetxController {
 
   @override
   void onClose() {
+    unawaited(_recordSessionForCurrent(resetSessionAfterRecord: true));
     _persistQueue();
     _persistPosition(position.value);
     _positionWorker?.dispose();
     _completedWorker?.dispose();
     _queueWorker?.dispose();
     _indexWorker?.dispose();
+    _progressWorker?.dispose();
     super.onClose();
+  }
+
+  String _stableTrackKey(MediaItem item) {
+    final publicId = item.publicId.trim();
+    if (publicId.isNotEmpty) return publicId;
+    return item.id.trim();
+  }
+
+  double _currentProgressRatio() {
+    final totalMs = duration.value.inMilliseconds;
+    if (totalMs <= 0) {
+      final sec = currentItemOrNull?.effectiveDurationSeconds ?? 0;
+      if (sec <= 0) return 0;
+      final fallbackTotalMs = sec * 1000;
+      return (position.value.inMilliseconds / fallbackTotalMs).clamp(0.0, 1.0);
+    }
+    return (position.value.inMilliseconds / totalMs).clamp(0.0, 1.0);
+  }
+
+  void _captureSessionProgress() {
+    final item = currentItemOrNull;
+    if (item == null) {
+      _sessionTrackKey = '';
+      _sessionMaxProgress = 0;
+      return;
+    }
+
+    final key = _stableTrackKey(item);
+    if (_sessionTrackKey != key) {
+      _sessionTrackKey = key;
+      _sessionMaxProgress = 0;
+      _completionLoggedTrackKey = '';
+    }
+
+    final progress = _currentProgressRatio();
+    if (progress > _sessionMaxProgress) {
+      _sessionMaxProgress = progress;
+    }
+  }
+
+  int _playbackSamples(MediaItem item) {
+    final byEvents = item.fullListenCount + item.skipCount;
+    final byPlays = item.playCount;
+    var samples = byEvents > byPlays ? byEvents : byPlays;
+    if (samples <= 0 && item.avgListenProgress > 0) {
+      samples = 1;
+    }
+    return samples;
+  }
+
+  Future<void> _applyPlaybackMetrics(
+    MediaItem seed, {
+    bool incrementPlay = false,
+    double? sessionProgress,
+    bool markSkip = false,
+    bool markCompleted = false,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final all = await _store.readAll();
+    final publicId = seed.publicId.trim();
+    final related = all
+        .where((existing) {
+          if (existing.id == seed.id) return true;
+          return publicId.isNotEmpty && existing.publicId.trim() == publicId;
+        })
+        .toList(growable: false);
+    final targets = related.isEmpty ? <MediaItem>[seed] : related;
+
+    for (final existing in targets) {
+      final prevAvg = existing.avgListenProgress.clamp(0, 1).toDouble();
+      final prevSamples = _playbackSamples(existing);
+      final hasSessionSample = sessionProgress != null;
+      final sample = (sessionProgress ?? prevAvg).clamp(0.0, 1.0).toDouble();
+      final nextSamples = hasSessionSample ? (prevSamples + 1) : prevSamples;
+      final nextAvg = hasSessionSample && nextSamples > 0
+          ? (((prevAvg * prevSamples) + sample) / nextSamples)
+                .clamp(0.0, 1.0)
+                .toDouble()
+          : prevAvg;
+
+      final updated = existing.copyWith(
+        playCount: existing.playCount + (incrementPlay ? 1 : 0),
+        lastPlayedAt: incrementPlay ? now : existing.lastPlayedAt,
+        skipCount: existing.skipCount + ((markSkip && !markCompleted) ? 1 : 0),
+        fullListenCount: existing.fullListenCount + (markCompleted ? 1 : 0),
+        avgListenProgress: nextAvg,
+        lastCompletedAt: markCompleted ? now : existing.lastCompletedAt,
+      );
+      await _store.upsert(updated);
+    }
+  }
+
+  Future<void> _recordSessionForCurrent({
+    bool markCompleted = false,
+    bool forceSkip = false,
+    double? forceProgress,
+    bool resetSessionAfterRecord = false,
+  }) async {
+    final item = currentItemOrNull;
+    if (item == null) return;
+
+    final key = _stableTrackKey(item);
+    if (markCompleted && _completionLoggedTrackKey == key) return;
+
+    _captureSessionProgress();
+    final progress = (forceProgress ?? _sessionMaxProgress).clamp(0.0, 1.0);
+    final hasDuration =
+        duration.value > Duration.zero ||
+        ((currentItemOrNull?.effectiveDurationSeconds ?? 0) > 0);
+    final shouldPersist =
+        markCompleted ||
+        forceSkip ||
+        progress >= 0.03 ||
+        (hasDuration && position.value >= const Duration(seconds: 3));
+    if (!shouldPersist) return;
+
+    await _applyPlaybackMetrics(
+      item,
+      sessionProgress: markCompleted ? 1.0 : progress,
+      markSkip: forceSkip,
+      markCompleted: markCompleted,
+    );
+
+    if (markCompleted) {
+      _completionLoggedTrackKey = key;
+    }
+
+    if (resetSessionAfterRecord || markCompleted || forceSkip) {
+      _sessionMaxProgress = 0;
+    }
+  }
+
+  Future<void> _recordTransitionSkipIfNeeded() async {
+    final item = currentItemOrNull;
+    if (item == null) return;
+
+    _captureSessionProgress();
+    final progress = _sessionMaxProgress.clamp(0.0, 1.0).toDouble();
+    final hasDuration =
+        duration.value > Duration.zero ||
+        ((currentItemOrNull?.effectiveDurationSeconds ?? 0) > 0);
+    final hasProgress =
+        progress >= 0.03 ||
+        (hasDuration && position.value >= const Duration(seconds: 3));
+    if (!hasProgress) return;
+
+    final minDurationForStrictSkip =
+        duration.value >= const Duration(seconds: 20);
+    final skipThreshold = minDurationForStrictSkip ? 0.90 : 0.75;
+    final shouldSkip = progress < skipThreshold;
+
+    await _recordSessionForCurrent(
+      forceSkip: shouldSkip,
+      forceProgress: progress,
+      resetSessionAfterRecord: shouldSkip,
+    );
   }
 }

@@ -43,6 +43,8 @@ class AudioPlayerController extends GetxController {
   Worker? _itemWorker;
   bool _countedCurrentSession = false;
   String _currentSessionTrackKey = '';
+  double _sessionMaxProgress = 0;
+  String _completionLoggedTrackKey = '';
   bool _handlingCompleted = false;
   bool _endActionHandledForTrack = false;
   String _endActionTrackKey = '';
@@ -58,6 +60,7 @@ class AudioPlayerController extends GetxController {
 
     _posSub = audioService.positionStream.listen((v) {
       position.value = v;
+      _captureSessionProgress();
       _maybeCountPlayback();
       _maybeApplyAutoPlayNextPolicy();
     });
@@ -73,8 +76,13 @@ class AudioPlayerController extends GetxController {
       if (_handlingCompleted) return;
       _handlingCompleted = true;
       try {
+        await _recordSessionForCurrent(
+          markCompleted: true,
+          forceProgress: 1.0,
+          resetSessionAfterRecord: true,
+        );
         if (_settings.autoPlayNext.value) {
-          await next();
+          await next(recordSkip: false);
         } else {
           await audioService.pause();
         }
@@ -97,6 +105,7 @@ class AudioPlayerController extends GetxController {
 
   @override
   void onClose() {
+    unawaited(_recordSessionForCurrent(resetSessionAfterRecord: true));
     _posSub?.cancel();
     _durSub?.cancel();
     _procSub?.cancel();
@@ -234,8 +243,12 @@ class AudioPlayerController extends GetxController {
     await audioService.toggle();
   }
 
-  Future<void> playAt(int index) async {
+  Future<void> playAt(int index, {bool recordSkip = true}) async {
     if (index < 0 || index >= queue.length) return;
+    if (index == currentIndex.value) return;
+    if (recordSkip) {
+      await _recordTransitionSkipIfNeeded();
+    }
     currentIndex.value = index;
     if (audioService.hasSourceLoaded &&
         _sameQueue(queue, audioService.queueItems)) {
@@ -246,8 +259,11 @@ class AudioPlayerController extends GetxController {
     await _playCurrent(forceReload: true);
   }
 
-  Future<void> next() async {
+  Future<void> next({bool recordSkip = true}) async {
     if (queue.isEmpty) return;
+    if (recordSkip) {
+      await _recordTransitionSkipIfNeeded();
+    }
     final before = currentIndex.value;
     final fallback = currentIndex.value + 1;
     await audioService.next();
@@ -256,12 +272,15 @@ class AudioPlayerController extends GetxController {
     if (audioService.currentQueueIndex == currentIndex.value &&
         fallback >= 0 &&
         fallback < queue.length) {
-      await playAt(fallback);
+      await playAt(fallback, recordSkip: false);
     }
   }
 
-  Future<void> previous() async {
+  Future<void> previous({bool recordSkip = true}) async {
     if (queue.isEmpty) return;
+    if (recordSkip) {
+      await _recordTransitionSkipIfNeeded();
+    }
     final before = currentIndex.value;
     final fallback = currentIndex.value - 1;
     await audioService.previous();
@@ -270,7 +289,7 @@ class AudioPlayerController extends GetxController {
     if (audioService.currentQueueIndex == currentIndex.value &&
         fallback >= 0 &&
         fallback < queue.length) {
-      await playAt(fallback);
+      await playAt(fallback, recordSkip: false);
     }
   }
 
@@ -427,27 +446,7 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> _trackPlay(MediaItem item) async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final all = await _store.readAll();
-
-    MediaItem updated = item.copyWith(
-      playCount: item.playCount + 1,
-      lastPlayedAt: now,
-    );
-
-    for (final existing in all) {
-      if (existing.id == item.id ||
-          (item.publicId.trim().isNotEmpty &&
-              existing.publicId.trim() == item.publicId.trim())) {
-        updated = existing.copyWith(
-          playCount: existing.playCount + 1,
-          lastPlayedAt: now,
-        );
-        break;
-      }
-    }
-
-    await _store.upsert(updated);
+    await _applyPlaybackMetrics(item, incrementPlay: true);
   }
 
   void _resetCountSession() {
@@ -455,16 +454,18 @@ class AudioPlayerController extends GetxController {
     if (item == null) {
       _currentSessionTrackKey = '';
       _countedCurrentSession = false;
+      _sessionMaxProgress = 0;
+      _completionLoggedTrackKey = '';
       return;
     }
 
-    final key = item.publicId.trim().isNotEmpty
-        ? item.publicId.trim()
-        : item.id.trim();
+    final key = _stableTrackKey(item);
 
     if (_currentSessionTrackKey != key) {
       _currentSessionTrackKey = key;
       _countedCurrentSession = false;
+      _sessionMaxProgress = 0;
+      _completionLoggedTrackKey = '';
     }
   }
 
@@ -520,7 +521,7 @@ class AudioPlayerController extends GetxController {
       final transitionMargin = Duration(seconds: secs.clamp(1, 12));
       if (position.value >= duration.value - transitionMargin) {
         _endActionHandledForTrack = true;
-        unawaited(audioService.next(withTransition: true));
+        unawaited(_runAutoNextTransition());
       }
       return;
     }
@@ -528,8 +529,169 @@ class AudioPlayerController extends GetxController {
     const pauseMargin = Duration(milliseconds: 350);
     if (position.value >= duration.value - pauseMargin) {
       _endActionHandledForTrack = true;
-      unawaited(audioService.pause());
+      unawaited(_runAutoPauseAtEnd());
     }
+  }
+
+  Future<void> _runAutoNextTransition() async {
+    await _recordSessionForCurrent(
+      markCompleted: true,
+      forceProgress: 1.0,
+      resetSessionAfterRecord: true,
+    );
+    await audioService.next(withTransition: true);
+  }
+
+  Future<void> _runAutoPauseAtEnd() async {
+    await _recordSessionForCurrent(
+      markCompleted: true,
+      forceProgress: 1.0,
+      resetSessionAfterRecord: true,
+    );
+    await audioService.pause();
+  }
+
+  String _stableTrackKey(MediaItem item) {
+    final publicId = item.publicId.trim();
+    if (publicId.isNotEmpty) return publicId;
+    return item.id.trim();
+  }
+
+  double _currentProgressRatio() {
+    final totalMs = duration.value.inMilliseconds;
+    if (totalMs <= 0) {
+      final sec = audioService.currentItem.value?.effectiveDurationSeconds ?? 0;
+      if (sec <= 0) return 0;
+      final fallbackTotalMs = sec * 1000;
+      return (position.value.inMilliseconds / fallbackTotalMs).clamp(0.0, 1.0);
+    }
+    return (position.value.inMilliseconds / totalMs).clamp(0.0, 1.0);
+  }
+
+  void _captureSessionProgress() {
+    final progress = _currentProgressRatio();
+    if (progress > _sessionMaxProgress) {
+      _sessionMaxProgress = progress;
+    }
+  }
+
+  int _playbackSamples(MediaItem item) {
+    final byEvents = item.fullListenCount + item.skipCount;
+    final byPlays = item.playCount;
+    var samples = byEvents > byPlays ? byEvents : byPlays;
+    if (samples <= 0 && item.avgListenProgress > 0) {
+      samples = 1;
+    }
+    return samples;
+  }
+
+  Future<void> _applyPlaybackMetrics(
+    MediaItem seed, {
+    bool incrementPlay = false,
+    double? sessionProgress,
+    bool markSkip = false,
+    bool markCompleted = false,
+  }) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final all = await _store.readAll();
+    final publicId = seed.publicId.trim();
+    final related = all
+        .where((existing) {
+          if (existing.id == seed.id) return true;
+          return publicId.isNotEmpty && existing.publicId.trim() == publicId;
+        })
+        .toList(growable: false);
+    final targets = related.isEmpty ? <MediaItem>[seed] : related;
+
+    for (final existing in targets) {
+      final prevAvg = existing.avgListenProgress.clamp(0, 1).toDouble();
+      final prevSamples = _playbackSamples(existing);
+      final hasSessionSample = sessionProgress != null;
+      final sample = (sessionProgress ?? prevAvg).clamp(0.0, 1.0).toDouble();
+      final nextSamples = hasSessionSample ? (prevSamples + 1) : prevSamples;
+      final nextAvg = hasSessionSample && nextSamples > 0
+          ? (((prevAvg * prevSamples) + sample) / nextSamples)
+                .clamp(0.0, 1.0)
+                .toDouble()
+          : prevAvg;
+
+      final updated = existing.copyWith(
+        playCount: existing.playCount + (incrementPlay ? 1 : 0),
+        lastPlayedAt: incrementPlay ? now : existing.lastPlayedAt,
+        skipCount: existing.skipCount + ((markSkip && !markCompleted) ? 1 : 0),
+        fullListenCount: existing.fullListenCount + (markCompleted ? 1 : 0),
+        avgListenProgress: nextAvg,
+        lastCompletedAt: markCompleted ? now : existing.lastCompletedAt,
+      );
+      await _store.upsert(updated);
+    }
+  }
+
+  Future<void> _recordSessionForCurrent({
+    bool markCompleted = false,
+    bool forceSkip = false,
+    double? forceProgress,
+    bool resetSessionAfterRecord = false,
+  }) async {
+    final item = audioService.currentItem.value;
+    if (item == null) return;
+
+    final key = _stableTrackKey(item);
+    if (markCompleted && _completionLoggedTrackKey == key) return;
+
+    _captureSessionProgress();
+    final progress = (forceProgress ?? _sessionMaxProgress).clamp(0.0, 1.0);
+    final hasDuration =
+        duration.value > Duration.zero ||
+        ((audioService.currentItem.value?.effectiveDurationSeconds ?? 0) > 0);
+    final shouldPersist =
+        markCompleted ||
+        forceSkip ||
+        progress >= 0.03 ||
+        (hasDuration && position.value >= _countThreshold);
+    if (!shouldPersist) return;
+
+    await _applyPlaybackMetrics(
+      item,
+      sessionProgress: markCompleted ? 1.0 : progress,
+      markSkip: forceSkip,
+      markCompleted: markCompleted,
+    );
+
+    if (markCompleted) {
+      _completionLoggedTrackKey = key;
+      _countedCurrentSession = false;
+    }
+
+    if (resetSessionAfterRecord || markCompleted || forceSkip) {
+      _sessionMaxProgress = 0;
+    }
+  }
+
+  Future<void> _recordTransitionSkipIfNeeded() async {
+    final item = audioService.currentItem.value;
+    if (item == null) return;
+
+    _captureSessionProgress();
+    final progress = _sessionMaxProgress.clamp(0.0, 1.0).toDouble();
+    final hasDuration =
+        duration.value > Duration.zero ||
+        ((audioService.currentItem.value?.effectiveDurationSeconds ?? 0) > 0);
+    final hasProgress =
+        progress >= 0.03 ||
+        (hasDuration && position.value >= const Duration(seconds: 3));
+    if (!hasProgress) return;
+
+    final minDurationForStrictSkip =
+        duration.value >= const Duration(seconds: 20);
+    final skipThreshold = minDurationForStrictSkip ? 0.90 : 0.75;
+    final shouldSkip = progress < skipThreshold;
+
+    await _recordSessionForCurrent(
+      forceSkip: shouldSkip,
+      forceProgress: progress,
+      resetSessionAfterRecord: shouldSkip,
+    );
   }
 
   void _restoreRepeatMode() {
