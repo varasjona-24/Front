@@ -210,6 +210,24 @@ class AudioService extends GetxService {
       return;
     }
 
+    // Cambio de variante en la misma cola sin regenerar orden/shuffle.
+    if (forceReload &&
+        hasSourceLoaded &&
+        _queueItems.isNotEmpty &&
+        incomingQueue != null &&
+        incomingQueue.isNotEmpty &&
+        _sameQueueById(incomingQueue, _queueItems)) {
+      final target = (queueIndex ?? 0).clamp(0, _queueItems.length - 1).toInt();
+      if (_sameItem(_queueItems[target], item)) {
+        await _reloadVariantInCurrentQueue(
+          targetIndex: target,
+          selectedVariant: variant,
+          autoPlay: autoPlay,
+        );
+        return;
+      }
+    }
+
     if (!forceReload &&
         isSameTrack(item, variant) &&
         hasSourceLoaded &&
@@ -265,6 +283,68 @@ class AudioService extends GetxService {
         await _player.pause();
       }
       _notifyHandler();
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> _reloadVariantInCurrentQueue({
+    required int targetIndex,
+    required MediaVariant selectedVariant,
+    required bool autoPlay,
+  }) async {
+    if (targetIndex < 0 || targetIndex >= _queueItems.length) return;
+    if (targetIndex >= _queueVariants.length) return;
+    if (!selectedVariant.isValid) {
+      throw Exception('Variante inválida para reproducir.');
+    }
+
+    final nextQueueVariants = List<MediaVariant>.from(_queueVariants);
+    nextQueueVariants[targetIndex] = selectedVariant;
+    final targetItem = _queueItems[targetIndex];
+    final currentPosition = _player.position;
+
+    isLoading.value = true;
+    state.value = PlaybackState.loading;
+
+    try {
+      final sources = <AudioSource>[];
+      for (var i = 0; i < _queueItems.length; i++) {
+        sources.add(
+          AudioSource.uri(
+            _resolvePlayableUri(_queueItems[i], nextQueueVariants[i]),
+          ),
+        );
+      }
+
+      await _player.setAudioSources(
+        sources,
+        initialIndex: targetIndex,
+        initialPosition: currentPosition,
+      );
+
+      _queueVariants = nextQueueVariants;
+      _activeIndex = targetIndex;
+
+      for (var i = 0; i < _linearItems.length; i++) {
+        if (_sameItem(_linearItems[i], targetItem)) {
+          _linearVariants[i] = selectedVariant;
+        }
+      }
+
+      currentItem.value = _queueItems[targetIndex];
+      currentVariant.value = _queueVariants[targetIndex];
+      _persistLastItem(_queueItems[targetIndex], _queueVariants[targetIndex]);
+      _keepLastItem = true;
+
+      if (autoPlay) {
+        await _player.play();
+      } else {
+        await _player.pause();
+      }
+
+      _notifyHandler();
+      _persistSessionSnapshot();
     } finally {
       isLoading.value = false;
     }

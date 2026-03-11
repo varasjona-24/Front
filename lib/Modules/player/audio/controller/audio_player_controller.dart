@@ -259,6 +259,15 @@ class AudioPlayerController extends GetxController {
   }
 
   MediaVariant? _resolveAudioVariant(MediaItem item) {
+    final loadedItem = audioService.currentItem.value;
+    final loadedVariant = audioService.currentVariant.value;
+    if (loadedItem != null &&
+        loadedVariant != null &&
+        loadedVariant.kind == MediaVariantKind.audio &&
+        loadedVariant.isValid &&
+        _sameItemKey(loadedItem, item)) {
+      return loadedVariant;
+    }
     return resolveNormalAudioVariant(item);
   }
 
@@ -285,8 +294,10 @@ class AudioPlayerController extends GetxController {
     final variant = item == null ? null : _resolveAudioVariant(item);
     if (item == null || variant == null) return;
 
+    final loadedItem = audioService.currentItem.value;
     if (audioService.hasSourceLoaded &&
-        audioService.isSameTrack(item, variant)) {
+        loadedItem != null &&
+        _sameItemKey(loadedItem, item)) {
       await audioService.toggle();
       return;
     }

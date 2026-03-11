@@ -122,7 +122,7 @@ class KaraokeRemotePipelineService {
       final sessionMap = _asMap(body?['session']) ?? body;
       final session = _parseSession(sessionMap);
       if (session == null || session.id.trim().isEmpty) {
-        throw Exception('El backend no devolvió sesión de karaoke válida.');
+        throw Exception('El backend no devolvió una sesión remota válida.');
       }
       return session;
     } on dio.DioException catch (e) {
