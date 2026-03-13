@@ -76,11 +76,28 @@ class AudioPlayerController extends GetxController {
       if (_handlingCompleted) return;
       _handlingCompleted = true;
       try {
+        final modeAtCompletion = repeatMode.value;
         await _recordSessionForCurrent(
           markCompleted: true,
           forceProgress: 1.0,
           resetSessionAfterRecord: true,
         );
+
+        if (modeAtCompletion == RepeatMode.once) {
+          await audioService.seek(Duration.zero);
+          await audioService.resume();
+          return;
+        }
+
+        if (modeAtCompletion == RepeatMode.loop) {
+          repeatMode.value = RepeatMode.off;
+          _storage.write(_repeatModeKey, repeatMode.value.name);
+          await audioService.setLoopOff();
+          await audioService.seek(Duration.zero);
+          await audioService.resume();
+          return;
+        }
+
         if (_settings.autoPlayNext.value) {
           await next(recordSkip: false);
         } else {
@@ -504,10 +521,26 @@ class AudioPlayerController extends GetxController {
         ? RepeatMode.off
         : RepeatMode.loop;
     _storage.write(_repeatModeKey, repeatMode.value.name);
-    if (repeatMode.value == RepeatMode.loop) {
-      await audioService.setLoopOne();
-    } else {
-      await audioService.setLoopOff();
+    await audioService.setLoopOff();
+  }
+
+  Future<void> cycleRepeatMode() async {
+    switch (repeatMode.value) {
+      case RepeatMode.off:
+        repeatMode.value = RepeatMode.loop;
+        _storage.write(_repeatModeKey, repeatMode.value.name);
+        await audioService.setLoopOff();
+        break;
+      case RepeatMode.loop:
+        repeatMode.value = RepeatMode.once;
+        _storage.write(_repeatModeKey, repeatMode.value.name);
+        await audioService.setLoopOne();
+        break;
+      case RepeatMode.once:
+        repeatMode.value = RepeatMode.off;
+        _storage.write(_repeatModeKey, repeatMode.value.name);
+        await audioService.setLoopOff();
+        break;
     }
   }
 
@@ -589,6 +622,19 @@ class AudioPlayerController extends GetxController {
     if (_endActionHandledForTrack) return;
     if (duration.value <= Duration.zero) return;
 
+    // "Una vez": reinicia la pista una única vez y luego desactiva repeat.
+    if (repeatMode.value == RepeatMode.loop) {
+      const restartMargin = Duration(milliseconds: 350);
+      if (position.value >= duration.value - restartMargin) {
+        _endActionHandledForTrack = true;
+        unawaited(_runRepeatSingleOnce());
+      }
+      return;
+    }
+
+    // "Solo esta": lo maneja just_audio con loopOne (indefinido).
+    if (repeatMode.value == RepeatMode.once) return;
+
     if (_settings.autoPlayNext.value) {
       final secs = audioService.crossfadeSeconds.value;
       if (secs <= 0) return;
@@ -614,6 +660,20 @@ class AudioPlayerController extends GetxController {
       resetSessionAfterRecord: true,
     );
     await audioService.next(withTransition: true);
+  }
+
+  Future<void> _runRepeatSingleOnce() async {
+    await _recordSessionForCurrent(
+      markCompleted: true,
+      forceProgress: 1.0,
+      resetSessionAfterRecord: true,
+    );
+
+    repeatMode.value = RepeatMode.off;
+    _storage.write(_repeatModeKey, repeatMode.value.name);
+    await audioService.setLoopOff();
+    await audioService.seek(Duration.zero);
+    await audioService.resume();
   }
 
   Future<void> _runAutoPauseAtEnd() async {
@@ -777,7 +837,7 @@ class AudioPlayerController extends GetxController {
     }
     if (raw == RepeatMode.loop.name) {
       repeatMode.value = RepeatMode.loop;
-      audioService.setLoopOne();
+      audioService.setLoopOff();
       return;
     }
     repeatMode.value = RepeatMode.off;

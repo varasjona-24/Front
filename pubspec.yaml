@@ -76,7 +76,9 @@ dev_dependencies:
 # The following section is specific to Flutter packages.
 flutter:
   assets:
+    - assets/ui/aguja.png
     - assets/ui/vinyl.png
+    - assets/ui/volumen.svg
     - assets/logo/listenfy_logo.svg
     - assets/hrtf/default.sofa
 

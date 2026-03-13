@@ -231,18 +231,41 @@ class _PlayerInstrumentalSheetState extends State<PlayerInstrumentalSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Modo instrumental',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+              Row(
+                children: [
+                  Icon(
+                    Icons.tune_rounded,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Modo instrumental',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  if (running)
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 _item.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 10),
               LinearProgressIndicator(
@@ -269,8 +292,27 @@ class _PlayerInstrumentalSheetState extends State<PlayerInstrumentalSheet> {
                   ),
                 ),
               ],
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
+              if (shownError != null && shownError.trim().isNotEmpty) ...[
+                Text(
+                  shownError,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Divider(color: theme.colorScheme.outline.withValues(alpha: 0.2)),
+              const SizedBox(height: 10),
               if (hasInstrumental) ...[
+                Text(
+                  'Opciones',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -313,7 +355,7 @@ class _PlayerInstrumentalSheetState extends State<PlayerInstrumentalSheet> {
                       ),
                     ],
                   ),
-                  ),
+                ),
                 const SizedBox(height: 12),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -329,6 +371,13 @@ class _PlayerInstrumentalSheetState extends State<PlayerInstrumentalSheet> {
                   ),
                 ),
               ] else ...[
+                Text(
+                  'Opciones',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
                 FilledButton.icon(
                   onPressed: (_switching || running)
                       ? null
@@ -339,17 +388,6 @@ class _PlayerInstrumentalSheetState extends State<PlayerInstrumentalSheet> {
                   icon: const Icon(Icons.download_rounded),
                   label: const Text('Descargar instrumental'),
                 ),
-              ],
-              const SizedBox(height: 10),
-              if (shownError != null && shownError.trim().isNotEmpty) ...[
-                Text(
-                  shownError,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.error,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
               ],
             ],
           ),

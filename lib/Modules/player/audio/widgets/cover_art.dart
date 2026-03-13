@@ -4,9 +4,11 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
 
 import '../../../../app/models/media_item.dart';
+import '../../../../app/services/audio_service.dart';
 import '../../../../app/services/audio_visualizer_service.dart';
 import '../../../../app/services/audio_waveform_service.dart';
 import '../controller/audio_player_controller.dart';
@@ -179,7 +181,7 @@ class _VinylCoverState extends State<_VinylCover>
         children: [
           // 1) VINILO (NO rota)
           Transform.translate(
-            offset: const Offset(0, 1), // 👈 bajadito para que se vea “debajo”
+            offset: const Offset(-20, 1), // 20px a la izquierda
             child: Image.asset(
               'assets/ui/vinyl.png', // <-- tu png del disco
               width: diskSize,
@@ -189,52 +191,170 @@ class _VinylCoverState extends State<_VinylCover>
           ),
 
           // 2) LABEL / COVER (SÍ rota)
-          ClipOval(
-            child: SizedBox(
-              width: labelSize,
-              height: labelSize,
-              child: RotationTransition(
-                turns: _rotationCtrl,
-                child: hasThumb
-                    ? (isLocal
-                          ? Image.file(
-                              File(thumb),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Center(
-                                child: Icon(
-                                  Icons.music_note_rounded,
-                                  size: 52,
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.6),
+          Transform.translate(
+            offset: const Offset(-20, 0), // 20px a la izquierda
+            child: ClipOval(
+              child: SizedBox(
+                width: labelSize,
+                height: labelSize,
+                child: RotationTransition(
+                  turns: _rotationCtrl,
+                  child: hasThumb
+                      ? (isLocal
+                            ? Image.file(
+                                File(thumb),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Icon(
+                                    Icons.music_note_rounded,
+                                    size: 52,
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.6),
+                                  ),
                                 ),
-                              ),
-                            )
-                          : Image.network(
-                              thumb,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Center(
-                                child: Icon(
-                                  Icons.music_note_rounded,
-                                  size: 52,
-                                  color: theme.colorScheme.onSurface
-                                      .withOpacity(0.6),
+                              )
+                            : Image.network(
+                                thumb,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Icon(
+                                    Icons.music_note_rounded,
+                                    size: 52,
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.6),
+                                  ),
                                 ),
-                              ),
-                            ))
-                    : Center(
-                        child: Icon(
-                          Icons.music_note_rounded,
-                          size: 52,
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              ))
+                      : Center(
+                          child: Icon(
+                            Icons.music_note_rounded,
+                            size: 52,
+                            color: theme.colorScheme.onSurface.withOpacity(0.6),
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
           ),
 
           // 3) AGUJA (siempre Positioned para no romper centrado)
-          const Positioned(top: -16, right: 23, child: TurntableNeedle()),
+          const Positioned(top: -16, right: 43, child: TurntableNeedle()),
+
+          // 4) Fader de volumen funcional (arrastrable)
+          Positioned(
+            top: 100,
+            right: -30,
+            child: _TurntableVolumeSlider(
+              audioService: controller.audioService,
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+class _TurntableVolumeSlider extends StatelessWidget {
+  const _TurntableVolumeSlider({required this.audioService});
+
+  final AudioService audioService;
+
+  static const double _trackWidth = 30;
+  static const double _trackHeight = 150;
+  static const double _touchWidth = 48;
+  static const double _knobSize = 20;
+  static const double _paddingTop = 8;
+  static const double _paddingBottom = 8;
+
+  double get _travel => _trackHeight - _knobSize - _paddingTop - _paddingBottom;
+
+  double _volumeToTop(double volume) {
+    final clamped = volume.clamp(0.0, 1.0).toDouble();
+    return _paddingTop + (1 - clamped) * _travel;
+  }
+
+  double _localDyToVolume(double localDy) {
+    final centeredDy = localDy - (_knobSize / 2);
+    final normalized = ((centeredDy - _paddingTop) / _travel).clamp(0.0, 1.0);
+    return (1 - normalized).toDouble();
+  }
+
+  void _setVolume(double next) {
+    unawaited(audioService.setVolume(next.clamp(0.0, 1.0).toDouble()));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: _touchWidth,
+      height: _trackHeight,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTapDown: (details) =>
+            _setVolume(_localDyToVolume(details.localPosition.dy)),
+        onVerticalDragUpdate: (details) =>
+            _setVolume(_localDyToVolume(details.localPosition.dy)),
+        child: Obx(() {
+          final volume = audioService.volume.value.clamp(0.0, 1.0).toDouble();
+          final top = _volumeToTop(volume);
+          final left = (_touchWidth - _trackWidth) / 2;
+          final knobLeft = (_touchWidth - _knobSize) / 2;
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: left,
+                top: 0,
+                child: SvgPicture.asset(
+                  'assets/ui/volumen.svg',
+                  width: _trackWidth,
+                  height: _trackHeight,
+                  fit: BoxFit.fill,
+                ),
+              ),
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 90),
+                curve: Curves.easeOut,
+                left: knobLeft,
+                top: top,
+                child: Container(
+                  width: _knobSize,
+                  height: _knobSize,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    color: theme.colorScheme.surface,
+                    border: Border.all(
+                      color: theme.colorScheme.outline.withValues(alpha: 0.24),
+                      width: 1,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 6,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(3),
+                        color: theme.colorScheme.onSurface.withValues(
+                          alpha: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        }),
       ),
     );
   }
