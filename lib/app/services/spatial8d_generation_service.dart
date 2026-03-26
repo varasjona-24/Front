@@ -9,18 +9,18 @@ import '../data/local/local_library_store.dart';
 import '../models/media_item.dart';
 import 'karaoke_remote_pipeline_service.dart';
 
-enum InstrumentalTaskStage {
+enum Spatial8dTaskStage {
   preparing,
   uploading,
-  separating,
+  processing,
   downloading,
   saving,
   completed,
   failed,
 }
 
-class InstrumentalTaskSnapshot {
-  const InstrumentalTaskSnapshot({
+class Spatial8dTaskSnapshot {
+  const Spatial8dTaskSnapshot({
     required this.itemKey,
     required this.stage,
     required this.progress,
@@ -34,7 +34,7 @@ class InstrumentalTaskSnapshot {
   });
 
   final String itemKey;
-  final InstrumentalTaskStage stage;
+  final Spatial8dTaskStage stage;
   final double progress;
   final String message;
   final int updatedAt;
@@ -45,8 +45,8 @@ class InstrumentalTaskSnapshot {
   final Map<String, dynamic>? itemJson;
 
   bool get isTerminal =>
-      stage == InstrumentalTaskStage.completed ||
-      stage == InstrumentalTaskStage.failed;
+      stage == Spatial8dTaskStage.completed ||
+      stage == Spatial8dTaskStage.failed;
 
   Map<String, dynamic> toJson() {
     return {
@@ -65,14 +65,14 @@ class InstrumentalTaskSnapshot {
     };
   }
 
-  factory InstrumentalTaskSnapshot.fromJson(Map<String, dynamic> json) {
+  factory Spatial8dTaskSnapshot.fromJson(Map<String, dynamic> json) {
     final stageRaw = (json['stage'] as String?)?.trim() ?? '';
-    final stage = InstrumentalTaskStage.values.firstWhere(
+    final stage = Spatial8dTaskStage.values.firstWhere(
       (e) => e.name == stageRaw,
-      orElse: () => InstrumentalTaskStage.failed,
+      orElse: () => Spatial8dTaskStage.failed,
     );
     final itemJsonRaw = json['itemJson'];
-    return InstrumentalTaskSnapshot(
+    return Spatial8dTaskSnapshot(
       itemKey: (json['itemKey'] as String?)?.trim() ?? '',
       stage: stage,
       progress: ((json['progress'] as num?)?.toDouble() ?? 0.0).clamp(0.0, 1.0),
@@ -88,8 +88,8 @@ class InstrumentalTaskSnapshot {
     );
   }
 
-  InstrumentalTaskSnapshot copyWith({
-    InstrumentalTaskStage? stage,
+  Spatial8dTaskSnapshot copyWith({
+    Spatial8dTaskStage? stage,
     double? progress,
     String? message,
     int? updatedAt,
@@ -99,7 +99,7 @@ class InstrumentalTaskSnapshot {
     String? error,
     Map<String, dynamic>? itemJson,
   }) {
-    return InstrumentalTaskSnapshot(
+    return Spatial8dTaskSnapshot(
       itemKey: itemKey,
       stage: stage ?? this.stage,
       progress: (progress ?? this.progress).clamp(0.0, 1.0),
@@ -114,16 +114,16 @@ class InstrumentalTaskSnapshot {
   }
 }
 
-class InstrumentalGenerationService extends GetxService {
-  static const String _storageKey = 'instrumental_tasks_v1';
+class Spatial8dGenerationService extends GetxService {
+  static const String _storageKey = 'spatial8d_tasks_v1';
 
   final GetStorage _storage = Get.find<GetStorage>();
   final LocalLibraryStore _library = Get.find<LocalLibraryStore>();
   final KaraokeRemotePipelineService _remote =
       Get.find<KaraokeRemotePipelineService>();
 
-  final RxMap<String, InstrumentalTaskSnapshot> tasks =
-      <String, InstrumentalTaskSnapshot>{}.obs;
+  final RxMap<String, Spatial8dTaskSnapshot> tasks =
+      <String, Spatial8dTaskSnapshot>{}.obs;
 
   final Map<String, Future<MediaItem?>> _running =
       <String, Future<MediaItem?>>{};
@@ -143,7 +143,7 @@ class InstrumentalGenerationService extends GetxService {
     return 'title:${item.title.trim().toLowerCase()}';
   }
 
-  InstrumentalTaskSnapshot? stateFor(MediaItem item) => tasks[keyForItem(item)];
+  Spatial8dTaskSnapshot? stateFor(MediaItem item) => tasks[keyForItem(item)];
 
   bool isRunningFor(MediaItem item) {
     final snapshot = stateFor(item);
@@ -199,7 +199,7 @@ class InstrumentalGenerationService extends GetxService {
         _updateSnapshot(
           snapshot.itemKey,
           snapshot.copyWith(
-            stage: InstrumentalTaskStage.failed,
+            stage: Spatial8dTaskStage.failed,
             message: 'No se encontró canción local para reanudar proceso.',
             error: 'No se encontró canción local para reanudar proceso.',
             updatedAt: DateTime.now().millisecondsSinceEpoch,
@@ -235,9 +235,9 @@ class InstrumentalGenerationService extends GetxService {
 
     _updateSnapshot(
       itemKey,
-      InstrumentalTaskSnapshot(
+      Spatial8dTaskSnapshot(
         itemKey: itemKey,
-        stage: InstrumentalTaskStage.preparing,
+        stage: Spatial8dTaskStage.preparing,
         progress: 0.03,
         message: 'Validando conexión con backend...',
         updatedAt: DateTime.now().millisecondsSinceEpoch,
@@ -251,13 +251,13 @@ class InstrumentalGenerationService extends GetxService {
       final reachable = await _remote.isBackendReachable();
       if (!reachable) {
         throw Exception(
-          'Sin conexión al servidor. El modo instrumental requiere internet.',
+          'Sin conexión al servidor. El modo 8D requiere internet.',
         );
       }
 
       _patch(
         itemKey,
-        stage: InstrumentalTaskStage.uploading,
+        stage: Spatial8dTaskStage.uploading,
         progress: 0.08,
         message: 'Subiendo audio fuente al servidor...',
       );
@@ -271,7 +271,7 @@ class InstrumentalGenerationService extends GetxService {
 
           _patch(
             itemKey,
-            stage: InstrumentalTaskStage.uploading,
+            stage: Spatial8dTaskStage.uploading,
             progress: 0.1,
             message:
                 'La sesión remota expiró. Creando una nueva automáticamente...',
@@ -281,7 +281,7 @@ class InstrumentalGenerationService extends GetxService {
           initialSession = await _remote.createSessionFromSource(
             item: currentItem,
             sourcePath: sourcePath,
-            mode: KaraokeRemoteVariantMode.instrumental,
+            mode: KaraokeRemoteVariantMode.spatial8d,
           );
           sessionId = initialSession.id;
         }
@@ -289,16 +289,16 @@ class InstrumentalGenerationService extends GetxService {
         initialSession = await _remote.createSessionFromSource(
           item: currentItem,
           sourcePath: sourcePath,
-          mode: KaraokeRemoteVariantMode.instrumental,
+          mode: KaraokeRemoteVariantMode.spatial8d,
         );
         sessionId = initialSession.id;
       }
 
       _patch(
         itemKey,
-        stage: InstrumentalTaskStage.separating,
+        stage: Spatial8dTaskStage.processing,
         progress: 0.14,
-        message: 'Separando voces e instrumental en backend...',
+        message: 'Procesando audio 8D en backend...',
         sessionId: sessionId,
       );
 
@@ -313,11 +313,11 @@ class InstrumentalGenerationService extends GetxService {
           ? initialSession
           : await _remote.waitUntilReady(
               sessionId: currentSessionId,
-              mode: KaraokeRemoteVariantMode.instrumental,
+              mode: KaraokeRemoteVariantMode.spatial8d,
               onProgress: (progress) {
                 _patch(
                   itemKey,
-                  stage: InstrumentalTaskStage.separating,
+                  stage: Spatial8dTaskStage.processing,
                   progress: (0.14 + progress.progress * 0.72).clamp(0.14, 0.9),
                   message: progress.message,
                   sessionId: sessionId,
@@ -328,35 +328,35 @@ class InstrumentalGenerationService extends GetxService {
       separatorModel = ready.separatorModel?.trim() ?? '';
       _patch(
         itemKey,
-        stage: InstrumentalTaskStage.downloading,
+        stage: Spatial8dTaskStage.downloading,
         progress: 0.92,
-        message: 'Descargando instrumental...',
+        message: 'Descargando audio 8D...',
         separatorModel: separatorModel,
         sessionId: sessionId,
       );
 
-      final downloadedPath = await _remote.downloadInstrumentalToLocal(
+      final downloadedPath = await _remote.downloadSpatial8dToLocal(
         session: ready,
         item: currentItem,
       );
 
       _patch(
         itemKey,
-        stage: InstrumentalTaskStage.saving,
+        stage: Spatial8dTaskStage.saving,
         progress: 0.96,
-        message: 'Guardando variante instrumental...',
+        message: 'Guardando variante 8D...',
         separatorModel: separatorModel,
         sessionId: sessionId,
       );
 
       currentItem = await _latestItem(currentItem) ?? currentItem;
       final sourceVariant = _resolveSourceVariant(currentItem, sourcePath);
-      final variant = await _buildInstrumentalVariant(
+      final variant = await _buildSpatial8dVariant(
         downloadedPath: downloadedPath,
         sourceVariant: sourceVariant,
         item: currentItem,
       );
-      final updated = _mergeInstrumentalVariant(currentItem, variant);
+      final updated = _mergeSpatial8dVariant(currentItem, variant);
       await _library.upsert(updated);
 
       if (Get.isRegistered<AudioPlayerController>()) {
@@ -365,11 +365,11 @@ class InstrumentalGenerationService extends GetxService {
 
       _updateSnapshot(
         itemKey,
-        InstrumentalTaskSnapshot(
+        Spatial8dTaskSnapshot(
           itemKey: itemKey,
-          stage: InstrumentalTaskStage.completed,
+          stage: Spatial8dTaskStage.completed,
           progress: 1.0,
-          message: 'Instrumental guardado correctamente.',
+          message: 'Audio 8D guardado correctamente.',
           updatedAt: DateTime.now().millisecondsSinceEpoch,
           sessionId: sessionId,
           sourcePath: sourcePath,
@@ -383,9 +383,9 @@ class InstrumentalGenerationService extends GetxService {
       final message = e.toString().replaceFirst('Exception: ', '');
       _updateSnapshot(
         itemKey,
-        InstrumentalTaskSnapshot(
+        Spatial8dTaskSnapshot(
           itemKey: itemKey,
-          stage: InstrumentalTaskStage.failed,
+          stage: Spatial8dTaskStage.failed,
           progress: 1.0,
           message: message,
           error: message,
@@ -408,7 +408,7 @@ class InstrumentalGenerationService extends GetxService {
     return null;
   }
 
-  Future<MediaItem?> _resolveItem(InstrumentalTaskSnapshot snapshot) async {
+  Future<MediaItem?> _resolveItem(Spatial8dTaskSnapshot snapshot) async {
     final itemJson = snapshot.itemJson;
     if (itemJson != null) {
       try {
@@ -451,7 +451,7 @@ class InstrumentalGenerationService extends GetxService {
     );
   }
 
-  Future<MediaVariant> _buildInstrumentalVariant({
+  Future<MediaVariant> _buildSpatial8dVariant({
     required String downloadedPath,
     required MediaVariant sourceVariant,
     required MediaItem item,
@@ -478,27 +478,24 @@ class InstrumentalGenerationService extends GetxService {
       createdAt: DateTime.now().millisecondsSinceEpoch,
       size: length,
       durationSeconds: sourceVariant.durationSeconds ?? item.durationSeconds,
-      role: 'instrumental',
+      role: 'spatial8d',
     );
   }
 
-  MediaItem _mergeInstrumentalVariant(
-    MediaItem item,
-    MediaVariant instrumental,
-  ) {
+  MediaItem _mergeSpatial8dVariant(MediaItem item, MediaVariant spatial8d) {
     final preserved = item.variants
         .where((v) {
           if (v.kind != MediaVariantKind.audio) return true;
-          return !v.isInstrumental;
+          return !v.isSpatial8d;
         })
         .toList(growable: true);
-    preserved.add(instrumental);
+    preserved.add(spatial8d);
     return item.copyWith(variants: preserved);
   }
 
   void _patch(
     String itemKey, {
-    InstrumentalTaskStage? stage,
+    Spatial8dTaskStage? stage,
     double? progress,
     String? message,
     String? sessionId,
@@ -519,7 +516,7 @@ class InstrumentalGenerationService extends GetxService {
     );
   }
 
-  void _updateSnapshot(String itemKey, InstrumentalTaskSnapshot snapshot) {
+  void _updateSnapshot(String itemKey, Spatial8dTaskSnapshot snapshot) {
     tasks[itemKey] = snapshot;
     _persistSnapshots();
   }
@@ -527,13 +524,13 @@ class InstrumentalGenerationService extends GetxService {
   void _restoreSnapshots() {
     final raw = _storage.read(_storageKey);
     if (raw is! Map) return;
-    final restored = <String, InstrumentalTaskSnapshot>{};
+    final restored = <String, Spatial8dTaskSnapshot>{};
     for (final entry in raw.entries) {
       final key = entry.key.toString();
       final value = entry.value;
       if (value is! Map) continue;
       try {
-        final parsed = InstrumentalTaskSnapshot.fromJson(
+        final parsed = Spatial8dTaskSnapshot.fromJson(
           Map<String, dynamic>.from(value),
         );
         if (parsed.itemKey.isEmpty) continue;
@@ -545,7 +542,7 @@ class InstrumentalGenerationService extends GetxService {
 
   void _persistSnapshots() {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final keep = <String, InstrumentalTaskSnapshot>{};
+    final keep = <String, Spatial8dTaskSnapshot>{};
     for (final entry in tasks.entries) {
       final snapshot = entry.value;
       if (snapshot.isTerminal &&

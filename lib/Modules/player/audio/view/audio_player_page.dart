@@ -18,10 +18,7 @@ void openPlayerVisualStyleSheet({
   if (Get.isBottomSheetOpen ?? false) return;
 
   Get.bottomSheet<void>(
-    _PlayerVisualStyleSheet(
-      currentStyle: currentStyle,
-      onSelected: onSelected,
-    ),
+    _PlayerVisualStyleSheet(currentStyle: currentStyle, onSelected: onSelected),
     isScrollControlled: false,
     useRootNavigator: true,
     ignoreSafeArea: false,
@@ -91,6 +88,8 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                         currentItem.publicId.trim() == item?.publicId.trim()));
             final isInstrumentalMode =
                 sameCurrentItem && (currentVariant?.isInstrumental ?? false);
+            final isSpatial8dMode =
+                sameCurrentItem && (currentVariant?.isSpatial8d ?? false);
 
             if (item == null) {
               return const Center(child: Text('No hay nada reproduciéndose'));
@@ -193,6 +192,8 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                                 label: 'Modo',
                                 value: isInstrumentalMode
                                     ? 'Instrumental'
+                                    : isSpatial8dMode
+                                    ? '8D'
                                     : 'Normal',
                                 onTap: () => openPlayerInstrumentalSheet(item),
                               ),
@@ -212,16 +213,21 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                                 final stereoOn =
                                     controller.spatialMode.value ==
                                     SpatialAudioMode.virtualizer;
+                                final lockedByBinaural =
+                                    controller.isSpatialModeLocked;
+                                final effectiveOn = stereoOn || lockedByBinaural;
                                 return _PlayerQuickActionTile(
                                   icon: Icons.surround_sound_rounded,
                                   label: 'Estéreo',
-                                  value: stereoOn ? 'On' : 'Off',
-                                  active: stereoOn,
-                                  onTap: () => controller.setSpatialMode(
-                                    stereoOn
-                                        ? SpatialAudioMode.off
-                                        : SpatialAudioMode.virtualizer,
-                                  ),
+                                  value: effectiveOn ? 'On' : 'Off',
+                                  active: effectiveOn,
+                                  onTap: lockedByBinaural
+                                      ? null
+                                      : () => controller.setSpatialMode(
+                                          stereoOn
+                                              ? SpatialAudioMode.off
+                                              : SpatialAudioMode.virtualizer,
+                                        ),
                                 );
                               }),
                             ),
@@ -229,7 +235,8 @@ class _AudioPlayerPageState extends State<AudioPlayerPage> {
                             Expanded(
                               child: Obx(() {
                                 final repeatMode = controller.repeatMode.value;
-                                final repeatActive = repeatMode != RepeatMode.off;
+                                final repeatActive =
+                                    repeatMode != RepeatMode.off;
                                 final repeatOne = repeatMode == RepeatMode.once;
                                 return _PlayerQuickActionTile(
                                   icon: repeatOne
@@ -321,40 +328,41 @@ class _PlayerVisualStyleSheet extends StatelessWidget {
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
-                children: CoverStyle.values.map((style) {
-                  final selected = style == currentStyle;
-                  return ChoiceChip(
-                    selected: selected,
-                    showCheckmark: false,
-                    avatar: Icon(
-                      _iconFor(style),
-                      size: 16,
-                      color: selected
-                          ? scheme.primary
-                          : scheme.onSurfaceVariant,
-                    ),
-                    label: Text(
-                      _labelFor(style),
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: selected ? scheme.primary : scheme.onSurface,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    selectedColor: scheme.primary.withValues(alpha: 0.12),
-                    backgroundColor: scheme.surfaceContainerHighest.withValues(
-                      alpha: 0.45,
-                    ),
-                    side: BorderSide(
-                      color: selected
-                          ? scheme.primary.withValues(alpha: 0.4)
-                          : scheme.outline.withValues(alpha: 0.2),
-                    ),
-                    onSelected: (_) {
-                      onSelected(style);
-                      Get.back<void>();
-                    },
-                  );
-                }).toList(growable: false),
+                children: CoverStyle.values
+                    .map((style) {
+                      final selected = style == currentStyle;
+                      return ChoiceChip(
+                        selected: selected,
+                        showCheckmark: false,
+                        avatar: Icon(
+                          _iconFor(style),
+                          size: 16,
+                          color: selected
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                        ),
+                        label: Text(
+                          _labelFor(style),
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: selected ? scheme.primary : scheme.onSurface,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        selectedColor: scheme.primary.withValues(alpha: 0.12),
+                        backgroundColor: scheme.surfaceContainerHighest
+                            .withValues(alpha: 0.45),
+                        side: BorderSide(
+                          color: selected
+                              ? scheme.primary.withValues(alpha: 0.4)
+                              : scheme.outline.withValues(alpha: 0.2),
+                        ),
+                        onSelected: (_) {
+                          onSelected(style);
+                          Get.back<void>();
+                        },
+                      );
+                    })
+                    .toList(growable: false),
               ),
             ],
           ),

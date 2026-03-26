@@ -174,16 +174,27 @@ class MediaItem {
   MediaVariant? get localAudioVariant {
     final normal = variants.firstWhereOrNull(
       (v) =>
-          v.kind == MediaVariantKind.audio && !v.isInstrumental && _hasLocal(v),
+          v.kind == MediaVariantKind.audio &&
+          !v.isInstrumental &&
+          !v.isSpatial8d &&
+          _hasLocal(v),
     );
     if (normal != null) return normal;
     return variants.firstWhereOrNull(
-      (v) => v.kind == MediaVariantKind.audio && _hasLocal(v),
+      (v) =>
+          v.kind == MediaVariantKind.audio &&
+          !v.isInstrumental &&
+          !v.isSpatial8d &&
+          _hasLocal(v),
     );
   }
 
   MediaVariant? get localInstrumentalVariant => variants.firstWhereOrNull(
     (v) => v.kind == MediaVariantKind.audio && v.isInstrumental && _hasLocal(v),
+  );
+
+  MediaVariant? get localSpatial8dVariant => variants.firstWhereOrNull(
+    (v) => v.kind == MediaVariantKind.audio && v.isSpatial8d && _hasLocal(v),
   );
 
   MediaVariant? get localVideoVariant => variants.firstWhereOrNull(
@@ -605,11 +616,25 @@ class MediaVariant {
         lowerFile.contains('instrumental') ||
         lowerPath.contains('_inst') ||
         lowerPath.contains('/instrumental');
-    return looksInstrumental ? 'instrumental' : 'main';
+    if (looksInstrumental) return 'instrumental';
+
+    final looksSpatial8d =
+        lowerFile.contains('spatial8d') ||
+        lowerFile.contains('_8d') ||
+        lowerFile.contains('8d_') ||
+        lowerPath.contains('spatial8d') ||
+        lowerPath.contains('/8d') ||
+        lowerPath.contains('_8d');
+    if (looksSpatial8d) return 'spatial8d';
+
+    return 'main';
   }
 
   bool get isInstrumental =>
       kind == MediaVariantKind.audio && roleKey == 'instrumental';
+
+  bool get isSpatial8d =>
+      kind == MediaVariantKind.audio && roleKey == 'spatial8d';
 
   bool sameSlotAs(MediaVariant other) {
     return kind == other.kind &&
@@ -654,6 +679,12 @@ class MediaVariant {
     final value = raw?.trim().toLowerCase() ?? '';
     if (value.isEmpty) return null;
     if (value == 'instrumental' || value == 'inst') return 'instrumental';
+    if (value == 'spatial8d' ||
+        value == 'spatial_8d' ||
+        value == '8d' ||
+        value == 'spatial') {
+      return 'spatial8d';
+    }
     if (value == 'main' || value == 'normal' || value == 'original') {
       return 'main';
     }

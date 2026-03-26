@@ -23,6 +23,7 @@ import 'app/services/audio_service.dart';
 import 'app/services/app_audio_handler.dart';
 import 'app/services/instrumental_generation_service.dart';
 import 'app/services/spatial_audio_service.dart';
+import 'app/services/spatial8d_generation_service.dart';
 import 'app/services/video_service.dart';
 import 'app/services/karaoke_remote_pipeline_service.dart';
 import 'Modules/settings/controller/settings_controller.dart';
@@ -100,6 +101,7 @@ Future<void> main() async {
   // 💾 Local storage
   Get.put(LocalLibraryStore(Get.find<GetStorage>()), permanent: true);
   Get.put(InstrumentalGenerationService(), permanent: true);
+  Get.put(Spatial8dGenerationService(), permanent: true);
   if (!Get.isRegistered<SourceThemeTopicStore>()) {
     Get.put(SourceThemeTopicStore(Get.find<GetStorage>()), permanent: true);
   }

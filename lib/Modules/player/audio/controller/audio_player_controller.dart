@@ -50,6 +50,8 @@ class AudioPlayerController extends GetxController {
   String _endActionTrackKey = '';
 
   Rx<SpatialAudioMode> get spatialMode => _spatial.mode;
+  bool get isSpatialModeLocked =>
+      audioService.currentVariant.value?.isSpatial8d ?? false;
 
   @override
   void onInit() {
@@ -114,10 +116,12 @@ class AudioPlayerController extends GetxController {
       _resetAutoPauseSession();
       _syncFromService();
       _applyDurationFallbackFromCurrentItem();
+      unawaited(_enforceSpatialModeForCurrentVariant());
     });
 
     _syncFromService();
     _resetCountSession();
+    unawaited(_enforceSpatialModeForCurrentVariant());
   }
 
   @override
@@ -224,7 +228,7 @@ class AudioPlayerController extends GetxController {
     for (final v in item.variants) {
       if (v.kind != MediaVariantKind.audio || !v.isValid) continue;
       if (localOnly && (v.localPath?.trim().isEmpty ?? true)) continue;
-      if (!v.isInstrumental) return v;
+      if (!v.isInstrumental && !v.isSpatial8d) return v;
       fallback ??= v;
     }
     return fallback;
@@ -237,6 +241,19 @@ class AudioPlayerController extends GetxController {
     for (final v in item.variants) {
       if (v.kind != MediaVariantKind.audio || !v.isValid) continue;
       if (!v.isInstrumental) continue;
+      if (localOnly && (v.localPath?.trim().isEmpty ?? true)) continue;
+      return v;
+    }
+    return null;
+  }
+
+  MediaVariant? resolveSpatial8dAudioVariant(
+    MediaItem item, {
+    bool localOnly = false,
+  }) {
+    for (final v in item.variants) {
+      if (v.kind != MediaVariantKind.audio || !v.isValid) continue;
+      if (!v.isSpatial8d) continue;
       if (localOnly && (v.localPath?.trim().isEmpty ?? true)) continue;
       return v;
     }
@@ -272,6 +289,7 @@ class AudioPlayerController extends GetxController {
       queueIndex: currentIndex.value,
       forceReload: true,
     );
+    await _enforceSpatialModeForVariant(variant);
     _syncFromService();
   }
 
@@ -302,6 +320,7 @@ class AudioPlayerController extends GetxController {
       queueIndex: currentIndex.value,
       forceReload: forceReload,
     );
+    await _enforceSpatialModeForVariant(variant);
 
     _syncFromService();
   }
@@ -484,7 +503,21 @@ class AudioPlayerController extends GetxController {
   }
 
   Future<void> setSpatialMode(SpatialAudioMode mode) async {
+    if (mode == SpatialAudioMode.off && isSpatialModeLocked) {
+      await _spatial.setMode(SpatialAudioMode.virtualizer);
+      return;
+    }
     await _spatial.setMode(mode);
+  }
+
+  Future<void> _enforceSpatialModeForVariant(MediaVariant? variant) async {
+    if (variant == null || !variant.isSpatial8d) return;
+    if (spatialMode.value == SpatialAudioMode.virtualizer) return;
+    await _spatial.setMode(SpatialAudioMode.virtualizer);
+  }
+
+  Future<void> _enforceSpatialModeForCurrentVariant() async {
+    await _enforceSpatialModeForVariant(audioService.currentVariant.value);
   }
 
   void toggleCoverStyle() {

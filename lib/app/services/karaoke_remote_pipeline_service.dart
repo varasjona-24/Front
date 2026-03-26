@@ -17,22 +17,28 @@ enum KaraokeRemoteSessionStatus {
   unknown,
 }
 
+enum KaraokeRemoteVariantMode { instrumental, spatial8d }
+
 class KaraokeRemoteSession {
   const KaraokeRemoteSession({
     required this.id,
+    required this.mode,
     required this.status,
     required this.progress,
     required this.message,
     this.instrumentalUrl,
+    this.spatial8dUrl,
     this.separatorModel,
     this.error,
   });
 
   final String id;
+  final KaraokeRemoteVariantMode mode;
   final KaraokeRemoteSessionStatus status;
   final double progress;
   final String message;
   final String? instrumentalUrl;
+  final String? spatial8dUrl;
   final String? separatorModel;
   final String? error;
 
@@ -41,6 +47,13 @@ class KaraokeRemoteSession {
   bool get isSeparationCompleted =>
       status == KaraokeRemoteSessionStatus.completed;
   bool get isFailed => status == KaraokeRemoteSessionStatus.failed;
+
+  String? urlFor(KaraokeRemoteVariantMode mode) {
+    return switch (mode) {
+      KaraokeRemoteVariantMode.instrumental => instrumentalUrl,
+      KaraokeRemoteVariantMode.spatial8d => spatial8dUrl,
+    };
+  }
 }
 
 class KaraokeRemoteProgress {
@@ -83,6 +96,7 @@ class KaraokeRemotePipelineService {
   Future<KaraokeRemoteSession> createSessionFromSource({
     required MediaItem item,
     required String sourcePath,
+    KaraokeRemoteVariantMode mode = KaraokeRemoteVariantMode.instrumental,
   }) async {
     final normalized = sourcePath.replaceFirst('file://', '').trim();
     if (normalized.isEmpty) {
@@ -105,6 +119,7 @@ class KaraokeRemotePipelineService {
       'artist': item.displaySubtitle,
       'source': 'listenfy_front',
       'filename': p.basename(normalized),
+      'mode': _modeQueryValue(mode),
     };
 
     try {
@@ -158,6 +173,7 @@ class KaraokeRemotePipelineService {
 
   Future<KaraokeRemoteSession> waitUntilReady({
     required String sessionId,
+    KaraokeRemoteVariantMode mode = KaraokeRemoteVariantMode.instrumental,
     Duration timeout = const Duration(minutes: 18),
     Duration pollEvery = const Duration(seconds: 2),
     void Function(KaraokeRemoteProgress progress)? onProgress,
@@ -169,8 +185,8 @@ class KaraokeRemotePipelineService {
       if (DateTime.now().difference(start) > timeout) {
         throw Exception(
           lastTransientError != null
-              ? 'Timeout esperando separación de instrumental en backend. Último error: $lastTransientError'
-              : 'Timeout esperando separación de instrumental en backend.',
+              ? 'Timeout esperando ${_modeLabel(mode)} en backend. Último error: $lastTransientError'
+              : 'Timeout esperando ${_modeLabel(mode)} en backend.',
         );
       }
 
@@ -222,7 +238,7 @@ class KaraokeRemotePipelineService {
         throw Exception(
           reason != null && reason.isNotEmpty
               ? reason
-              : 'La separación de instrumental falló en backend.',
+              : 'El procesamiento de ${_modeLabel(mode)} falló en backend.',
         );
       }
 
@@ -234,27 +250,65 @@ class KaraokeRemotePipelineService {
     required KaraokeRemoteSession session,
     required MediaItem item,
   }) async {
-    final url = session.instrumentalUrl?.trim() ?? '';
+    return downloadVariantToLocal(
+      session: session,
+      item: item,
+      mode: KaraokeRemoteVariantMode.instrumental,
+    );
+  }
+
+  Future<String> downloadSpatial8dToLocal({
+    required KaraokeRemoteSession session,
+    required MediaItem item,
+  }) async {
+    return downloadVariantToLocal(
+      session: session,
+      item: item,
+      mode: KaraokeRemoteVariantMode.spatial8d,
+    );
+  }
+
+  Future<String> downloadVariantToLocal({
+    required KaraokeRemoteSession session,
+    required MediaItem item,
+    required KaraokeRemoteVariantMode mode,
+  }) async {
+    final url = session.urlFor(mode)?.trim() ?? '';
     if (url.isEmpty) {
-      throw Exception('La sesión no tiene URL de instrumental.');
+      throw Exception(
+        mode == KaraokeRemoteVariantMode.instrumental
+            ? 'La sesión no tiene URL de instrumental.'
+            : 'La sesión no tiene URL de audio 8D.',
+      );
     }
 
     final dir = await _ensureCacheDir();
+    final suffix = mode == KaraokeRemoteVariantMode.instrumental
+        ? 'inst'
+        : '8d';
     final outputPath = p.join(
       dir.path,
-      '${_safeName(item.title)}_${session.id}_inst.wav',
+      '${_safeName(item.title)}_${session.id}_$suffix.wav',
     );
+
+    final action = mode == KaraokeRemoteVariantMode.instrumental
+        ? 'descargar instrumental'
+        : 'descargar audio 8D';
 
     await _downloadWithRetry(
       url: url,
       outputPath: outputPath,
-      action: 'descargar instrumental',
+      action: action,
       maxAttempts: 4,
       retryDelay: const Duration(seconds: 2),
     );
     final file = File(outputPath);
     if (!file.existsSync() || file.lengthSync() <= 0) {
-      throw Exception('No se pudo descargar instrumental remoto.');
+      throw Exception(
+        mode == KaraokeRemoteVariantMode.instrumental
+            ? 'No se pudo descargar instrumental remoto.'
+            : 'No se pudo descargar audio 8D remoto.',
+      );
     }
     return outputPath;
   }
@@ -327,24 +381,18 @@ class KaraokeRemotePipelineService {
     final resultMap = _asMap(map['result']);
     final id = _stringOf(map['id']).trim();
     if (id.isEmpty) return null;
+    final mode = _parseMode(_stringOf(resultMap?['mode'] ?? map['mode']));
 
     final statusRaw = _stringOf(map['status']);
     final status = _parseStatus(statusRaw);
     final progress = _parseProgress(map['progress']);
-    final message = _stringOf(map['message']).ifEmpty(switch (status) {
-      KaraokeRemoteSessionStatus.separating =>
-        'Separando instrumental en backend...',
-      KaraokeRemoteSessionStatus.readyToRecord =>
-        'Instrumental listo para grabar.',
-      KaraokeRemoteSessionStatus.completed =>
-        'Separación instrumental completada.',
-      KaraokeRemoteSessionStatus.failed => 'Proceso fallido en backend.',
-      KaraokeRemoteSessionStatus.canceled => 'Proceso cancelado.',
-      KaraokeRemoteSessionStatus.unknown => 'Procesando...',
-    });
+    final message = _stringOf(
+      map['message'],
+    ).ifEmpty(_defaultStatusMessage(status, mode));
 
     return KaraokeRemoteSession(
       id: id,
+      mode: mode,
       status: status,
       progress: progress,
       message: message,
@@ -353,7 +401,18 @@ class KaraokeRemotePipelineService {
       instrumentalUrl: _stringOf(
         resultMap?['instrumentalUrl'] ?? map['instrumentalUrl'],
       ).ifEmptyNull(),
+      spatial8dUrl: _stringOf(
+        resultMap?['spatial8dUrl'] ?? map['spatial8dUrl'],
+      ).ifEmptyNull(),
     );
+  }
+
+  KaraokeRemoteVariantMode _parseMode(String raw) {
+    final value = raw.trim().toLowerCase();
+    if (value == 'spatial8d' || value == '8d' || value == 'spatial') {
+      return KaraokeRemoteVariantMode.spatial8d;
+    }
+    return KaraokeRemoteVariantMode.instrumental;
   }
 
   KaraokeRemoteSessionStatus _parseStatus(String raw) {
@@ -398,6 +457,35 @@ class KaraokeRemotePipelineService {
               '${Uri.encodeQueryComponent(entry.key)}=${Uri.encodeQueryComponent(entry.value)}',
         )
         .join('&');
+  }
+
+  String _modeQueryValue(KaraokeRemoteVariantMode mode) {
+    return mode == KaraokeRemoteVariantMode.instrumental
+        ? 'instrumental'
+        : 'spatial8d';
+  }
+
+  String _modeLabel(KaraokeRemoteVariantMode mode) {
+    return mode == KaraokeRemoteVariantMode.instrumental
+        ? 'separación de instrumental'
+        : 'procesamiento 8D';
+  }
+
+  String _defaultStatusMessage(
+    KaraokeRemoteSessionStatus status,
+    KaraokeRemoteVariantMode mode,
+  ) {
+    final noun = mode == KaraokeRemoteVariantMode.instrumental
+        ? 'instrumental'
+        : 'audio 8D';
+    return switch (status) {
+      KaraokeRemoteSessionStatus.separating => 'Procesando $noun en backend...',
+      KaraokeRemoteSessionStatus.readyToRecord => '$noun listo.',
+      KaraokeRemoteSessionStatus.completed => 'Procesamiento $noun completado.',
+      KaraokeRemoteSessionStatus.failed => 'Proceso fallido en backend.',
+      KaraokeRemoteSessionStatus.canceled => 'Proceso cancelado.',
+      KaraokeRemoteSessionStatus.unknown => 'Procesando...',
+    };
   }
 
   Map<String, dynamic>? _asMap(dynamic raw) {
@@ -449,6 +537,9 @@ class KaraokeRemotePipelineService {
       }
       if (action == 'descargar instrumental') {
         return 'El backend aún no expone el instrumental (404). Reintenta en unos segundos.';
+      }
+      if (action == 'descargar audio 8D') {
+        return 'El backend aún no expone el audio 8D (404). Reintenta en unos segundos.';
       }
       return 'Recurso remoto no encontrado (404).';
     }

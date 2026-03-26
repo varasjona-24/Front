@@ -955,7 +955,10 @@ class AudioService extends GetxService {
     if (_sameItem(queueItem, selectedItem)) return selectedVariant;
 
     for (final v in queueItem.variants) {
-      if (v.kind == MediaVariantKind.audio && !v.isInstrumental && v.isValid) {
+      if (v.kind == MediaVariantKind.audio &&
+          !v.isInstrumental &&
+          !v.isSpatial8d &&
+          v.isValid) {
         return v;
       }
     }
