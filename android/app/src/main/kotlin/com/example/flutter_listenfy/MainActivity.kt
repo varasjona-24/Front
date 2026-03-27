@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.BluetoothProfile
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.Handler
@@ -46,6 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AudioServiceActivity() {
     private val channel = "listenfy/bluetooth_audio"
+    private val mediaMetadataChannel = "listenfy/media_metadata"
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
     private val audioCleanupChannel = "listenfy/audio_cleanup"
@@ -176,6 +178,54 @@ class MainActivity : AudioServiceActivity() {
                     },
                     BluetoothProfile.A2DP
                 )
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, mediaMetadataChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "extractAudioMetadata" -> {
+                        val path = call.argument<String>("path")?.trim().orEmpty()
+                        if (path.isBlank()) {
+                            result.success(null)
+                            return@setMethodCallHandler
+                        }
+
+                        Thread {
+                            val retriever = MediaMetadataRetriever()
+                            try {
+                                if (path.startsWith("content://")) {
+                                    retriever.setDataSource(this, Uri.parse(path))
+                                } else {
+                                    retriever.setDataSource(path)
+                                }
+
+                                val title = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                                val artist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                                val albumArtist = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUMARTIST)
+                                val author = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_AUTHOR)
+                                val album = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ALBUM)
+                                val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                                val picture = retriever.embeddedPicture
+
+                                val payload = HashMap<String, Any?>()
+                                payload["title"] = title
+                                payload["artist"] = artist ?: albumArtist ?: author
+                                payload["album"] = album
+                                payload["durationMs"] = durationMs
+                                payload["picture"] = picture
+
+                                runOnUiThread { result.success(payload) }
+                            } catch (_: Throwable) {
+                                runOnUiThread { result.success(null) }
+                            } finally {
+                                try {
+                                    retriever.release()
+                                } catch (_: Throwable) {}
+                            }
+                        }.start()
+                    }
+                    else -> result.notImplemented()
+                }
             }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, spatialChannel)

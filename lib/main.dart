@@ -22,6 +22,7 @@ import 'app/data/local/local_library_store.dart';
 import 'app/services/audio_service.dart';
 import 'app/services/app_audio_handler.dart';
 import 'app/services/instrumental_generation_service.dart';
+import 'app/services/local_media_metadata_service.dart';
 import 'app/services/spatial_audio_service.dart';
 import 'app/services/spatial8d_generation_service.dart';
 import 'app/services/video_service.dart';
@@ -97,6 +98,7 @@ Future<void> main() async {
     KaraokeRemotePipelineService(client: Get.find<DioClient>()),
     permanent: true,
   );
+  Get.put(LocalMediaMetadataService(), permanent: true);
 
   // 💾 Local storage
   Get.put(LocalLibraryStore(Get.find<GetStorage>()), permanent: true);

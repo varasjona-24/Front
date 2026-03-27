@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:path/path.dart' as p;
+import 'package:share_plus/share_plus.dart';
 
 import '../data/local/local_library_store.dart';
 import '../models/media_item.dart';
@@ -125,6 +127,107 @@ class MediaActionsController extends GetxController {
   }
 
   // ============================
+  // 📤 COMPARTIR
+  // ============================
+  Future<void> shareMediaExternally(MediaItem item) async {
+    try {
+      final variant = _pickShareVariant(item);
+
+      if (variant == null) {
+        Get.snackbar(
+          'Compartir',
+          'No hay archivo local para compartir.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final localPath = variant.localPath?.trim();
+      if (localPath == null || localPath.isEmpty) {
+        Get.snackbar(
+          'Compartir',
+          'No hay archivo local para compartir.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final mediaFile = File(localPath);
+      if (!await mediaFile.exists()) {
+        Get.snackbar(
+          'Compartir',
+          'El archivo ya no existe en el dispositivo.',
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      await Share.shareXFiles(
+        <XFile>[
+          XFile(
+            mediaFile.path,
+            name: p.basename(mediaFile.path),
+            mimeType: _guessMimeType(variant),
+          ),
+        ],
+        subject: 'Archivo compartido desde Listenfy',
+        text: 'Comparte esta canción/video con otra app o dispositivo.',
+      );
+    } catch (e) {
+      debugPrint('Error sharing song: $e');
+      Get.snackbar(
+        'Compartir',
+        'No se pudo compartir la canción.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
+  }
+
+  MediaVariant? _pickShareVariant(MediaItem item) {
+    final localVariants = item.variants.where((v) {
+      final pth = v.localPath?.trim() ?? '';
+      return pth.isNotEmpty;
+    }).toList();
+    if (localVariants.isEmpty) return null;
+
+    for (final variant in localVariants) {
+      if (variant.kind != MediaVariantKind.audio) continue;
+      if (variant.isInstrumental || variant.isSpatial8d) continue;
+      return variant;
+    }
+
+    for (final variant in localVariants) {
+      if (variant.kind == MediaVariantKind.audio) return variant;
+    }
+
+    return localVariants.first;
+  }
+
+  String _guessMimeType(MediaVariant variant) {
+    final ext = variant.format.toLowerCase().trim();
+    if (variant.kind == MediaVariantKind.video) {
+      return switch (ext) {
+        'mp4' => 'video/mp4',
+        'mov' => 'video/quicktime',
+        'mkv' => 'video/x-matroska',
+        'webm' => 'video/webm',
+        _ => 'video/*',
+      };
+    }
+
+    return switch (ext) {
+      'mp3' => 'audio/mpeg',
+      'm4a' => 'audio/mp4',
+      'wav' => 'audio/wav',
+      'flac' => 'audio/flac',
+      'aac' => 'audio/aac',
+      'ogg' => 'audio/ogg',
+      'opus' => 'audio/opus',
+      _ => 'audio/*',
+    };
+  }
+
+  // ============================
   // 🧾 ACCIONES UI
   // ============================
   Future<MediaItem> _resolveLatest(MediaItem item) async {
@@ -151,7 +254,7 @@ class MediaActionsController extends GetxController {
         ? Get.find<NavigationController>()
         : null;
 
-    final resolved = await _resolveLatest(item);
+    final selected = item;
     Future<void> Function()? pendingAction;
 
     nav?.setOverlayOpen(true);
@@ -174,7 +277,8 @@ class MediaActionsController extends GetxController {
                   title: const Text('Editar cancion'),
                   onTap: () {
                     pendingAction = () async {
-                      final changed = await openEditPage(resolved);
+                      final latest = await _resolveLatest(selected);
+                      final changed = await openEditPage(latest);
                       if (changed == true && onChanged != null) {
                         await onChanged();
                       }
@@ -184,18 +288,19 @@ class MediaActionsController extends GetxController {
                 ),
                 ListTile(
                   leading: Icon(
-                    resolved.isFavorite
+                    selected.isFavorite
                         ? Icons.favorite_rounded
                         : Icons.favorite_border_rounded,
                   ),
                   title: Text(
-                    resolved.isFavorite
+                    selected.isFavorite
                         ? 'Quitar de favoritos'
                         : 'Agregar a favoritos',
                   ),
                   onTap: () {
                     pendingAction = () async {
-                      await toggleFavorite(resolved, onChanged: onChanged);
+                      final latest = await _resolveLatest(selected);
+                      await toggleFavorite(latest, onChanged: onChanged);
                     };
                     Navigator.of(ctx).pop();
                   },
@@ -205,7 +310,24 @@ class MediaActionsController extends GetxController {
                   title: const Text('Borrar del dispositivo'),
                   onTap: () {
                     pendingAction = () async {
-                      await confirmDelete(context, resolved, onChanged: onChanged);
+                      final latest = await _resolveLatest(selected);
+                      if (!context.mounted) return;
+                      await confirmDelete(
+                        context,
+                        latest,
+                        onChanged: onChanged,
+                      );
+                    };
+                    Navigator.of(ctx).pop();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.ios_share_rounded),
+                  title: const Text('Compartir archivo (externo)'),
+                  onTap: () {
+                    pendingAction = () async {
+                      final latest = await _resolveLatest(selected);
+                      await shareMediaExternally(latest);
                     };
                     Navigator.of(ctx).pop();
                   },
