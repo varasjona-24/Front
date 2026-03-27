@@ -48,6 +48,9 @@ class DownloadsController extends GetxController {
   final RxString sharedUrl = ''.obs;
   final RxBool shareDialogOpen = false.obs;
   final RxBool sharedArgConsumed = false.obs;
+  final RxBool localImportArgConsumed = false.obs;
+  final RxBool localImportDialogOpen = false.obs;
+  final RxBool openLocalImportRequested = false.obs;
   StreamSubscription<List<SharedMediaFile>>? _shareSub;
   bool _processingSharedFiles = false;
 
@@ -198,6 +201,10 @@ class DownloadsController extends GetxController {
         Get.toNamed(AppRoutes.downloads);
       }
     });
+  }
+
+  void requestOpenLocalImport() {
+    openLocalImportRequested.value = true;
   }
 
   // ============================

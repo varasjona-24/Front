@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -27,6 +28,7 @@ import 'app/services/spatial_audio_service.dart';
 import 'app/services/spatial8d_generation_service.dart';
 import 'app/services/video_service.dart';
 import 'app/services/karaoke_remote_pipeline_service.dart';
+import 'app/services/deep_link_service.dart';
 import 'Modules/settings/controller/settings_controller.dart';
 import 'Modules/settings/controller/playback_settings_controller.dart';
 import 'Modules/settings/controller/sleep_timer_controller.dart';
@@ -147,6 +149,7 @@ Future<void> main() async {
 
   // 📥 Imports/Downloads global (share intent listener)
   Get.put(DownloadsController(), permanent: true);
+  Get.put(DeepLinkService(), permanent: true);
 
   // 🎚️ Reaplicar ecualizador cuando AudioService ya existe (no bloquear arranque)
   if (Get.isRegistered<EqualizerController>()) {
@@ -172,6 +175,7 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _checkPermissions();
+    unawaited(Get.find<DeepLinkService>().start());
   }
 
   Future<void> _checkPermissions() async {

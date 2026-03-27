@@ -57,6 +57,8 @@ import 'package:flutter_listenfy/Modules/home/view/app_songs_search_page.dart';
 import 'package:flutter_listenfy/Modules/sources/view/source_library_page.dart';
 import 'package:flutter_listenfy/Modules/sources/view/source_theme_topic_page.dart';
 import 'package:flutter_listenfy/Modules/sources/view/source_theme_topic_playlist_page.dart';
+import 'package:flutter_listenfy/Modules/nearby_transfer/binding/nearby_transfer_binding.dart';
+import 'package:flutter_listenfy/Modules/nearby_transfer/view/nearby_transfer_page.dart';
 
 abstract class AppPages {
   static final routes = <GetPage>[
@@ -226,6 +228,11 @@ abstract class AppPages {
       name: AppRoutes.createEntity,
       page: () => const CreateEntityPage(),
       binding: EditEntityBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.nearbyTransfer,
+      page: () => const NearbyTransferPage(),
+      binding: NearbyTransferBinding(),
     ),
 
     // Video Player

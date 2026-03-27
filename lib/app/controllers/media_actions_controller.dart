@@ -322,6 +322,20 @@ class MediaActionsController extends GetxController {
                   },
                 ),
                 ListTile(
+                  leading: const Icon(Icons.bluetooth_searching_rounded),
+                  title: const Text('Transferir a Listenfy (offline)'),
+                  onTap: () {
+                    pendingAction = () async {
+                      final latest = await _resolveLatest(selected);
+                      await Get.toNamed(
+                        AppRoutes.nearbyTransfer,
+                        arguments: {'item': latest},
+                      );
+                    };
+                    Navigator.of(ctx).pop();
+                  },
+                ),
+                ListTile(
                   leading: const Icon(Icons.ios_share_rounded),
                   title: const Text('Compartir archivo (externo)'),
                   onTap: () {

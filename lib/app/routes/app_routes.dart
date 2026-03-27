@@ -30,4 +30,5 @@ abstract class AppRoutes {
   static const editEntity = '/edit';
   static const createEntity = '/create';
   static const lyricsEntry = '/lyrics/entry';
+  static const nearbyTransfer = '/transfer/nearby';
 }

@@ -56,6 +56,9 @@ dependencies:
   video_player: ^2.5.0
   webview_flutter: ^4.8.0
   receive_sharing_intent: ^1.4.5
+  app_links: ^6.3.3
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
   share_plus: ^10.1.4
   flutter_custom_tabs: ^2.4.0
   just_audio_background: ^0.0.1-beta.17

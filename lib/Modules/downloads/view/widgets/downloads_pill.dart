@@ -210,12 +210,15 @@ class DownloadsPill extends GetView<DownloadsController> {
   /// 📁 Descargar desde dispositivo local
   Future<void> _pickLocalFiles(BuildContext context) async {
     if (context.mounted) {
-      _showImportDialog(context);
+      showLocalImportDialog(context, controller);
     }
   }
 
   /// 📋 Dialog para importar archivos locales
-  Future<void> _showImportDialog(BuildContext context) async {
+  static Future<void> showLocalImportDialog(
+    BuildContext context,
+    DownloadsController controller,
+  ) async {
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -385,8 +388,11 @@ class DownloadsPill extends GetView<DownloadsController> {
                                           Icons.download_done_rounded,
                                         ),
                                         tooltip: 'Importar',
-                                        onPressed: () =>
-                                            _importItem(context, item, i),
+                                        onPressed: () => _importItem(
+                                          context: context,
+                                          controller: controller,
+                                          item: item,
+                                        ),
                                       ),
                               ),
                             );
@@ -401,7 +407,10 @@ class DownloadsPill extends GetView<DownloadsController> {
                         () => FilledButton.icon(
                           onPressed: controller.importing.value
                               ? null
-                              : () => _importAllItems(context),
+                              : () => _importAllItems(
+                                context: context,
+                                controller: controller,
+                              ),
                           icon: controller.importing.value
                               ? const SizedBox(
                                   width: 16,
@@ -457,11 +466,11 @@ class DownloadsPill extends GetView<DownloadsController> {
   }
 
   /// 📥 Importar un archivo específico
-  Future<void> _importItem(
-    BuildContext context,
-    MediaItem item,
-    int index,
-  ) async {
+  static Future<void> _importItem({
+    required BuildContext context,
+    required DownloadsController controller,
+    required MediaItem item,
+  }) async {
     final result = await controller.importLocalFileToApp(item);
     if (result != null && context.mounted) {
       Get.snackbar(
@@ -472,7 +481,10 @@ class DownloadsPill extends GetView<DownloadsController> {
     }
   }
 
-  Future<void> _importAllItems(BuildContext context) async {
+  static Future<void> _importAllItems({
+    required BuildContext context,
+    required DownloadsController controller,
+  }) async {
     final items = controller.localFilesForImport.toList();
     if (items.isEmpty) {
       Get.snackbar(
