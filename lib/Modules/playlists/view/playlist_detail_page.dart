@@ -16,6 +16,7 @@ import '../../../app/ui/widgets/media/app_media_items_view.dart';
 import '../../../app/models/media_item.dart';
 import '../controller/playlists_controller.dart';
 import '../domain/playlist.dart';
+import 'widgets/playlist_song_picker_sheet.dart';
 import '../../../app/utils/format_bytes.dart';
 
 class PlaylistDetailPage extends GetView<PlaylistsController> {
@@ -460,6 +461,8 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
           context,
           item,
           onChanged: controller.load,
+          queueContext: queue,
+          queueContextIndex: queue.indexWhere((entry) => entry.id == item.id),
           onStartMultiSelect: () {
             Get.toNamed(
               AppRoutes.homeSectionList,
@@ -479,6 +482,10 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
                       context,
                       target,
                       onChanged: controller.load,
+                      queueContext: queue,
+                      queueContextIndex: queue.indexWhere(
+                        (entry) => entry.id == target.id,
+                      ),
                       onStartMultiSelect: onStartMultiSelect,
                     ),
                 'onDeleteSelected': (List<MediaItem> selected) async {
@@ -549,7 +556,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
     }).toList();
 
     nav?.setOverlayOpen(true);
-    await showModalBottomSheet<void>(
+    final selected = await showModalBottomSheet<List<MediaItem>>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -558,13 +565,16 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) {
-        return _AddSongsSheet(
-          playlist: playlist,
+        return PlaylistSongPickerSheet(
+          title: tr('playlists.detail.add_songs'),
           allItems: allItems,
-          controller: controller,
+          submitLabelBuilder: (count) =>
+              tr('playlists.detail.add_selected', args: ['$count']),
         );
       },
     ).whenComplete(() => nav?.setOverlayOpen(false));
+    if (selected == null || selected.isEmpty) return;
+    await controller.addItemsToPlaylist(playlist.id, selected);
   }
 }
 
@@ -689,269 +699,3 @@ class _PlaylistSortOption extends StatelessWidget {
 }
 
 enum _TrackAction { removeFromPlaylist, moreActions }
-
-class _AddSongsSheet extends StatefulWidget {
-  const _AddSongsSheet({
-    required this.playlist,
-    required this.allItems,
-    required this.controller,
-  });
-
-  final Playlist playlist;
-  final List<MediaItem> allItems;
-  final PlaylistsController controller;
-
-  @override
-  State<_AddSongsSheet> createState() => _AddSongsSheetState();
-}
-
-class _AddSongsSheetState extends State<_AddSongsSheet> {
-  final TextEditingController _searchCtrl = TextEditingController();
-  final Set<String> _selected = <String>{};
-  String _query = '';
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  String _keyFor(MediaItem item) {
-    final publicId = item.publicId.trim();
-    return publicId.isNotEmpty ? publicId : item.id.trim();
-  }
-
-  List<MediaItem> get _filteredItems {
-    final normalizedQuery = _query.trim().toLowerCase();
-    if (normalizedQuery.isEmpty) return widget.allItems;
-    return widget.allItems
-        .where((item) {
-          return item.title.toLowerCase().contains(normalizedQuery) ||
-              item.displaySubtitle.toLowerCase().contains(normalizedQuery);
-        })
-        .toList(growable: false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final normalizedQuery = _query.trim().toLowerCase();
-    final items = _filteredItems;
-
-    return SafeArea(
-      child: SizedBox(
-        height: MediaQuery.of(context).size.height * 0.82,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.playlist_add_rounded),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          tr('playlists.detail.add_songs'),
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text(tr('common.close')),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _searchCtrl,
-                    onChanged: (value) {
-                      setState(() => _query = value);
-                    },
-                    textInputAction: TextInputAction.search,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _query.trim().isEmpty
-                          ? null
-                          : IconButton(
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                _searchCtrl.clear();
-                                setState(() => _query = '');
-                              },
-                            ),
-                      hintText: tr('home.search.by_title_artist'),
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      Chip(
-                        avatar: const Icon(
-                          Icons.library_music_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          tr(
-                            'playlists.detail.available_count',
-                            args: ['${widget.allItems.length}'],
-                          ),
-                        ),
-                      ),
-                      Chip(
-                        avatar: const Icon(
-                          Icons.check_circle_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          tr(
-                            'playlists.detail.selected_count',
-                            args: ['${_selected.length}'],
-                          ),
-                        ),
-                      ),
-                      if (normalizedQuery.isNotEmpty)
-                        Chip(
-                          avatar: const Icon(
-                            Icons.filter_alt_rounded,
-                            size: 18,
-                          ),
-                          label: Text(
-                            tr(
-                              'home.search.results',
-                              args: ['${items.length}'],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: items.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          normalizedQuery.isEmpty
-                              ? tr('playlists.detail.no_new_songs')
-                              : tr('edit.no_songs_found'),
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                      itemCount: items.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 8),
-                      itemBuilder: (ctx, i) => _songTile(ctx, items[i]),
-                    ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _selected.isEmpty ? null : _addSelected,
-                  icon: const Icon(Icons.add_rounded),
-                  label: Text(
-                    _selected.isEmpty
-                        ? tr('playlists.detail.select_songs')
-                        : tr(
-                            'playlists.detail.add_selected',
-                            args: ['${_selected.length}'],
-                          ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _songTile(BuildContext context, MediaItem item) {
-    final key = _keyFor(item);
-    final checked = _selected.contains(key);
-    final thumb = item.effectiveThumbnail;
-
-    return Material(
-      color: checked
-          ? Theme.of(
-              context,
-            ).colorScheme.primaryContainer.withValues(alpha: 0.5)
-          : Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: checked
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.outlineVariant,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        onTap: () => _toggle(key, checked),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: SizedBox(
-            width: 48,
-            height: 48,
-            child: thumb == null || thumb.isEmpty
-                ? ColoredBox(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surfaceContainerHighest,
-                    child: const Icon(Icons.music_note_rounded),
-                  )
-                : Image(
-                    image: thumb.startsWith('http')
-                        ? NetworkImage(thumb)
-                        : FileImage(File(thumb)) as ImageProvider,
-                    fit: BoxFit.cover,
-                  ),
-          ),
-        ),
-        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-        subtitle: Text(
-          item.displaySubtitle.isEmpty
-              ? 'Artista desconocido'
-              : item.displaySubtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Checkbox(
-          value: checked,
-          onChanged: (v) => _toggle(key, checked),
-        ),
-      ),
-    );
-  }
-
-  void _toggle(String key, bool checked) {
-    setState(() {
-      if (checked) {
-        _selected.remove(key);
-      } else {
-        _selected.add(key);
-      }
-    });
-  }
-
-  Future<void> _addSelected() async {
-    final toAdd = widget.allItems.where((item) {
-      return _selected.contains(_keyFor(item));
-    }).toList();
-    await widget.controller.addItemsToPlaylist(widget.playlist.id, toAdd);
-    if (mounted) Navigator.of(context).pop();
-  }
-}

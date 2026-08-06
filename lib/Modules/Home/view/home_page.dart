@@ -232,6 +232,14 @@ class HomePage extends GetView<HomeController> {
                                                   item,
                                                   onChanged:
                                                       controller.loadHome,
+                                                  queueContext:
+                                                      controller.fullFavorites,
+                                                  queueContextIndex: controller
+                                                      .fullFavorites
+                                                      .indexWhere(
+                                                        (entry) =>
+                                                            entry.id == item.id,
+                                                      ),
                                                   onStartMultiSelect:
                                                       onStartMultiSelect,
                                                 ),
@@ -254,6 +262,14 @@ class HomePage extends GetView<HomeController> {
                                             context,
                                             item,
                                             onChanged: controller.loadHome,
+                                            queueContext:
+                                                controller.fullFavorites,
+                                            queueContextIndex: controller
+                                                .fullFavorites
+                                                .indexWhere(
+                                                  (entry) =>
+                                                      entry.id == item.id,
+                                                ),
                                             onStartMultiSelect: () => Get.toNamed(
                                               AppRoutes.homeSectionList,
                                               arguments: {
@@ -273,15 +289,24 @@ class HomePage extends GetView<HomeController> {
                                                       item,
                                                       _, {
                                                       onStartMultiSelect,
-                                                    }) =>
-                                                        actions.showItemActions(
-                                                          context,
-                                                          item,
-                                                          onChanged: controller
-                                                              .loadHome,
-                                                          onStartMultiSelect:
-                                                              onStartMultiSelect,
-                                                        ),
+                                                    }) => actions.showItemActions(
+                                                      context,
+                                                      item,
+                                                      onChanged:
+                                                          controller.loadHome,
+                                                      queueContext: controller
+                                                          .fullFavorites,
+                                                      queueContextIndex:
+                                                          controller
+                                                              .fullFavorites
+                                                              .indexWhere(
+                                                                (entry) =>
+                                                                    entry.id ==
+                                                                    item.id,
+                                                              ),
+                                                      onStartMultiSelect:
+                                                          onStartMultiSelect,
+                                                    ),
                                                 'onShuffle': (queue) =>
                                                     controller.openMedia(
                                                       queue.first,
@@ -340,6 +365,14 @@ class HomePage extends GetView<HomeController> {
                                                   item,
                                                   onChanged:
                                                       controller.loadHome,
+                                                  queueContext: controller
+                                                      .fullRecommended,
+                                                  queueContextIndex: controller
+                                                      .fullRecommended
+                                                      .indexWhere(
+                                                        (entry) =>
+                                                            entry.id == item.id,
+                                                      ),
                                                   onStartMultiSelect:
                                                       onStartMultiSelect,
                                                 ),
@@ -398,15 +431,23 @@ class HomePage extends GetView<HomeController> {
                                                       item,
                                                       _, {
                                                       onStartMultiSelect,
-                                                    }) =>
-                                                        actions.showItemActions(
-                                                          context,
-                                                          item,
-                                                          onChanged: controller
-                                                              .loadHome,
-                                                          onStartMultiSelect:
-                                                              onStartMultiSelect,
-                                                        ),
+                                                    }) => actions.showItemActions(
+                                                      context,
+                                                      item,
+                                                      onChanged:
+                                                          controller.loadHome,
+                                                      queueContext:
+                                                          collection.items,
+                                                      queueContextIndex:
+                                                          collection.items
+                                                              .indexWhere(
+                                                                (entry) =>
+                                                                    entry.id ==
+                                                                    item.id,
+                                                              ),
+                                                      onStartMultiSelect:
+                                                          onStartMultiSelect,
+                                                    ),
                                                 'onShuffle': (queue) =>
                                                     controller.openMedia(
                                                       queue.first,
@@ -456,6 +497,14 @@ class HomePage extends GetView<HomeController> {
                                                   item,
                                                   onChanged:
                                                       controller.loadHome,
+                                                  queueContext:
+                                                      controller.fullMostPlayed,
+                                                  queueContextIndex: controller
+                                                      .fullMostPlayed
+                                                      .indexWhere(
+                                                        (entry) =>
+                                                            entry.id == item.id,
+                                                      ),
                                                   onStartMultiSelect:
                                                       onStartMultiSelect,
                                                 ),
@@ -482,6 +531,14 @@ class HomePage extends GetView<HomeController> {
                                             context,
                                             item,
                                             onChanged: controller.loadHome,
+                                            queueContext:
+                                                controller.fullMostPlayed,
+                                            queueContextIndex: controller
+                                                .fullMostPlayed
+                                                .indexWhere(
+                                                  (entry) =>
+                                                      entry.id == item.id,
+                                                ),
                                             onStartMultiSelect: () => Get.toNamed(
                                               AppRoutes.homeSectionList,
                                               arguments: {
@@ -506,15 +563,24 @@ class HomePage extends GetView<HomeController> {
                                                       item,
                                                       _, {
                                                       onStartMultiSelect,
-                                                    }) =>
-                                                        actions.showItemActions(
-                                                          context,
-                                                          item,
-                                                          onChanged: controller
-                                                              .loadHome,
-                                                          onStartMultiSelect:
-                                                              onStartMultiSelect,
-                                                        ),
+                                                    }) => actions.showItemActions(
+                                                      context,
+                                                      item,
+                                                      onChanged:
+                                                          controller.loadHome,
+                                                      queueContext: controller
+                                                          .fullMostPlayed,
+                                                      queueContextIndex:
+                                                          controller
+                                                              .fullMostPlayed
+                                                              .indexWhere(
+                                                                (entry) =>
+                                                                    entry.id ==
+                                                                    item.id,
+                                                              ),
+                                                      onStartMultiSelect:
+                                                          onStartMultiSelect,
+                                                    ),
                                                 'onShuffle': (queue) =>
                                                     controller.openMedia(
                                                       queue.first,
@@ -567,6 +633,14 @@ class HomePage extends GetView<HomeController> {
                                                   item,
                                                   onChanged:
                                                       controller.loadHome,
+                                                  queueContext: controller
+                                                      .fullRecentlyPlayed,
+                                                  queueContextIndex: controller
+                                                      .fullRecentlyPlayed
+                                                      .indexWhere(
+                                                        (entry) =>
+                                                            entry.id == item.id,
+                                                      ),
                                                   onStartMultiSelect:
                                                       onStartMultiSelect,
                                                 ),
@@ -589,6 +663,14 @@ class HomePage extends GetView<HomeController> {
                                             context,
                                             item,
                                             onChanged: controller.loadHome,
+                                            queueContext:
+                                                controller.fullRecentlyPlayed,
+                                            queueContextIndex: controller
+                                                .fullRecentlyPlayed
+                                                .indexWhere(
+                                                  (entry) =>
+                                                      entry.id == item.id,
+                                                ),
                                             onStartMultiSelect: () => Get.toNamed(
                                               AppRoutes.homeSectionList,
                                               arguments: {
@@ -609,15 +691,24 @@ class HomePage extends GetView<HomeController> {
                                                       item,
                                                       _, {
                                                       onStartMultiSelect,
-                                                    }) =>
-                                                        actions.showItemActions(
-                                                          context,
-                                                          item,
-                                                          onChanged: controller
-                                                              .loadHome,
-                                                          onStartMultiSelect:
-                                                              onStartMultiSelect,
-                                                        ),
+                                                    }) => actions.showItemActions(
+                                                      context,
+                                                      item,
+                                                      onChanged:
+                                                          controller.loadHome,
+                                                      queueContext: controller
+                                                          .fullRecentlyPlayed,
+                                                      queueContextIndex:
+                                                          controller
+                                                              .fullRecentlyPlayed
+                                                              .indexWhere(
+                                                                (entry) =>
+                                                                    entry.id ==
+                                                                    item.id,
+                                                              ),
+                                                      onStartMultiSelect:
+                                                          onStartMultiSelect,
+                                                    ),
                                                 'onShuffle': (queue) =>
                                                     controller.openMedia(
                                                       queue.first,
@@ -672,6 +763,14 @@ class HomePage extends GetView<HomeController> {
                                                   item,
                                                   onChanged:
                                                       controller.loadHome,
+                                                  queueContext:
+                                                      controller.fullFeatured,
+                                                  queueContextIndex: controller
+                                                      .fullFeatured
+                                                      .indexWhere(
+                                                        (entry) =>
+                                                            entry.id == item.id,
+                                                      ),
                                                   onStartMultiSelect:
                                                       onStartMultiSelect,
                                                 ),
@@ -699,6 +798,14 @@ class HomePage extends GetView<HomeController> {
                                               context,
                                               item,
                                               onChanged: controller.loadHome,
+                                              queueContext:
+                                                  controller.fullFeatured,
+                                              queueContextIndex: controller
+                                                  .fullFeatured
+                                                  .indexWhere(
+                                                    (entry) =>
+                                                        entry.id == item.id,
+                                                  ),
                                               onStartMultiSelect: () => Get.toNamed(
                                                 AppRoutes.homeSectionList,
                                                 arguments: {
@@ -718,16 +825,25 @@ class HomePage extends GetView<HomeController> {
                                                         item,
                                                         _, {
                                                         onStartMultiSelect,
-                                                      }) => actions
-                                                          .showItemActions(
-                                                            context,
-                                                            item,
-                                                            onChanged:
-                                                                controller
-                                                                    .loadHome,
-                                                            onStartMultiSelect:
-                                                                onStartMultiSelect,
-                                                          ),
+                                                      }) => actions.showItemActions(
+                                                        context,
+                                                        item,
+                                                        onChanged:
+                                                            controller.loadHome,
+                                                        queueContext: controller
+                                                            .fullFeatured,
+                                                        queueContextIndex:
+                                                            controller
+                                                                .fullFeatured
+                                                                .indexWhere(
+                                                                  (entry) =>
+                                                                      entry
+                                                                          .id ==
+                                                                      item.id,
+                                                                ),
+                                                        onStartMultiSelect:
+                                                            onStartMultiSelect,
+                                                      ),
                                                   'onShuffle': (queue) =>
                                                       controller.openMedia(
                                                         queue.first,
@@ -782,6 +898,14 @@ class HomePage extends GetView<HomeController> {
                                                   item,
                                                   onChanged:
                                                       controller.loadHome,
+                                                  queueContext: controller
+                                                      .fullLatestDownloads,
+                                                  queueContextIndex: controller
+                                                      .fullLatestDownloads
+                                                      .indexWhere(
+                                                        (entry) =>
+                                                            entry.id == item.id,
+                                                      ),
                                                   onStartMultiSelect:
                                                       onStartMultiSelect,
                                                 ),
@@ -804,6 +928,14 @@ class HomePage extends GetView<HomeController> {
                                             context,
                                             item,
                                             onChanged: controller.loadHome,
+                                            queueContext:
+                                                controller.fullLatestDownloads,
+                                            queueContextIndex: controller
+                                                .fullLatestDownloads
+                                                .indexWhere(
+                                                  (entry) =>
+                                                      entry.id == item.id,
+                                                ),
                                             onStartMultiSelect: () => Get.toNamed(
                                               AppRoutes.homeSectionList,
                                               arguments: {
@@ -824,15 +956,24 @@ class HomePage extends GetView<HomeController> {
                                                       item,
                                                       _, {
                                                       onStartMultiSelect,
-                                                    }) =>
-                                                        actions.showItemActions(
-                                                          context,
-                                                          item,
-                                                          onChanged: controller
-                                                              .loadHome,
-                                                          onStartMultiSelect:
-                                                              onStartMultiSelect,
-                                                        ),
+                                                    }) => actions.showItemActions(
+                                                      context,
+                                                      item,
+                                                      onChanged:
+                                                          controller.loadHome,
+                                                      queueContext: controller
+                                                          .fullLatestDownloads,
+                                                      queueContextIndex:
+                                                          controller
+                                                              .fullLatestDownloads
+                                                              .indexWhere(
+                                                                (entry) =>
+                                                                    entry.id ==
+                                                                    item.id,
+                                                              ),
+                                                      onStartMultiSelect:
+                                                          onStartMultiSelect,
+                                                    ),
                                                 'onShuffle': (queue) =>
                                                     controller.openMedia(
                                                       queue.first,
@@ -999,6 +1140,10 @@ class _HomeOrderedSections extends StatelessWidget {
                   context,
                   item,
                   onChanged: controller.loadHome,
+                  queueContext: mostPlayedItems,
+                  queueContextIndex: mostPlayedItems.indexWhere(
+                    (entry) => entry.id == item.id,
+                  ),
                   onStartMultiSelect: () => _openList(
                     context,
                     title: _homeWidgetTitle(id),
@@ -1050,6 +1195,8 @@ class _HomeOrderedSections extends StatelessWidget {
             context,
             item,
             onChanged: controller.loadHome,
+            queueContext: full,
+            queueContextIndex: index,
             onStartMultiSelect: () => _openList(
               context,
               title: title,
@@ -1078,6 +1225,8 @@ class _HomeOrderedSections extends StatelessWidget {
           context,
           item,
           onChanged: controller.loadHome,
+          queueContext: full,
+          queueContextIndex: full.indexWhere((entry) => entry.id == item.id),
           onStartMultiSelect: () => _openList(
             context,
             title: title,
@@ -1107,6 +1256,10 @@ class _HomeOrderedSections extends StatelessWidget {
               context,
               item,
               onChanged: controller.loadHome,
+              queueContext: items,
+              queueContextIndex: items.indexWhere(
+                (entry) => entry.id == item.id,
+              ),
               onStartMultiSelect: onStartMultiSelect,
             ),
         onShuffle: (queue) => controller.openMedia(queue.first, 0, queue),
@@ -1137,6 +1290,10 @@ class _HomeOrderedSections extends StatelessWidget {
               context,
               item,
               onChanged: controller.loadHome,
+              queueContext: items,
+              queueContextIndex: items.indexWhere(
+                (entry) => entry.id == item.id,
+              ),
               onStartMultiSelect: onStartMultiSelect,
             ),
         'onShuffle': (queue) => controller.openMedia(queue.first, 0, queue),
@@ -1163,6 +1320,50 @@ class _CustomHomeSections extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final children = <Widget>[];
+    if (mode == HomeMode.audio) {
+      final temporary = controller.temporaryPlaylistChoices();
+      if (temporary.isNotEmpty) {
+        const sectionId = 'temporary_playlists';
+        final section = HomeCustomSection(
+          id: sectionId,
+          kind: HomeCustomSectionKind.playlist,
+          targetId: temporary.map((playlist) => playlist.id).join('|'),
+          title: tr('home.temporary_playlists'),
+        );
+
+        void open(HomePlaylistChoice playlist) {
+          Get.toNamed(
+            AppRoutes.playlistDetail,
+            arguments: {'playlistId': playlist.id},
+          );
+        }
+
+        void remove(HomePlaylistChoice playlist) {
+          _confirmRemoveCustomItem(
+            context: context,
+            label: playlist.name,
+            onConfirm: () => controller.removeTemporaryPlaylist(playlist.id),
+          );
+        }
+
+        children.add(
+          _CustomPlaylistCardsSection(
+            section: section,
+            playlists: temporary,
+            onHeaderTap: () => _openPlaylistChoicesList(
+              context,
+              section: section,
+              playlists: temporary,
+              onPlaylistTap: open,
+              onPlaylistLongPress: remove,
+            ),
+            onPlaylistTap: open,
+            onPlaylistLongPress: remove,
+          ),
+        );
+        children.add(const SizedBox(height: 18));
+      }
+    }
     final sections = mode == HomeMode.video
         ? controller.videoCustomHomeSections
         : controller.customHomeSections;
@@ -1217,6 +1418,8 @@ class _CustomHomeSections extends StatelessWidget {
           context,
           item,
           onChanged: controller.loadHome,
+          queueContext: items,
+          queueContextIndex: index,
           onStartMultiSelect: () => _openList(
             context,
             section.title,
@@ -1246,6 +1449,8 @@ class _CustomHomeSections extends StatelessWidget {
           context,
           item,
           onChanged: controller.loadHome,
+          queueContext: items,
+          queueContextIndex: items.indexWhere((entry) => entry.id == item.id),
           onStartMultiSelect: () => _openList(
             context,
             section.title,
@@ -1477,6 +1682,10 @@ class _CustomHomeSections extends StatelessWidget {
               context,
               item,
               onChanged: controller.loadHome,
+              queueContext: items,
+              queueContextIndex: items.indexWhere(
+                (entry) => entry.id == item.id,
+              ),
               onStartMultiSelect: onStartMultiSelect,
             ),
         if (itemsRefreshBuilder != null)

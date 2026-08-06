@@ -16,7 +16,21 @@ class QueuePage extends GetView<AudioPlayerController> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(tr('player.queue_title')), centerTitle: true),
+      appBar: AppBar(
+        title: Text(tr('player.queue_title')),
+        centerTitle: true,
+        actions: [
+          Obx(
+            () => IconButton(
+              tooltip: tr('player.queue_save_tooltip'),
+              icon: const Icon(Icons.save_alt_rounded),
+              onPressed: controller.queue.isEmpty
+                  ? null
+                  : () => _confirmSaveQueue(context),
+            ),
+          ),
+        ],
+      ),
       body: Obx(() {
         final queue = controller.queue; // RxList
         final idx = controller.currentIndex.value;
@@ -41,8 +55,8 @@ class QueuePage extends GetView<AudioPlayerController> {
               child: ReorderableListView.builder(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 itemCount: queue.length,
-                onReorder: (oldIndex, newIndex) async {
-                  await controller.reorderQueue(oldIndex, newIndex);
+                onReorderItem: (oldIndex, newIndex) async {
+                  await controller.reorderQueueItem(oldIndex, newIndex);
                 },
                 buildDefaultDragHandles: false,
                 itemBuilder: (context, i) {
@@ -103,6 +117,44 @@ class QueuePage extends GetView<AudioPlayerController> {
   // ===========================================================================
   // UI
   // ===========================================================================
+
+  Future<void> _confirmSaveQueue(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('player.queue_save_title')),
+        content: Text(tr('player.queue_save_prompt')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(tr('common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(tr('player.queue_save_confirm')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    final result = await controller.saveCurrentQueueAsTemporaryPlaylist(
+      name: tr('player.temporary_queue_name'),
+    );
+    final message = switch (result) {
+      TemporaryQueueSaveResult.created => tr('player.temporary_queue_created'),
+      TemporaryQueueSaveResult.duplicate => tr(
+        'player.temporary_queue_already_saved',
+      ),
+      TemporaryQueueSaveResult.empty => tr('player.queue_empty'),
+      TemporaryQueueSaveResult.unavailable => tr('common.error'),
+    };
+    Get.snackbar(
+      tr('player.queue_title'),
+      message,
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
 
   Widget _header({
     required ThemeData theme,

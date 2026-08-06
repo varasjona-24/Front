@@ -9,6 +9,8 @@ class Playlist {
     this.coverUrl,
     this.coverLocalPath,
     this.coverCleared = false,
+    this.expiresAt,
+    this.fingerprint,
   });
 
   final String id;
@@ -20,6 +22,13 @@ class Playlist {
   final String? coverUrl;
   final String? coverLocalPath;
   final bool coverCleared;
+  final int? expiresAt;
+  final String? fingerprint;
+
+  bool get isTemporary => expiresAt != null;
+
+  bool get isExpired =>
+      expiresAt != null && expiresAt! <= DateTime.now().millisecondsSinceEpoch;
 
   Playlist copyWith({
     String? id,
@@ -31,6 +40,8 @@ class Playlist {
     String? coverUrl,
     String? coverLocalPath,
     bool? coverCleared,
+    int? expiresAt,
+    String? fingerprint,
   }) {
     return Playlist(
       id: id ?? this.id,
@@ -42,6 +53,8 @@ class Playlist {
       coverUrl: coverUrl ?? this.coverUrl,
       coverLocalPath: coverLocalPath ?? this.coverLocalPath,
       coverCleared: coverCleared ?? this.coverCleared,
+      expiresAt: expiresAt ?? this.expiresAt,
+      fingerprint: fingerprint ?? this.fingerprint,
     );
   }
 
@@ -63,6 +76,8 @@ class Playlist {
       coverUrl: (json['coverUrl'] as String?)?.trim(),
       coverLocalPath: (json['coverLocalPath'] as String?)?.trim(),
       coverCleared: (json['coverCleared'] as bool?) ?? false,
+      expiresAt: (json['expiresAt'] as num?)?.toInt(),
+      fingerprint: (json['fingerprint'] as String?)?.trim(),
     );
   }
 
@@ -76,5 +91,7 @@ class Playlist {
     'coverUrl': coverUrl,
     'coverLocalPath': coverLocalPath,
     'coverCleared': coverCleared,
+    'expiresAt': expiresAt,
+    'fingerprint': fingerprint,
   };
 }

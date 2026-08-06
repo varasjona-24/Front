@@ -288,22 +288,22 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     Get.toNamed(AppRoutes.audioPlayer, arguments: {'queue': items, 'index': 0});
   }
 
-  void _playNext(List<MediaItem> items) {
+  Future<void> _playNext(List<MediaItem> items) async {
     if (items.isEmpty) return;
     if (Get.isRegistered<AudioPlayerController>()) {
       final audio = Get.find<AudioPlayerController>();
-      audio.insertNext(items);
+      await audio.insertNext(items);
       Get.snackbar(tr('playlists.queue'), tr('playlists.queued_next'));
       return;
     }
     Get.snackbar(tr('playlists.queue'), tr('playlists.open_player_required'));
   }
 
-  void _addToQueue(List<MediaItem> items) {
+  Future<void> _addToQueue(List<MediaItem> items) async {
     if (items.isEmpty) return;
     if (Get.isRegistered<AudioPlayerController>()) {
       final audio = Get.find<AudioPlayerController>();
-      audio.addToQueue(items);
+      await audio.addToQueue(items);
       Get.snackbar(tr('playlists.queue'), tr('playlists.queued'));
       return;
     }

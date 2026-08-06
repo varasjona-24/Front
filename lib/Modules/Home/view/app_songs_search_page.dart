@@ -406,6 +406,8 @@ class _AppSongsSearchPageState extends State<AppSongsSearchPage> {
       context,
       item,
       onChanged: _home.loadHome,
+      queueContext: list,
+      queueContextIndex: list.indexWhere((entry) => entry.id == item.id),
       onStartMultiSelect: () {
         Get.toNamed(
           AppRoutes.homeSectionList,
@@ -420,6 +422,10 @@ class _AppSongsSearchPageState extends State<AppSongsSearchPage> {
                       context,
                       target,
                       onChanged: _home.loadHome,
+                      queueContext: list,
+                      queueContextIndex: list.indexWhere(
+                        (entry) => entry.id == target.id,
+                      ),
                       onStartMultiSelect: onStartMultiSelect,
                     ),
             'onDeleteSelected': (List<MediaItem> selected) async {

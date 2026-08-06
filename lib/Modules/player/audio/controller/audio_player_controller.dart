@@ -8,6 +8,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../settings/controller/playback_settings_controller.dart';
+import '../../../playlists/data/playlist_store.dart';
 import '../../../../app/data/local/local_library_store.dart';
 import '../../../../app/models/media_item.dart';
 import '../../../../app/services/audio_service.dart';
@@ -17,6 +18,8 @@ import '../../../recommendations/data/listening_event_store.dart';
 enum CoverStyle { square, vinyl, landscape }
 
 enum RepeatMode { off, once, loop }
+
+enum TemporaryQueueSaveResult { created, duplicate, empty, unavailable }
 
 class AudioPlayerController extends GetxController {
   static const List<CoverStyle> availableCoverStyles = <CoverStyle>[
@@ -551,16 +554,23 @@ class AudioPlayerController extends GetxController {
     if (oldIndex < 0 || oldIndex >= queue.length) return;
     if (newIndex < 0 || newIndex > queue.length) return;
 
+    if (newIndex > oldIndex) newIndex -= 1;
+    await reorderQueueItem(oldIndex, newIndex);
+  }
+
+  Future<void> reorderQueueItem(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 || oldIndex >= queue.length) return;
+    if (newIndex < 0 || newIndex >= queue.length) return;
+    if (oldIndex == newIndex) return;
+
     final serviceCanReorder =
         audioService.hasSourceLoaded &&
         _sameQueue(queue, audioService.queueItems);
     if (serviceCanReorder) {
-      await audioService.reorderQueue(oldIndex, newIndex);
+      await audioService.reorderQueueItem(oldIndex, newIndex);
       _syncFromService();
       return;
     }
-
-    if (newIndex > oldIndex) newIndex -= 1;
 
     final item = queue.removeAt(oldIndex);
     queue.insert(newIndex, item);
@@ -588,15 +598,126 @@ class AudioPlayerController extends GetxController {
     }
   }
 
-  void addToQueue(List<MediaItem> items) {
+  Future<void> addToQueue(List<MediaItem> items) async {
     if (items.isEmpty) return;
     queue.addAll(items);
+    await _reloadLoadedQueueIfNeeded();
   }
 
-  void insertNext(List<MediaItem> items) {
+  Future<void> insertNext(List<MediaItem> items) async {
     if (items.isEmpty) return;
     final insertAt = (currentIndex.value + 1).clamp(0, queue.length);
     queue.insertAll(insertAt, items);
+    await _reloadLoadedQueueIfNeeded();
+  }
+
+  Future<TemporaryQueueSaveResult> saveCurrentQueueAsTemporaryPlaylist({
+    required String name,
+  }) async {
+    final sourceQueue = audioService.queueItems.isNotEmpty
+        ? audioService.queueItems
+        : queue.toList(growable: false);
+    final itemIds = _queueItemIds(sourceQueue);
+    if (itemIds.isEmpty) return TemporaryQueueSaveResult.empty;
+    if (!Get.isRegistered<PlaylistStore>()) {
+      return TemporaryQueueSaveResult.unavailable;
+    }
+
+    final store = Get.find<PlaylistStore>();
+    final fingerprint = _queueFingerprint(itemIds);
+    final existing = await _findExistingTemporaryQueue(
+      store,
+      fingerprint: fingerprint,
+    );
+    if (existing) return TemporaryQueueSaveResult.duplicate;
+
+    final playlist = await store.createTemporary(
+      name: name,
+      itemIds: itemIds,
+      fingerprint: fingerprint,
+    );
+    return playlist == null
+        ? TemporaryQueueSaveResult.unavailable
+        : TemporaryQueueSaveResult.created;
+  }
+
+  Future<void> replaceQueue(List<MediaItem> items, int index) async {
+    if (items.isEmpty) return;
+    final previousItem = currentItemOrNull;
+    final wasPlaying = audioService.isPlaying.value;
+    final resumePosition = audioService.currentPosition;
+    if (isShuffling.value || audioService.shuffleEnabled) {
+      isShuffling.value = false;
+      await audioService.setShuffle(false);
+    }
+    queue.assignAll(items);
+    currentIndex.value = index.clamp(0, items.length - 1).toInt();
+    final nextItem = currentItemOrNull;
+    final canResume =
+        previousItem != null &&
+        nextItem != null &&
+        _sameItemKey(previousItem, nextItem);
+    await _playCurrent(
+      forceReload: true,
+      resumePosition: canResume ? resumePosition : Duration.zero,
+    );
+    audioService.revealMiniPlayer();
+    if (!wasPlaying) {
+      await audioService.pause();
+    }
+  }
+
+  List<String> _queueItemIds(List<MediaItem> queueItems) {
+    final seen = <String>{};
+    final itemIds = <String>[];
+    for (final queueItem in queueItems) {
+      final id = _queueItemKey(queueItem);
+      if (id.isNotEmpty && seen.add(id)) itemIds.add(id);
+    }
+    return itemIds;
+  }
+
+  String _queueItemKey(MediaItem item) {
+    final publicId = item.publicId.trim();
+    if (publicId.isNotEmpty) return publicId;
+    return item.id.trim();
+  }
+
+  String _queueFingerprint(List<String> itemIds) {
+    return itemIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .join('|');
+  }
+
+  Future<bool> _findExistingTemporaryQueue(
+    PlaylistStore store, {
+    required String fingerprint,
+  }) async {
+    if (fingerprint.isEmpty) return false;
+    final playlists = await store.readAll();
+    for (final playlist in playlists) {
+      if (!playlist.isTemporary) continue;
+      final savedFingerprint = playlist.fingerprint?.trim();
+      final fallbackFingerprint = _queueFingerprint(playlist.itemIds);
+      if (savedFingerprint == fingerprint ||
+          fallbackFingerprint == fingerprint) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<void> _reloadLoadedQueueIfNeeded() async {
+    if (!audioService.hasSourceLoaded || queue.isEmpty) return;
+    if (currentIndex.value < 0 || currentIndex.value >= queue.length) return;
+
+    final wasPlaying = audioService.isPlaying.value;
+    final pos = audioService.currentPosition;
+    await _playCurrent(forceReload: true, resumePosition: pos);
+    if (!wasPlaying) {
+      await audioService.pause();
+    }
   }
 
   void _syncFromService() {

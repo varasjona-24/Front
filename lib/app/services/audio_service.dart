@@ -90,6 +90,18 @@ class AudioService extends GetxService {
     }
   }
 
+  void revealMiniPlayer() {
+    _showMiniPlayerForPlayback();
+  }
+
+  void _playWithoutBlocking() {
+    unawaited(
+      _player.play().catchError((error, stackTrace) {
+        debugPrint('AudioService play failed: $error');
+      }),
+    );
+  }
+
   bool get eqSupported => Platform.isAndroid && _androidEqualizer != null;
   int? get androidAudioSessionId => _player.androidAudioSessionId;
   Stream<int?> get androidAudioSessionIdStream =>
@@ -353,7 +365,7 @@ class AudioService extends GetxService {
         if (forceReload || initialPosition > Duration.zero) {
           await seek(initialPosition);
         }
-        if (autoPlay) await _player.play();
+        if (autoPlay) _playWithoutBlocking();
         return;
       }
       await _transitionToIndex(
@@ -368,7 +380,7 @@ class AudioService extends GetxService {
         isSameTrack(item, variant) &&
         hasSourceLoaded &&
         _queueItems.isNotEmpty) {
-      if (autoPlay) await _player.play();
+      if (autoPlay) _playWithoutBlocking();
       return;
     }
 
@@ -420,7 +432,7 @@ class AudioService extends GetxService {
       _persistLastItem(_queueItems[_activeIndex], _queueVariants[_activeIndex]);
       _keepLastItem = true;
       if (autoPlay) {
-        await _player.play();
+        _playWithoutBlocking();
       } else {
         await _player.pause();
       }
@@ -486,7 +498,7 @@ class AudioService extends GetxService {
       _keepLastItem = true;
 
       if (autoPlay) {
-        await _player.play();
+        _playWithoutBlocking();
       } else {
         await _player.pause();
       }
@@ -535,7 +547,7 @@ class AudioService extends GetxService {
     }
     if (hasSourceLoaded) {
       _showMiniPlayerForPlayback();
-      await _player.play();
+      _playWithoutBlocking();
     }
   }
 
@@ -557,7 +569,7 @@ class AudioService extends GetxService {
   Future<void> resume() async {
     if (!hasSourceLoaded) return;
     _showMiniPlayerForPlayback();
-    await _player.play();
+    _playWithoutBlocking();
   }
 
   Future<void> stop() async {
@@ -712,6 +724,15 @@ class AudioService extends GetxService {
     if (newIndex < 0 || newIndex > _queueItems.length) return;
 
     if (newIndex > oldIndex) newIndex -= 1;
+    await reorderQueueItem(oldIndex, newIndex);
+  }
+
+  Future<void> reorderQueueItem(int oldIndex, int newIndex) async {
+    if (_queueItems.isEmpty || _queueItems.length != _queueVariants.length) {
+      return;
+    }
+    if (oldIndex < 0 || oldIndex >= _queueItems.length) return;
+    if (newIndex < 0 || newIndex >= _queueItems.length) return;
     if (oldIndex == newIndex) return;
 
     final wasPlaying = _player.playing;
@@ -762,7 +783,7 @@ class AudioService extends GetxService {
     _keepLastItem = true;
 
     if (wasPlaying) {
-      await _player.play();
+      _playWithoutBlocking();
     } else {
       await _player.pause();
     }
@@ -808,7 +829,7 @@ class AudioService extends GetxService {
     _activeIndex = target;
 
     if (autoPlay || wasPlaying) {
-      await _player.play();
+      _playWithoutBlocking();
     } else {
       await _player.pause();
     }
@@ -828,7 +849,7 @@ class AudioService extends GetxService {
     await _player.seek(Duration.zero, index: target);
     _activeIndex = target;
     if (autoPlay || wasPlaying) {
-      await _player.play();
+      _playWithoutBlocking();
     } else {
       await _player.pause();
     }
@@ -903,7 +924,7 @@ class AudioService extends GetxService {
     }
 
     if (playing) {
-      await _player.play();
+      _playWithoutBlocking();
     } else {
       await _player.pause();
     }
@@ -1095,7 +1116,7 @@ class AudioService extends GetxService {
       final shouldAutoPlay = autoPlayOverride ?? wasPlaying;
       if (shouldAutoPlay) {
         _showMiniPlayerForPlayback();
-        await _player.play();
+        _playWithoutBlocking();
       } else {
         await _player.pause();
       }

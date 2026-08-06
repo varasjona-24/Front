@@ -822,6 +822,18 @@ class HomeController extends GetxController {
         .toList(growable: false);
   }
 
+  List<HomePlaylistChoice> temporaryPlaylistChoices() {
+    return playlistChoices()
+        .where((playlist) => playlist.id.startsWith('temporary_'))
+        .toList(growable: false);
+  }
+
+  Future<void> removeTemporaryPlaylist(String id) async {
+    if (!id.startsWith('temporary_')) return;
+    await _playlistStore?.remove(id);
+    await loadHome();
+  }
+
   List<HomeCollectionChoice> collectionChoices() {
     final playlists =
         _topicPlaylistStore?.readAllSync() ??
