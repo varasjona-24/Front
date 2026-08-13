@@ -10,6 +10,7 @@ import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import '../../../app/ui/widgets/dialogs/sort_options_sheet.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/media/app_media_items_view.dart';
 import '../Controller/home_controller.dart';
@@ -263,83 +264,126 @@ class _AppSongsSearchPageState extends State<AppSongsSearchPage> {
         return StatefulBuilder(
           builder: (context, modalSetState) {
             void selectSort(_SongLibrarySort value) {
+              if (_sort == value) {
+                _setSortAscending(!_sortAscending);
+                modalSetState(() {});
+                return;
+              }
               _setSort(value);
-              modalSetState(() {});
-            }
-
-            void selectDirection(bool value) {
-              _setSortAscending(value);
               modalSetState(() {});
             }
 
             return SafeArea(
               child: SingleChildScrollView(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Ordenar por',
-                        style: theme.textTheme.headlineSmall?.copyWith(
+                        tr('home.custom.sort_by'),
+                        style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
                       _SongSortOption(
+                        icon: Icons.access_time_rounded,
                         label: tr('home.search.imported_time'),
+                        sublabel: _songSortDirectionLabel(
+                          _SongLibrarySort.importedAt,
+                          ascending: _sort == _SongLibrarySort.importedAt
+                              ? _sortAscending
+                              : false,
+                        ),
                         selected: _sort == _SongLibrarySort.importedAt,
+                        ascending: _sort == _SongLibrarySort.importedAt
+                            ? _sortAscending
+                            : null,
                         onTap: () => selectSort(_SongLibrarySort.importedAt),
                       ),
                       _SongSortOption(
+                        icon: Icons.title_rounded,
                         label: tr('home.search.sort_title'),
+                        sublabel: _songSortDirectionLabel(
+                          _SongLibrarySort.title,
+                          ascending: _sort == _SongLibrarySort.title
+                              ? _sortAscending
+                              : true,
+                        ),
                         selected: _sort == _SongLibrarySort.title,
+                        ascending: _sort == _SongLibrarySort.title
+                            ? _sortAscending
+                            : null,
                         onTap: () => selectSort(_SongLibrarySort.title),
                       ),
                       _SongSortOption(
+                        icon: Icons.person_rounded,
                         label: tr('home.search.sort_artist'),
+                        sublabel: _songSortDirectionLabel(
+                          _SongLibrarySort.artist,
+                          ascending: _sort == _SongLibrarySort.artist
+                              ? _sortAscending
+                              : true,
+                        ),
                         selected: _sort == _SongLibrarySort.artist,
+                        ascending: _sort == _SongLibrarySort.artist
+                            ? _sortAscending
+                            : null,
                         onTap: () => selectSort(_SongLibrarySort.artist),
                       ),
                       _SongSortOption(
+                        icon: Icons.sd_storage_rounded,
                         label: tr('home.search.sort_size'),
+                        sublabel: _songSortDirectionLabel(
+                          _SongLibrarySort.size,
+                          ascending: _sort == _SongLibrarySort.size
+                              ? _sortAscending
+                              : false,
+                        ),
                         selected: _sort == _SongLibrarySort.size,
+                        ascending: _sort == _SongLibrarySort.size
+                            ? _sortAscending
+                            : null,
                         onTap: () => selectSort(_SongLibrarySort.size),
                       ),
                       _SongSortOption(
+                        icon: Icons.equalizer_rounded,
                         label: tr('home.search.sort_plays'),
+                        sublabel: _songSortDirectionLabel(
+                          _SongLibrarySort.plays,
+                          ascending: _sort == _SongLibrarySort.plays
+                              ? _sortAscending
+                              : false,
+                        ),
                         selected: _sort == _SongLibrarySort.plays,
+                        ascending: _sort == _SongLibrarySort.plays
+                            ? _sortAscending
+                            : null,
                         onTap: () => selectSort(_SongLibrarySort.plays),
                       ),
                       _SongSortOption(
+                        icon: Icons.timer_rounded,
                         label: tr('home.search.sort_duration'),
+                        sublabel: _songSortDirectionLabel(
+                          _SongLibrarySort.duration,
+                          ascending: _sort == _SongLibrarySort.duration
+                              ? _sortAscending
+                              : false,
+                        ),
                         selected: _sort == _SongLibrarySort.duration,
+                        ascending: _sort == _SongLibrarySort.duration
+                            ? _sortAscending
+                            : null,
                         onTap: () => selectSort(_SongLibrarySort.duration),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Divider(
-                          color: scheme.outlineVariant.withValues(alpha: 0.5),
-                          height: 1,
-                        ),
-                      ),
-                      _SongSortOption(
-                        label: tr('home.search.desc_recent'),
-                        selected: !_sortAscending,
-                        onTap: () => selectDirection(false),
-                      ),
-                      _SongSortOption(
-                        label: tr('home.search.asc_oldest'),
-                        selected: _sortAscending,
-                        onTap: () => selectDirection(true),
-                      ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 18),
                       SizedBox(
                         width: double.infinity,
-                        child: OutlinedButton(
+                        child: FilledButton(
                           onPressed: () => Navigator.of(ctx).pop(),
-                          child: Text(tr('common.close')),
+                          child: Text(tr('common.accept')),
                         ),
                       ),
                     ],
@@ -368,7 +412,7 @@ class _AppSongsSearchPageState extends State<AppSongsSearchPage> {
         return AppMediaListTile(
           item: item,
           videoStyle: _isVideoMode,
-          carded: !_isVideoMode,
+          carded: true,
           onTap: () => _home.openMedia(item, index, list),
           onLongPress: () => _openItemActions(context, item, list),
           onMore: () => _openItemActions(context, item, list),
@@ -442,59 +486,56 @@ class _AppSongsSearchPageState extends State<AppSongsSearchPage> {
       },
     );
   }
+
+  String _songSortDirectionLabel(
+    _SongLibrarySort sort, {
+    required bool ascending,
+  }) {
+    return switch (sort) {
+      _SongLibrarySort.title ||
+      _SongLibrarySort.artist => ascending ? 'A-Z' : 'Z-A',
+      _SongLibrarySort.importedAt =>
+        ascending
+            ? tr('home.search.asc_oldest')
+            : tr('home.search.desc_recent'),
+      _SongLibrarySort.size ||
+      _SongLibrarySort.plays ||
+      _SongLibrarySort.duration =>
+        ascending
+            ? tr('home.section.low_to_high')
+            : tr('home.section.high_to_low'),
+    };
+  }
 }
 
 class _SongSortOption extends StatelessWidget {
   const _SongSortOption({
+    required this.icon,
     required this.label,
+    required this.sublabel,
     required this.selected,
     required this.onTap,
+    this.ascending,
   });
 
+  final IconData icon;
   final String label;
+  final String sublabel;
   final bool selected;
   final VoidCallback onTap;
+  final bool? ascending;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
+      child: SortOptionTile(
+        icon: icon,
+        label: label,
+        sublabel: sublabel,
+        selected: selected,
+        ascending: ascending,
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? scheme.primary.withValues(alpha: 0.10)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: selected ? scheme.primary : scheme.onSurface,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked,
-                color: selected ? scheme.primary : scheme.outline,
-                size: 24,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

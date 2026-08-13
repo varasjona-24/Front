@@ -7,11 +7,17 @@ class SortSheetOption {
     required this.label,
     required this.selected,
     required this.onTap,
+    this.icon,
+    this.sublabel,
+    this.ascending,
   });
 
   final String label;
   final bool selected;
   final VoidCallback onTap;
+  final IconData? icon;
+  final String? sublabel;
+  final bool? ascending;
 }
 
 Future<void> showSortOptionsSheet({
@@ -36,33 +42,38 @@ Future<void> showSortOptionsSheet({
         builder: (context, modalSetState) {
           return SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  for (final option in optionsBuilder())
+                  const SizedBox(height: 14),
+                  for (final option in optionsBuilder()) ...[
                     SortOptionTile(
+                      icon: option.icon,
                       label: option.label,
+                      sublabel: option.sublabel,
                       selected: option.selected,
+                      ascending: option.ascending,
                       onTap: () {
                         option.onTap();
                         modalSetState(() {});
                       },
                     ),
+                    const SizedBox(height: 6),
+                  ],
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
-                    child: OutlinedButton(
+                    child: FilledButton(
                       onPressed: () => Navigator.of(ctx).pop(),
-                      child: Text(tr('common.close')),
+                      child: Text(tr('common.accept')),
                     ),
                   ),
                 ],
@@ -78,54 +89,97 @@ Future<void> showSortOptionsSheet({
 class SortOptionTile extends StatelessWidget {
   const SortOptionTile({
     super.key,
+    this.icon,
     required this.label,
+    this.sublabel,
     required this.selected,
     required this.onTap,
+    this.ascending,
   });
 
+  final IconData? icon;
   final String label;
+  final String? sublabel;
   final bool selected;
   final VoidCallback onTap;
+  final bool? ascending;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? scheme.primary.withValues(alpha: 0.10)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected
+              ? scheme.primaryContainer
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? scheme.primary : scheme.outlineVariant,
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: selected ? scheme.primary : scheme.onSurface,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon ?? Icons.sort_rounded,
+              size: 19,
+              color: selected ? scheme.primary : scheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: sublabel == null
+                  ? Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: selected
+                            ? FontWeight.w800
+                            : FontWeight.w600,
+                        color: selected ? scheme.primary : scheme.onSurface,
+                      ),
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: selected
+                                ? FontWeight.w800
+                                : FontWeight.w600,
+                            color: selected ? scheme.primary : scheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          sublabel!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+            if (selected)
               Icon(
-                selected
+                ascending == null
                     ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked,
-                color: selected ? scheme.primary : scheme.outline,
-                size: 24,
+                    : ascending == true
+                    ? Icons.arrow_upward_rounded
+                    : Icons.arrow_downward_rounded,
+                size: 18,
+                color: scheme.primary,
               ),
-            ],
-          ),
+          ],
         ),
       ),
     );

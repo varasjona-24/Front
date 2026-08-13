@@ -14,6 +14,7 @@ import '../../../app/controllers/navigation_controller.dart';
 import '../../../app/ui/themes/app_spacing.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
+import '../../../app/ui/widgets/dialogs/sort_options_sheet.dart';
 import '../../../app/ui/widgets/media/app_media_items_view.dart';
 import '../../../app/utils/format_bytes.dart';
 import '../Controller/home_controller.dart';
@@ -560,6 +561,14 @@ class _SectionListPageState extends State<SectionListPage> {
           final selected = home.sortForHomeWidget(sourceId);
           final asc = home.sortAscendingForHomeWidget(sourceId);
           final options = home.sortOptionsForHomeWidget(sourceId);
+          void pickSort(HomeMediaSort option) {
+            if (selected == option) {
+              home.setHomeWidgetSortAscending(sourceId, !asc);
+            } else {
+              home.setHomeWidgetSort(sourceId, option);
+            }
+            _refreshFromSourceSort();
+          }
 
           return SafeArea(
             child: SingleChildScrollView(
@@ -569,7 +578,7 @@ class _SectionListPageState extends State<SectionListPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Ordenar',
+                    tr('home.custom.sort_by'),
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -579,36 +588,16 @@ class _SectionListPageState extends State<SectionListPage> {
                     _SortOption(
                       icon: option.icon,
                       label: option.label,
+                      sublabel: _directionLabel(
+                        sort: option,
+                        ascending: selected == option
+                            ? asc
+                            : _defaultAscendingFor(option),
+                      ),
                       selected: selected == option,
-                      onTap: () {
-                        home.setHomeWidgetSort(sourceId, option);
-                        _refreshFromSourceSort();
-                      },
+                      ascending: selected == option ? asc : null,
+                      onTap: () => pickSort(option),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Divider(
-                      color: scheme.outlineVariant.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  _SortOption(
-                    icon: Icons.south_rounded,
-                    label: _directionLabel(home, sourceId, ascending: false),
-                    selected: !asc,
-                    onTap: () {
-                      home.setHomeWidgetSortAscending(sourceId, false);
-                      _refreshFromSourceSort();
-                    },
-                  ),
-                  _SortOption(
-                    icon: Icons.north_rounded,
-                    label: _directionLabel(home, sourceId, ascending: true),
-                    selected: asc,
-                    onTap: () {
-                      home.setHomeWidgetSortAscending(sourceId, true);
-                      _refreshFromSourceSort();
-                    },
-                  ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -626,12 +615,10 @@ class _SectionListPageState extends State<SectionListPage> {
     ).whenComplete(() => nav?.setOverlayOpen(false));
   }
 
-  String _directionLabel(
-    HomeController home,
-    HomeWidgetId sourceId, {
+  String _directionLabel({
+    required HomeMediaSort sort,
     required bool ascending,
   }) {
-    final sort = home.sortForHomeWidget(sourceId);
     return switch (sort) {
       HomeMediaSort.title || HomeMediaSort.artist => ascending ? 'A-Z' : 'Z-A',
       HomeMediaSort.importedAt || HomeMediaSort.recent =>
@@ -642,6 +629,17 @@ class _SectionListPageState extends State<SectionListPage> {
         ascending
             ? tr('home.section.low_to_high')
             : tr('home.section.high_to_low'),
+    };
+  }
+
+  bool _defaultAscendingFor(HomeMediaSort sort) {
+    return switch (sort) {
+      HomeMediaSort.title || HomeMediaSort.artist => true,
+      HomeMediaSort.importedAt ||
+      HomeMediaSort.recent ||
+      HomeMediaSort.plays ||
+      HomeMediaSort.size ||
+      HomeMediaSort.duration => false,
     };
   }
 
@@ -871,58 +869,30 @@ class _SortOption extends StatelessWidget {
   const _SortOption({
     required this.icon,
     required this.label,
+    required this.sublabel,
     required this.selected,
     required this.onTap,
+    this.ascending,
   });
 
   final IconData icon;
   final String label;
+  final String sublabel;
   final bool selected;
   final VoidCallback onTap;
+  final bool? ascending;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+      child: SortOptionTile(
+        icon: icon,
+        label: label,
+        sublabel: sublabel,
+        selected: selected,
+        ascending: ascending,
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? scheme.primaryContainer
-                : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? scheme.primary : scheme.outlineVariant,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: selected ? scheme.primary : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (selected) Icon(Icons.check_rounded, color: scheme.primary),
-            ],
-          ),
-        ),
       ),
     );
   }

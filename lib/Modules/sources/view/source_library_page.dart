@@ -524,7 +524,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
       title: tr('sources.sort_collections'),
       optionsBuilder: () => [
         SortSheetOption(
+          icon: Icons.history_rounded,
           label: tr('sources.recent_first'),
+          sublabel: tr('sources.sort_collections'),
           selected: _topicSort == _TopicSort.recent,
           onTap: () {
             setState(() => _topicSort = _TopicSort.recent);
@@ -532,7 +534,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
           },
         ),
         SortSheetOption(
+          icon: Icons.sort_by_alpha_rounded,
           label: tr('sources.name'),
+          sublabel: tr('sources.sort_collections'),
           selected: _topicSort == _TopicSort.name,
           onTap: () {
             setState(() => _topicSort = _TopicSort.name);
@@ -540,7 +544,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
           },
         ),
         SortSheetOption(
+          icon: Icons.library_music_rounded,
           label: tr('sources.more_items'),
+          sublabel: tr('sources.sort_collections'),
           selected: _topicSort == _TopicSort.items,
           onTap: () {
             setState(() => _topicSort = _TopicSort.items);
@@ -548,7 +554,9 @@ class _SourceLibraryPageState extends State<SourceLibraryPage> {
           },
         ),
         SortSheetOption(
+          icon: Icons.folder_special_rounded,
           label: tr('sources.more_collections'),
+          sublabel: tr('sources.sort_collections'),
           selected: _topicSort == _TopicSort.lists,
           onTap: () {
             setState(() => _topicSort = _TopicSort.lists);

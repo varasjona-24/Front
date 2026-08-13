@@ -16,6 +16,7 @@ import '../../../app/routes/app_routes.dart';
 import '../controller/artists_controller.dart';
 import '../domain/artist_profile.dart';
 import '../../edit/controller/edit_entity_controller.dart';
+import '../../../app/ui/widgets/dialogs/sort_options_sheet.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/media/app_media_items_view.dart';
 import 'widgets/artist_avatar.dart';
@@ -762,12 +763,12 @@ class _SongSectionState extends State<_SongSection> {
         return StatefulBuilder(
           builder: (context, setSheetState) {
             void updateSort(HomeMediaSort value) {
+              if (_sort == value) {
+                _setSortAscending(!_sortAscending);
+                setSheetState(() {});
+                return;
+              }
               _setSort(value);
-              setSheetState(() {});
-            }
-
-            void updateDirection(bool value) {
-              _setSortAscending(value);
               setSheetState(() {});
             }
 
@@ -789,27 +790,16 @@ class _SongSectionState extends State<_SongSection> {
                       _ArtistSongSortOption(
                         icon: option.icon,
                         label: option.label,
+                        sublabel: _directionLabel(
+                          option,
+                          ascending: _sort == option
+                              ? _sortAscending
+                              : _defaultAscendingFor(option),
+                        ),
                         selected: _sort == option,
+                        ascending: _sort == option ? _sortAscending : null,
                         onTap: () => updateSort(option),
                       ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Divider(
-                        color: scheme.outlineVariant.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    _ArtistSongSortOption(
-                      icon: Icons.south_rounded,
-                      label: _directionLabel(ascending: false),
-                      selected: !_sortAscending,
-                      onTap: () => updateDirection(false),
-                    ),
-                    _ArtistSongSortOption(
-                      icon: Icons.north_rounded,
-                      label: _directionLabel(ascending: true),
-                      selected: _sortAscending,
-                      onTap: () => updateDirection(true),
-                    ),
                     const SizedBox(height: 18),
                     SizedBox(
                       width: double.infinity,
@@ -828,8 +818,19 @@ class _SongSectionState extends State<_SongSection> {
     ).whenComplete(() => nav?.setOverlayOpen(false));
   }
 
-  String _directionLabel({required bool ascending}) {
-    return switch (_sort) {
+  bool _defaultAscendingFor(HomeMediaSort sort) {
+    return switch (sort) {
+      HomeMediaSort.title || HomeMediaSort.artist => true,
+      HomeMediaSort.importedAt ||
+      HomeMediaSort.recent ||
+      HomeMediaSort.plays ||
+      HomeMediaSort.size ||
+      HomeMediaSort.duration => false,
+    };
+  }
+
+  String _directionLabel(HomeMediaSort sort, {required bool ascending}) {
+    return switch (sort) {
       HomeMediaSort.title || HomeMediaSort.artist => ascending ? 'A-Z' : 'Z-A',
       HomeMediaSort.importedAt || HomeMediaSort.recent =>
         ascending
@@ -847,58 +848,30 @@ class _ArtistSongSortOption extends StatelessWidget {
   const _ArtistSongSortOption({
     required this.icon,
     required this.label,
+    required this.sublabel,
     required this.selected,
     required this.onTap,
+    this.ascending,
   });
 
   final IconData icon;
   final String label;
+  final String sublabel;
   final bool selected;
   final VoidCallback onTap;
+  final bool? ascending;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+      child: SortOptionTile(
+        icon: icon,
+        label: label,
+        sublabel: sublabel,
+        selected: selected,
+        ascending: ascending,
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? scheme.primaryContainer
-                : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected ? scheme.primary : scheme.outlineVariant,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                size: 19,
-                color: selected ? scheme.primary : scheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (selected) Icon(Icons.check_rounded, color: scheme.primary),
-            ],
-          ),
-        ),
       ),
     );
   }

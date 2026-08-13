@@ -19,7 +19,15 @@ enum CoverStyle { square, vinyl, landscape }
 
 enum RepeatMode { off, once, loop }
 
-enum TemporaryQueueSaveResult { created, duplicate, empty, unavailable }
+enum TemporaryQueueSaveResult {
+  created,
+  duplicate,
+  dailyLimitReached,
+  empty,
+  unavailable,
+}
+
+enum PermanentQueueSaveResult { created, duplicate, empty, unavailable }
 
 class AudioPlayerController extends GetxController {
   static const List<CoverStyle> availableCoverStyles = <CoverStyle>[
@@ -613,11 +621,9 @@ class AudioPlayerController extends GetxController {
 
   Future<TemporaryQueueSaveResult> saveCurrentQueueAsTemporaryPlaylist({
     required String name,
+    String? coverLocalPath,
   }) async {
-    final sourceQueue = audioService.queueItems.isNotEmpty
-        ? audioService.queueItems
-        : queue.toList(growable: false);
-    final itemIds = _queueItemIds(sourceQueue);
+    final itemIds = _currentQueueItemIds();
     if (itemIds.isEmpty) return TemporaryQueueSaveResult.empty;
     if (!Get.isRegistered<PlaylistStore>()) {
       return TemporaryQueueSaveResult.unavailable;
@@ -630,15 +636,46 @@ class AudioPlayerController extends GetxController {
       fingerprint: fingerprint,
     );
     if (existing) return TemporaryQueueSaveResult.duplicate;
+    if (await store.hasReachedDailyTemporaryLimit()) {
+      return TemporaryQueueSaveResult.dailyLimitReached;
+    }
 
     final playlist = await store.createTemporary(
       name: name,
       itemIds: itemIds,
       fingerprint: fingerprint,
+      coverLocalPath: coverLocalPath,
     );
     return playlist == null
         ? TemporaryQueueSaveResult.unavailable
         : TemporaryQueueSaveResult.created;
+  }
+
+  Future<PermanentQueueSaveResult> saveCurrentQueueAsPlaylist({
+    required String name,
+  }) async {
+    final itemIds = _currentQueueItemIds();
+    if (itemIds.isEmpty) return PermanentQueueSaveResult.empty;
+    if (!Get.isRegistered<PlaylistStore>()) {
+      return PermanentQueueSaveResult.unavailable;
+    }
+
+    final store = Get.find<PlaylistStore>();
+    final fingerprint = _queueFingerprint(itemIds);
+    final existing = await _findExistingQueuePlaylist(
+      store,
+      fingerprint: fingerprint,
+    );
+    if (existing) return PermanentQueueSaveResult.duplicate;
+
+    final playlist = await store.createQueuePlaylist(
+      name: name,
+      itemIds: itemIds,
+      fingerprint: fingerprint,
+    );
+    return playlist == null
+        ? PermanentQueueSaveResult.unavailable
+        : PermanentQueueSaveResult.created;
   }
 
   Future<void> replaceQueue(List<MediaItem> items, int index) async {
@@ -677,6 +714,13 @@ class AudioPlayerController extends GetxController {
     return itemIds;
   }
 
+  List<String> _currentQueueItemIds() {
+    final sourceQueue = audioService.queueItems.isNotEmpty
+        ? audioService.queueItems
+        : queue.toList(growable: false);
+    return _queueItemIds(sourceQueue);
+  }
+
   String _queueItemKey(MediaItem item) {
     final publicId = item.publicId.trim();
     if (publicId.isNotEmpty) return publicId;
@@ -704,6 +748,20 @@ class AudioPlayerController extends GetxController {
           fallbackFingerprint == fingerprint) {
         return true;
       }
+    }
+    return false;
+  }
+
+  Future<bool> _findExistingQueuePlaylist(
+    PlaylistStore store, {
+    required String fingerprint,
+  }) async {
+    if (fingerprint.isEmpty) return false;
+    final playlists = await store.readAll();
+    for (final playlist in playlists) {
+      if (playlist.isTemporary) continue;
+      final savedFingerprint = playlist.fingerprint?.trim();
+      if (savedFingerprint == fingerprint) return true;
     }
     return false;
   }

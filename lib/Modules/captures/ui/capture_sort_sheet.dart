@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart'
     hide StringTranslateExtension;
 import 'package:flutter/material.dart';
 
+import '../../../app/ui/widgets/dialogs/sort_options_sheet.dart';
 import '../domain/capture_gallery_sort.dart';
 
 class CaptureSortSheet extends StatelessWidget {
@@ -95,62 +96,13 @@ class _SortOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return InkWell(
-      borderRadius: BorderRadius.circular(14),
+    return SortOptionTile(
+      icon: icon,
+      label: label,
+      sublabel: sublabel,
+      selected: selected,
+      ascending: ascending,
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected
-              ? scheme.primaryContainer
-              : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: selected ? scheme.primary : scheme.outlineVariant,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 19,
-              color: selected ? scheme.primary : scheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                      color: selected ? scheme.primary : scheme.onSurface,
-                    ),
-                  ),
-                  Text(
-                    sublabel,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (selected)
-              Icon(
-                ascending == true
-                    ? Icons.arrow_upward_rounded
-                    : Icons.arrow_downward_rounded,
-                size: 18,
-                color: scheme.primary,
-              ),
-          ],
-        ),
-      ),
     );
   }
 }

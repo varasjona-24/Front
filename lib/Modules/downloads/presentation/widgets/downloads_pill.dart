@@ -25,10 +25,18 @@ class DownloadsPill extends GetView<DownloadsController> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Card(
-      elevation: 0,
-      color: scheme.surfaceContainer,
-      margin: EdgeInsets.zero,
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.16),
+            blurRadius: 22,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
@@ -57,70 +65,78 @@ class DownloadsPill extends GetView<DownloadsController> {
             const SizedBox(height: AppSpacing.md),
             Container(
               decoration: BoxDecoration(
-                color: scheme.surface,
+                color: scheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: scheme.outlineVariant),
               ),
               child: Column(
-                children: [
-                  _importActionTile(
-                    context: context,
-                    icon: Icons.link_rounded,
-                    title: tr('downloads.url_import_title'),
-                    subtitle: tr('downloads.url_import_subtitle'),
-                    onTap: () =>
-                        DownloadsPill.showImportUrlDialog(context, controller),
-                  ),
-                  Divider(height: 1, color: scheme.outlineVariant),
-                  _importActionTile(
-                    context: context,
-                    icon: Icons.folder_open_rounded,
-                    title: tr('downloads.local_import_title'),
-                    subtitle: tr('downloads.local_import_subtitle'),
-                    onTap: () => _pickLocalFiles(context),
-                  ),
-                  Divider(height: 1, color: scheme.outlineVariant),
-                  _importActionTile(
-                    context: context,
-                    icon: Icons.qr_code_scanner_rounded,
-                    title: tr('downloads.scan_qr_title'),
-                    subtitle: tr('downloads.scan_qr_subtitle'),
-                    onTap: () => _scanListenfyQr(),
-                  ),
-                  Divider(height: 1, color: scheme.outlineVariant),
-                  _importActionTile(
-                    context: context,
-                    icon: Icons.public_rounded,
-                    title: tr('downloads.web_search_title'),
-                    subtitle: tr('downloads.web_search_subtitle'),
-                    onTap: () async {
-                      final size = MediaQuery.of(context).size;
-                      final scheme = Theme.of(context).colorScheme;
-                      await showDialog<void>(
+                children:
+                    [
+                      _importActionTile(
                         context: context,
-                        barrierDismissible: true,
-                        builder: (ctx) {
-                          return Dialog(
-                            insetPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 20,
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(22),
-                            ),
-                            backgroundColor: scheme.surface,
-                            child: SizedBox(
-                              width: size.width * 0.9,
-                              height: size.height * 0.54,
-                              child: const ImportsWebViewPage(),
-                            ),
+                        icon: Icons.link_rounded,
+                        title: tr('downloads.url_import_title'),
+                        subtitle: tr('downloads.url_import_subtitle'),
+                        onTap: () => DownloadsPill.showImportUrlDialog(
+                          context,
+                          controller,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      _importActionTile(
+                        context: context,
+                        icon: Icons.folder_open_rounded,
+                        title: tr('downloads.local_import_title'),
+                        subtitle: tr('downloads.local_import_subtitle'),
+                        onTap: () => _pickLocalFiles(context),
+                      ),
+                      const SizedBox(height: 6),
+                      _importActionTile(
+                        context: context,
+                        icon: Icons.qr_code_scanner_rounded,
+                        title: tr('downloads.scan_qr_title'),
+                        subtitle: tr('downloads.scan_qr_subtitle'),
+                        onTap: () => _scanListenfyQr(),
+                      ),
+                      const SizedBox(height: 6),
+                      _importActionTile(
+                        context: context,
+                        icon: Icons.public_rounded,
+                        title: tr('downloads.web_search_title'),
+                        subtitle: tr('downloads.web_search_subtitle'),
+                        onTap: () async {
+                          final size = MediaQuery.of(context).size;
+                          final scheme = Theme.of(context).colorScheme;
+                          await showDialog<void>(
+                            context: context,
+                            barrierDismissible: true,
+                            builder: (ctx) {
+                              return Dialog(
+                                insetPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 20,
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                backgroundColor: scheme.surface,
+                                child: SizedBox(
+                                  width: size.width * 0.9,
+                                  height: size.height * 0.54,
+                                  child: const ImportsWebViewPage(),
+                                ),
+                              );
+                            },
                           );
                         },
+                      ),
+                    ].map((child) {
+                      if (child is SizedBox) return child;
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: child,
                       );
-                    },
-                  ),
-                ],
+                    }).toList(),
               ),
             ),
           ],
@@ -139,9 +155,7 @@ class DownloadsPill extends GetView<DownloadsController> {
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final bg = highlighted
-        ? scheme.primary.withValues(alpha: 0.1)
-        : Colors.transparent;
+    final bg = highlighted ? scheme.primaryContainer : scheme.surface;
 
     return Material(
       color: bg,

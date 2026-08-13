@@ -42,6 +42,8 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     return Obx(() {
       final list = controller.playlists;
       final total = list.length;
+      final totalSongs = _totalSongs(list);
+      final featured = _featuredPlaylist(list);
 
       return Scaffold(
         extendBody: true,
@@ -68,13 +70,36 @@ class PlaylistsPage extends GetView<PlaylistsController> {
                                 ),
                                 sliver: SliverList.list(
                                   children: [
-                                    _header(theme),
-                                    const SizedBox(height: 10),
-                                    _summaryRow(
+                                    _libraryHeader(
                                       theme: theme,
                                       total: total,
+                                      totalSongs: totalSongs,
                                       onAdd: () => _createPlaylist(context),
                                     ),
+                                    if (featured != null) ...[
+                                      const SizedBox(height: AppSpacing.md),
+                                      _FeaturedPlaylistCard(
+                                        playlist: featured,
+                                        resolveItems:
+                                            controller.resolvePlaylistItems,
+                                        onOpen: () => Get.toNamed(
+                                          AppRoutes.playlistDetail,
+                                          arguments: {
+                                            'playlistId': featured.id,
+                                            'isSmart': false,
+                                          },
+                                        ),
+                                        onPlay: () => _playPlaylist(
+                                          controller.resolvePlaylistItems(
+                                            featured,
+                                          ),
+                                        ),
+                                        onMenu: () => _openPlaylistActions(
+                                          Get.context!,
+                                          featured,
+                                        ),
+                                      ),
+                                    ],
                                     const SizedBox(height: AppSpacing.lg),
                                     _myPlaylistsHeader(theme, list.length),
                                     const SizedBox(height: 10),
@@ -126,36 +151,81 @@ class PlaylistsPage extends GetView<PlaylistsController> {
     });
   }
 
-  Widget _header(ThemeData theme) {
-    return Text(
-      tr('playlists.title'),
-      style: theme.textTheme.headlineSmall?.copyWith(
-        fontWeight: FontWeight.w800,
-      ),
-    );
+  int _totalSongs(List<Playlist> playlists) {
+    var total = 0;
+    for (final playlist in playlists) {
+      total += controller.resolvePlaylistItems(playlist).length;
+    }
+    return total;
   }
 
-  Widget _summaryRow({
+  Playlist? _featuredPlaylist(List<Playlist> playlists) {
+    if (playlists.isEmpty) return null;
+    Playlist? best;
+    var bestCount = -1;
+    for (final playlist in playlists) {
+      final count = controller.resolvePlaylistItems(playlist).length;
+      if (count > bestCount) {
+        best = playlist;
+        bestCount = count;
+      }
+    }
+    return best;
+  }
+
+  Widget _libraryHeader({
     required ThemeData theme,
     required int total,
+    required int totalSongs,
     required VoidCallback onAdd,
   }) {
-    return Row(
-      children: [
-        Text(
-          tr('playlists.summary', args: ['$total']),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w600,
+    final scheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
-        ),
-        const Spacer(),
-        IconButton(
-          icon: const Icon(Icons.add),
-          tooltip: tr('playlists.new'),
-          onPressed: onAdd,
-        ),
-      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            tr('playlists.title'),
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            tr('playlists.library_subtitle'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+              height: 1.25,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Divider(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.46),
+          ),
+          const SizedBox(height: 14),
+          _HeaderActionPanel(
+            total: total,
+            totalSongs: totalSongs,
+            onAdd: onAdd,
+          ),
+        ],
+      ),
     );
   }
 
@@ -174,33 +244,62 @@ class PlaylistsPage extends GetView<PlaylistsController> {
       return SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
         sliver: SliverToBoxAdapter(
-          child: Text(
-            tr('playlists.empty'),
-            style: Get.textTheme.bodyMedium?.copyWith(
-              color: Get.theme.colorScheme.onSurfaceVariant,
-            ),
+          child: _EmptyPlaylistsCard(
+            onCreate: () => _createPlaylist(Get.context!),
           ),
         ),
       );
     }
 
     return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      sliver: SliverList.builder(
-        itemCount: list.length,
-        itemBuilder: (context, index) {
-          final playlist = list[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: _PlaylistTile(
-              playlist: playlist,
-              resolveItems: controller.resolvePlaylistItems,
-              onOpen: () => Get.toNamed(
-                AppRoutes.playlistDetail,
-                arguments: {'playlistId': playlist.id, 'isSmart': false},
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+      sliver: SliverLayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.crossAxisExtent >= 720;
+          if (!isWide) {
+            return SliverGrid.builder(
+              itemCount: list.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisExtent: 198,
+                mainAxisSpacing: 24,
+                crossAxisSpacing: 28,
               ),
-              onMenu: () => _openPlaylistActions(Get.context!, playlist),
+              itemBuilder: (context, index) {
+                final playlist = list[index];
+                return _PlaylistTile(
+                  playlist: playlist,
+                  resolveItems: controller.resolvePlaylistItems,
+                  onOpen: () => Get.toNamed(
+                    AppRoutes.playlistDetail,
+                    arguments: {'playlistId': playlist.id, 'isSmart': false},
+                  ),
+                  onMenu: () => _openPlaylistActions(Get.context!, playlist),
+                );
+              },
+            );
+          }
+
+          return SliverGrid.builder(
+            itemCount: list.length,
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 380,
+              mainAxisExtent: 132,
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
             ),
+            itemBuilder: (context, index) {
+              final playlist = list[index];
+              return _PlaylistTile(
+                playlist: playlist,
+                resolveItems: controller.resolvePlaylistItems,
+                onOpen: () => Get.toNamed(
+                  AppRoutes.playlistDetail,
+                  arguments: {'playlistId': playlist.id, 'isSmart': false},
+                ),
+                onMenu: () => _openPlaylistActions(Get.context!, playlist),
+              );
+            },
           );
         },
       ),
@@ -623,67 +722,496 @@ class _PlaylistTile extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final items = resolveItems(playlist);
-    final localPath = playlist.coverLocalPath?.trim();
-    final localExists =
-        localPath != null &&
-        localPath.isNotEmpty &&
-        File(localPath).existsSync();
-    final thumb = localExists
-        ? localPath
-        : (playlist.coverUrl?.trim().isNotEmpty == true
-              ? playlist.coverUrl
-              : (playlist.coverCleared
-                    ? null
-                    : (items.isNotEmpty
-                          ? items.first.effectiveThumbnail
-                          : null)));
+    final covers = _playlistCovers(playlist, items, limit: 4);
 
-    ImageProvider? provider;
-    if (thumb != null && thumb.isNotEmpty) {
-      provider = thumb.startsWith('http')
-          ? NetworkImage(thumb)
-          : FileImage(File(thumb));
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 240;
+        final songCount = tr(
+          items.length == 1 ? 'common.songs.one' : 'common.songs.other',
+          args: ['${items.length}'],
+        );
 
-    return Card(
-      elevation: 0,
-      color: scheme.surfaceContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: ListTile(
-        onTap: onOpen,
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 54,
-            height: 54,
-            color: scheme.surfaceContainerHighest,
-            child: provider != null
-                ? Image(image: provider, fit: BoxFit.cover)
-                : Icon(
-                    Icons.music_note_rounded,
-                    color: scheme.onSurfaceVariant,
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onOpen,
+            borderRadius: BorderRadius.circular(18),
+            child: Ink(
+              padding: EdgeInsets.all(compact ? 8 : 10),
+              decoration: BoxDecoration(
+                color: scheme.surfaceContainer.withValues(alpha: 0.76),
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 9),
                   ),
+                ],
+              ),
+              child: compact
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: SizedBox.expand(
+                            child: _PlaylistCoverMosaic(
+                              covers: covers,
+                              size: double.infinity,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 9),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    playlist.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    songCount,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: scheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: IconButton(
+                                padding: EdgeInsets.zero,
+                                iconSize: 20,
+                                icon: const Icon(Icons.more_vert_rounded),
+                                tooltip: tr('playlists.options'),
+                                onPressed: onMenu,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        _PlaylistCoverMosaic(covers: covers, size: 74),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                playlist.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                songCount,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.more_vert_rounded),
+                          tooltip: tr('playlists.options'),
+                          onPressed: onMenu,
+                        ),
+                      ],
+                    ),
+            ),
           ),
-        ),
-        title: Text(
-          playlist.name,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        subtitle: Text(
-          tr(
-            items.length == 1 ? 'common.songs.one' : 'common.songs.other',
-            args: ['${items.length}'],
+        );
+      },
+    );
+  }
+}
+
+class _FeaturedPlaylistCard extends StatelessWidget {
+  const _FeaturedPlaylistCard({
+    required this.playlist,
+    required this.resolveItems,
+    required this.onOpen,
+    required this.onPlay,
+    required this.onMenu,
+  });
+
+  final Playlist playlist;
+  final List<MediaItem> Function(Playlist) resolveItems;
+  final VoidCallback onOpen;
+  final VoidCallback onPlay;
+  final VoidCallback onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final items = resolveItems(playlist);
+    final covers = _playlistCovers(playlist, items, limit: 4);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(24),
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainer.withValues(alpha: 0.86),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.more_vert_rounded),
-          tooltip: tr('playlists.options'),
-          onPressed: onMenu,
+          child: Row(
+            children: [
+              _PlaylistCoverMosaic(covers: covers, size: 112),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      tr('playlists.featured'),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      playlist.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      tr(
+                        items.length == 1
+                            ? 'common.songs.one'
+                            : 'common.songs.other',
+                        args: ['${items.length}'],
+                      ),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        FilledButton.icon(
+                          onPressed: items.isEmpty ? null : onPlay,
+                          icon: const Icon(Icons.play_arrow_rounded),
+                          label: Text(tr('playlists.play')),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          onPressed: onMenu,
+                          icon: const Icon(Icons.more_horiz_rounded),
+                          tooltip: tr('playlists.options'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+class _PlaylistCoverMosaic extends StatelessWidget {
+  const _PlaylistCoverMosaic({required this.covers, required this.size});
+
+  final List<ImageProvider> covers;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final radius = size.isFinite && size >= 100 ? 20.0 : 16.0;
+    final iconSize = size.isFinite ? size * 0.38 : 42.0;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: SizedBox(
+        width: size.isFinite ? size : double.infinity,
+        height: size.isFinite ? size : double.infinity,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                scheme.primary.withValues(alpha: 0.24),
+                scheme.tertiary.withValues(alpha: 0.14),
+                scheme.surfaceContainerHighest,
+              ],
+            ),
+          ),
+          child: covers.isEmpty
+              ? Icon(
+                  Icons.queue_music_rounded,
+                  color: scheme.onSurfaceVariant,
+                  size: iconSize,
+                )
+              : covers.length == 1
+              ? Image(image: covers.first, fit: BoxFit.cover)
+              : GridView.builder(
+                  padding: EdgeInsets.zero,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                  ),
+                  itemCount: 4,
+                  itemBuilder: (context, index) {
+                    final provider = covers[index % covers.length];
+                    return Image(image: provider, fit: BoxFit.cover);
+                  },
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderActionPanel extends StatelessWidget {
+  const _HeaderActionPanel({
+    required this.total,
+    required this.totalSongs,
+    required this.onAdd,
+  });
+
+  final int total;
+  final int totalSongs;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _HeaderInfoMetric(
+                  icon: Icons.queue_music_rounded,
+                  value: total,
+                  label: tr('playlists.metric_lists'),
+                ),
+              ),
+              Expanded(
+                child: _HeaderInfoMetric(
+                  icon: Icons.music_note_rounded,
+                  value: totalSongs,
+                  label: tr('playlists.metric_songs'),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.add_rounded),
+              label: Text(tr('playlists.new')),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                textStyle: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderInfoMetric extends StatelessWidget {
+  const _HeaderInfoMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final int value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 24, color: scheme.onSurface),
+        const SizedBox(height: 6),
+        Text(
+          NumberFormat.compact(
+            locale: context.locale.toLanguageTag(),
+          ).format(value),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyPlaylistsCard extends StatelessWidget {
+  const _EmptyPlaylistsCard({required this.onCreate});
+
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainer.withValues(alpha: 0.84),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.playlist_add_rounded, color: scheme.primary, size: 34),
+          const SizedBox(height: 10),
+          Text(
+            tr('playlists.empty_title'),
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 5),
+          Text(
+            tr('playlists.empty'),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: onCreate,
+            icon: const Icon(Icons.add_rounded),
+            label: Text(tr('playlists.new')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+List<ImageProvider> _playlistCovers(
+  Playlist playlist,
+  List<MediaItem> items, {
+  required int limit,
+}) {
+  final explicit = _playlistExplicitCover(playlist);
+  if (explicit != null) return <ImageProvider>[explicit];
+
+  final covers = <ImageProvider>[];
+  if (!playlist.coverCleared) {
+    for (final item in items) {
+      final thumb = item.effectiveThumbnail?.trim() ?? '';
+      if (thumb.isEmpty) continue;
+      try {
+        covers.add(_playlistImageProvider(thumb));
+      } catch (_) {}
+      if (covers.length >= limit) break;
+    }
+  }
+
+  return covers.take(limit).toList(growable: false);
+}
+
+ImageProvider? _playlistExplicitCover(Playlist playlist) {
+  final localPath = playlist.coverLocalPath?.trim();
+  final isAssetCover = localPath?.startsWith('assets/') == true;
+  final localExists =
+      localPath != null &&
+      localPath.isNotEmpty &&
+      (isAssetCover || File(localPath).existsSync());
+  if (localExists) return _playlistImageProvider(localPath);
+
+  final url = playlist.coverUrl?.trim();
+  if (url != null && url.isNotEmpty) return _playlistImageProvider(url);
+  return null;
+}
+
+ImageProvider _playlistImageProvider(String raw) {
+  final value = raw.trim();
+  if (value.startsWith('assets/')) return AssetImage(value);
+  if (value.startsWith('http')) return NetworkImage(value);
+  return FileImage(File(value));
 }
 
 class _NoGlowScrollBehavior extends ScrollBehavior {

@@ -716,6 +716,38 @@ class AudioService extends GetxService {
     );
   }
 
+  Future<void> playQueueFromExternalRequest({
+    required List<MediaItem> items,
+    required int index,
+  }) async {
+    final playable = items
+        .where((item) => item.localAudioVariant != null)
+        .toList(growable: false);
+    if (playable.isEmpty) return;
+
+    final requested = index >= 0 && index < items.length ? items[index] : null;
+    var targetIndex = requested == null
+        ? 0
+        : playable.indexWhere((item) => _sameItem(item, requested));
+    if (targetIndex < 0) targetIndex = 0;
+
+    final item = playable[targetIndex];
+    final variant = item.localAudioVariant;
+    if (variant == null) return;
+
+    await play(
+      item,
+      variant,
+      queue: playable,
+      queueIndex: targetIndex,
+      forceReload: true,
+    );
+  }
+
+  Future<void> playQueueIndexFromExternalRequest(int index) async {
+    await jumpToQueueIndex(index);
+  }
+
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
     if (_queueItems.isEmpty || _queueItems.length != _queueVariants.length) {
       return;

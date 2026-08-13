@@ -7,6 +7,7 @@ class PlaylistStore {
 
   final GetStorage _box;
   static const _key = 'playlists';
+  static const maxTemporaryPlaylistsPerDay = 3;
 
   Future<List<Playlist>> readAll() async {
     final all = _readRawPlaylists();
@@ -35,6 +36,7 @@ class PlaylistStore {
     required String name,
     required List<String> itemIds,
     String? fingerprint,
+    String? coverLocalPath,
     Duration lifetime = const Duration(days: 3),
   }) async {
     final ids = itemIds
@@ -44,6 +46,8 @@ class PlaylistStore {
     if (ids.isEmpty) return null;
 
     final nowDate = DateTime.now();
+    if (await hasReachedDailyTemporaryLimit(nowDate)) return null;
+
     final now = nowDate.millisecondsSinceEpoch;
     final playlist = Playlist(
       id: 'temporary_${nowDate.microsecondsSinceEpoch}',
@@ -53,9 +57,51 @@ class PlaylistStore {
       updatedAt: now,
       expiresAt: now + lifetime.inMilliseconds,
       fingerprint: fingerprint?.trim(),
+      coverLocalPath: coverLocalPath?.trim().isEmpty == true
+          ? null
+          : coverLocalPath?.trim(),
     );
     await upsert(playlist);
     return playlist;
+  }
+
+  Future<Playlist?> createQueuePlaylist({
+    required String name,
+    required List<String> itemIds,
+    String? fingerprint,
+  }) async {
+    final trimmedName = name.trim();
+    final ids = itemIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toSet();
+    if (trimmedName.isEmpty || ids.isEmpty) return null;
+
+    final nowDate = DateTime.now();
+    final now = nowDate.millisecondsSinceEpoch;
+    final playlist = Playlist(
+      id: 'pl_${nowDate.microsecondsSinceEpoch}',
+      name: trimmedName,
+      itemIds: ids.toList(growable: false),
+      createdAt: now,
+      updatedAt: now,
+      fingerprint: fingerprint?.trim(),
+    );
+    await upsert(playlist);
+    return playlist;
+  }
+
+  Future<bool> hasReachedDailyTemporaryLimit([DateTime? now]) async {
+    final day = now ?? DateTime.now();
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+    final playlists = await readAll();
+    final count = playlists.where((playlist) {
+      if (!playlist.isTemporary) return false;
+      final createdAt = DateTime.fromMillisecondsSinceEpoch(playlist.createdAt);
+      return !createdAt.isBefore(start) && createdAt.isBefore(end);
+    }).length;
+    return count >= maxTemporaryPlaylistsPerDay;
   }
 
   Future<void> upsert(Playlist playlist) async {

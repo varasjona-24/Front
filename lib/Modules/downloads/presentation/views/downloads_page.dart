@@ -118,7 +118,9 @@ class DownloadsPage extends GetView<DownloadsController> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const DownloadsHeader(),
+                            DownloadsHeader(
+                              total: controller.state.value.items.length,
+                            ),
                             const SizedBox(height: AppSpacing.lg),
                             const DownloadsPill(),
                             const SizedBox(height: AppSpacing.lg),

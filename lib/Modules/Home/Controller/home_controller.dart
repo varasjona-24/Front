@@ -805,12 +805,14 @@ class HomeController extends GetxController {
   }
 
   Future<List<Playlist>> loadPlaylistChoices() async {
-    return await _playlistStore?.readAll() ?? const <Playlist>[];
+    final playlists = await _playlistStore?.readAll() ?? const <Playlist>[];
+    return playlists.where((playlist) => !playlist.isTemporary).toList();
   }
 
   List<HomePlaylistChoice> playlistChoices() {
     final playlists = _playlistStore?.readAllSync() ?? const <Playlist>[];
     return playlists
+        .where((playlist) => !playlist.isTemporary)
         .map(
           (playlist) => HomePlaylistChoice(
             id: playlist.id,
@@ -823,8 +825,17 @@ class HomeController extends GetxController {
   }
 
   List<HomePlaylistChoice> temporaryPlaylistChoices() {
-    return playlistChoices()
-        .where((playlist) => playlist.id.startsWith('temporary_'))
+    final playlists = _playlistStore?.readAllSync() ?? const <Playlist>[];
+    return playlists
+        .where((playlist) => playlist.isTemporary && !playlist.isExpired)
+        .map(
+          (playlist) => HomePlaylistChoice(
+            id: playlist.id,
+            name: playlist.name,
+            count: playlist.itemIds.length,
+            cover: _playlistCover(playlist),
+          ),
+        )
         .toList(growable: false);
   }
 

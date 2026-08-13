@@ -61,7 +61,7 @@ class PlaylistsController extends GetxController {
       _library.assignAll(items);
 
       final stored = await _store.readAll();
-      playlists.assignAll(stored);
+      playlists.assignAll(stored.where((playlist) => !playlist.isTemporary));
 
       _buildSmartPlaylists();
     } finally {
@@ -107,6 +107,9 @@ class PlaylistsController extends GetxController {
 
   Playlist? getPlaylistById(String id) {
     for (final p in playlists) {
+      if (p.id == id) return p;
+    }
+    for (final p in _store.readAllSync()) {
       if (p.id == id) return p;
     }
     return null;

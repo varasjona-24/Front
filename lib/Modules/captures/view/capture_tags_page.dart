@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../app/routes/app_routes.dart';
+import '../../../app/ui/widgets/dialogs/sort_options_sheet.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../edit/controller/edit_entity_controller.dart';
 import '../../sources/ui/source_filter_toolbar.dart';
@@ -408,28 +409,11 @@ class _TagSortOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return ListTile(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      tileColor: selected
-          ? scheme.primaryContainer
-          : scheme.surfaceContainerHighest.withValues(alpha: .55),
-      leading: Icon(icon, color: selected ? scheme.primary : null),
-      title: Text(
-        label,
-        style: theme.textTheme.bodyMedium?.copyWith(
-          fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-        ),
-      ),
-      trailing: selected
-          ? Icon(
-              ascending
-                  ? Icons.arrow_upward_rounded
-                  : Icons.arrow_downward_rounded,
-              color: scheme.primary,
-            )
-          : null,
+    return SortOptionTile(
+      icon: icon,
+      label: label,
+      selected: selected,
+      ascending: ascending,
       onTap: onTap,
     );
   }

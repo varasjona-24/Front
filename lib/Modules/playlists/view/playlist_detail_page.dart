@@ -9,6 +9,7 @@ import '../../../app/routes/app_routes.dart';
 import '../../../app/controllers/media_actions_controller.dart';
 import '../../../app/controllers/navigation_controller.dart';
 import '../../../app/ui/themes/app_spacing.dart';
+import '../../../app/ui/widgets/dialogs/sort_options_sheet.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/branding/listenfy_logo.dart';
@@ -119,7 +120,8 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
                       playlist: playlist,
                       isSmartPlaylist: isSmart,
                       actions: actions,
-                      canRemoveFromPlaylist: !isSmart && playlist != null,
+                      canRemoveFromPlaylist:
+                          !isSmart && playlist != null && !playlist.isTemporary,
                     ),
                     compactListCard: true,
                   ),
@@ -208,7 +210,7 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
   ) {
     return Row(
       children: [
-        if (!isSmartPlaylist)
+        if (!isSmartPlaylist && playlist?.isTemporary != true)
           Expanded(
             child: _PlaylistCommandButton(
               icon: Icons.add_rounded,
@@ -216,7 +218,8 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
               onPressed: () => _openAddSongs(context, playlist),
             ),
           ),
-        if (!isSmartPlaylist) const SizedBox(width: 10),
+        if (!isSmartPlaylist && playlist?.isTemporary != true)
+          const SizedBox(width: 10),
         Expanded(
           child: _PlaylistCommandButton(
             icon: Icons.play_arrow_rounded,
@@ -285,92 +288,120 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
         return Obx(() {
           final sort = controller.trackSort.value;
           final asc = controller.trackSortAscending.value;
+          void pickSort(PlaylistTrackSort next) {
+            if (sort == next) {
+              controller.setTrackSortAscending(!asc);
+              return;
+            }
+            controller.setTrackSort(next);
+          }
 
           return SafeArea(
             child: SingleChildScrollView(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       tr('playlists.detail.sort_by'),
-                      style: theme.textTheme.headlineSmall?.copyWith(
+                      style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     _PlaylistSortOption(
+                      icon: Icons.playlist_add_check_rounded,
                       label: tr('playlists.detail.sort_added'),
-                      selected: sort == PlaylistTrackSort.addedAt,
-                      onTap: () =>
-                          controller.setTrackSort(PlaylistTrackSort.addedAt),
-                    ),
-                    _PlaylistSortOption(
-                      label: tr('playlists.detail.sort_title'),
-                      selected: sort == PlaylistTrackSort.title,
-                      onTap: () =>
-                          controller.setTrackSort(PlaylistTrackSort.title),
-                    ),
-                    _PlaylistSortOption(
-                      label: tr('playlists.detail.sort_artist'),
-                      selected: sort == PlaylistTrackSort.artist,
-                      onTap: () =>
-                          controller.setTrackSort(PlaylistTrackSort.artist),
-                    ),
-                    _PlaylistSortOption(
-                      label: tr('playlists.detail.sort_size'),
-                      selected: sort == PlaylistTrackSort.size,
-                      onTap: () =>
-                          controller.setTrackSort(PlaylistTrackSort.size),
-                    ),
-                    _PlaylistSortOption(
-                      label: tr('playlists.detail.sort_plays'),
-                      selected: sort == PlaylistTrackSort.plays,
-                      onTap: () =>
-                          controller.setTrackSort(PlaylistTrackSort.plays),
-                    ),
-                    _PlaylistSortOption(
-                      label: tr('playlists.detail.sort_duration'),
-                      selected: sort == PlaylistTrackSort.duration,
-                      onTap: () =>
-                          controller.setTrackSort(PlaylistTrackSort.duration),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Divider(
-                        color: scheme.outlineVariant.withValues(alpha: 0.5),
-                        height: 1,
+                      sublabel: _playlistSortDirectionLabel(
+                        PlaylistTrackSort.addedAt,
+                        ascending: sort == PlaylistTrackSort.addedAt
+                            ? asc
+                            : false,
                       ),
+                      selected: sort == PlaylistTrackSort.addedAt,
+                      ascending: sort == PlaylistTrackSort.addedAt ? asc : null,
+                      onTap: () => pickSort(PlaylistTrackSort.addedAt),
                     ),
+                    const SizedBox(height: 6),
                     _PlaylistSortOption(
-                      label: tr('playlists.detail.desc_recent'),
-                      selected: !asc,
-                      onTap: () => controller.setTrackSortAscending(false),
+                      icon: Icons.title_rounded,
+                      label: tr('playlists.detail.sort_title'),
+                      sublabel: _playlistSortDirectionLabel(
+                        PlaylistTrackSort.title,
+                        ascending: sort == PlaylistTrackSort.title ? asc : true,
+                      ),
+                      selected: sort == PlaylistTrackSort.title,
+                      ascending: sort == PlaylistTrackSort.title ? asc : null,
+                      onTap: () => pickSort(PlaylistTrackSort.title),
                     ),
+                    const SizedBox(height: 6),
                     _PlaylistSortOption(
-                      label: tr('playlists.detail.asc_oldest'),
-                      selected: asc,
-                      onTap: () => controller.setTrackSortAscending(true),
+                      icon: Icons.person_rounded,
+                      label: tr('playlists.detail.sort_artist'),
+                      sublabel: _playlistSortDirectionLabel(
+                        PlaylistTrackSort.artist,
+                        ascending: sort == PlaylistTrackSort.artist
+                            ? asc
+                            : true,
+                      ),
+                      selected: sort == PlaylistTrackSort.artist,
+                      ascending: sort == PlaylistTrackSort.artist ? asc : null,
+                      onTap: () => pickSort(PlaylistTrackSort.artist),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 6),
+                    _PlaylistSortOption(
+                      icon: Icons.sd_storage_rounded,
+                      label: tr('playlists.detail.sort_size'),
+                      sublabel: _playlistSortDirectionLabel(
+                        PlaylistTrackSort.size,
+                        ascending: sort == PlaylistTrackSort.size ? asc : false,
+                      ),
+                      selected: sort == PlaylistTrackSort.size,
+                      ascending: sort == PlaylistTrackSort.size ? asc : null,
+                      onTap: () => pickSort(PlaylistTrackSort.size),
+                    ),
+                    const SizedBox(height: 6),
+                    _PlaylistSortOption(
+                      icon: Icons.equalizer_rounded,
+                      label: tr('playlists.detail.sort_plays'),
+                      sublabel: _playlistSortDirectionLabel(
+                        PlaylistTrackSort.plays,
+                        ascending: sort == PlaylistTrackSort.plays
+                            ? asc
+                            : false,
+                      ),
+                      selected: sort == PlaylistTrackSort.plays,
+                      ascending: sort == PlaylistTrackSort.plays ? asc : null,
+                      onTap: () => pickSort(PlaylistTrackSort.plays),
+                    ),
+                    const SizedBox(height: 6),
+                    _PlaylistSortOption(
+                      icon: Icons.timer_rounded,
+                      label: tr('playlists.detail.sort_duration'),
+                      sublabel: _playlistSortDirectionLabel(
+                        PlaylistTrackSort.duration,
+                        ascending: sort == PlaylistTrackSort.duration
+                            ? asc
+                            : false,
+                      ),
+                      selected: sort == PlaylistTrackSort.duration,
+                      ascending: sort == PlaylistTrackSort.duration
+                          ? asc
+                          : null,
+                      onTap: () => pickSort(PlaylistTrackSort.duration),
+                    ),
+                    const SizedBox(height: 18),
                     SizedBox(
                       width: double.infinity,
-                      child: OutlinedButton(
+                      child: FilledButton(
                         onPressed: () => Navigator.of(ctx).pop(),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          side: BorderSide(color: scheme.outlineVariant),
-                        ),
                         child: Text(
-                          tr('common.close'),
+                          tr('common.accept'),
                           style: theme.textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w700,
-                            color: scheme.onSurfaceVariant,
+                            color: scheme.onPrimary,
                           ),
                         ),
                       ),
@@ -433,6 +464,26 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
       isSmartPlaylist: isSmartPlaylist,
       actions: actions,
     );
+  }
+
+  String _playlistSortDirectionLabel(
+    PlaylistTrackSort sort, {
+    required bool ascending,
+  }) {
+    return switch (sort) {
+      PlaylistTrackSort.title ||
+      PlaylistTrackSort.artist => ascending ? 'A-Z' : 'Z-A',
+      PlaylistTrackSort.addedAt =>
+        ascending
+            ? tr('playlists.detail.asc_oldest')
+            : tr('playlists.detail.desc_recent'),
+      PlaylistTrackSort.size ||
+      PlaylistTrackSort.plays ||
+      PlaylistTrackSort.duration =>
+        ascending
+            ? tr('home.section.low_to_high')
+            : tr('home.section.high_to_low'),
+    };
   }
 
   Future<void> _handleTrackAction({
@@ -522,8 +573,9 @@ class PlaylistDetailPage extends GetView<PlaylistsController> {
   ImageProvider? _resolveCover(Playlist? playlist, List<MediaItem> items) {
     if (playlist != null) {
       final local = playlist.coverLocalPath?.trim();
-      if (local != null && local.isNotEmpty && File(local).existsSync()) {
-        return FileImage(File(local));
+      if (local != null && local.isNotEmpty) {
+        if (local.startsWith('assets/')) return AssetImage(local);
+        if (File(local).existsSync()) return FileImage(File(local));
       }
       final url = playlist.coverUrl?.trim();
       if (url != null && url.isNotEmpty) {
@@ -643,57 +695,30 @@ class _PlaylistCommandButton extends StatelessWidget {
 
 class _PlaylistSortOption extends StatelessWidget {
   const _PlaylistSortOption({
+    required this.icon,
     required this.label,
+    required this.sublabel,
     required this.selected,
     required this.onTap,
+    this.ascending,
   });
 
+  final IconData icon;
   final String label;
+  final String sublabel;
   final bool selected;
   final VoidCallback onTap;
+  final bool? ascending;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: selected
-                ? scheme.primary.withValues(alpha: 0.10)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: selected ? scheme.primary : scheme.onSurface,
-                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Icon(
-                selected
-                    ? Icons.check_circle_rounded
-                    : Icons.radio_button_unchecked,
-                color: selected ? scheme.primary : scheme.outline,
-                size: 24,
-              ),
-            ],
-          ),
-        ),
-      ),
+    return SortOptionTile(
+      icon: icon,
+      label: label,
+      sublabel: sublabel,
+      selected: selected,
+      ascending: ascending,
+      onTap: onTap,
     );
   }
 }

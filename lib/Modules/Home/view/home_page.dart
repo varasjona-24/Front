@@ -11,6 +11,7 @@ import 'package:listenfy/Modules/recommendations/domain/recommendation_collectio
 import '../../../app/models/media_item.dart';
 import '../../../app/ui/widgets/navigation/app_top_bar.dart';
 import '../../../app/ui/widgets/navigation/app_bottom_nav.dart';
+import '../../../app/ui/widgets/dialogs/sort_options_sheet.dart';
 import '../../../app/ui/widgets/list/media_horizontal_list.dart';
 import '../../../app/ui/widgets/media/media_history_item_tile.dart';
 import '../../../app/ui/themes/app_spacing.dart';
@@ -2673,14 +2674,15 @@ Future<void> _showHomeChoiceSortSheet({
       return StatefulBuilder(
         builder: (context, setSheetState) {
           void updateSort(_HomeChoiceSort value) {
-            sheetSort = value;
-            onSortChanged(value);
-            setSheetState(() {});
-          }
-
-          void updateDirection(bool value) {
-            sheetAscending = value;
-            onDirectionChanged(value);
+            if (sheetSort == value) {
+              sheetAscending = !sheetAscending;
+              onDirectionChanged(sheetAscending);
+            } else {
+              sheetSort = value;
+              sheetAscending = _defaultHomeChoiceAscending(value);
+              onSortChanged(value);
+              onDirectionChanged(sheetAscending);
+            }
             setSheetState(() {});
           }
 
@@ -2699,36 +2701,22 @@ Future<void> _showHomeChoiceSortSheet({
                   ),
                   const SizedBox(height: 14),
                   for (final option in _HomeChoiceSort.values)
-                    _HomeChoiceSortOption(
-                      icon: option.icon,
-                      label: option.label,
-                      selected: sheetSort == option,
-                      onTap: () => updateSort(option),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _HomeChoiceSortOption(
+                        icon: option.icon,
+                        label: option.label,
+                        sublabel: _homeChoiceDirectionLabel(
+                          sort: option,
+                          ascending: sheetSort == option
+                              ? sheetAscending
+                              : _defaultHomeChoiceAscending(option),
+                        ),
+                        selected: sheetSort == option,
+                        ascending: sheetSort == option ? sheetAscending : null,
+                        onTap: () => updateSort(option),
+                      ),
                     ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Divider(
-                      color: scheme.outlineVariant.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  _HomeChoiceSortOption(
-                    icon: Icons.south_rounded,
-                    label: _homeChoiceDirectionLabel(
-                      sort: sheetSort,
-                      ascending: false,
-                    ),
-                    selected: !sheetAscending,
-                    onTap: () => updateDirection(false),
-                  ),
-                  _HomeChoiceSortOption(
-                    icon: Icons.north_rounded,
-                    label: _homeChoiceDirectionLabel(
-                      sort: sheetSort,
-                      ascending: true,
-                    ),
-                    selected: sheetAscending,
-                    onTap: () => updateDirection(true),
-                  ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -2745,6 +2733,13 @@ Future<void> _showHomeChoiceSortSheet({
       );
     },
   ).whenComplete(() => nav?.setOverlayOpen(false));
+}
+
+bool _defaultHomeChoiceAscending(_HomeChoiceSort sort) {
+  return switch (sort) {
+    _HomeChoiceSort.name => true,
+    _HomeChoiceSort.count => false,
+  };
 }
 
 String _homeChoiceDirectionLabel({
@@ -2764,31 +2759,27 @@ class _HomeChoiceSortOption extends StatelessWidget {
   const _HomeChoiceSortOption({
     required this.icon,
     required this.label,
+    required this.sublabel,
     required this.selected,
+    required this.ascending,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final String sublabel;
   final bool selected;
+  final bool? ascending;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(icon, color: selected ? scheme.primary : null),
-      title: Text(
-        label,
-        style: theme.textTheme.bodyLarge?.copyWith(
-          fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
-        ),
-      ),
-      trailing: selected
-          ? Icon(Icons.check_circle_rounded, color: scheme.primary)
-          : null,
+    return SortOptionTile(
+      icon: icon,
+      label: label,
+      sublabel: sublabel,
+      selected: selected,
+      ascending: ascending,
       onTap: onTap,
     );
   }
@@ -2801,6 +2792,7 @@ ImageProvider? _artistImageProvider(String? raw) {
 ImageProvider? _homeImageProvider(String? raw) {
   final value = raw?.trim() ?? '';
   if (value.isEmpty) return null;
+  if (value.startsWith('assets/')) return AssetImage(value);
   return value.startsWith('http')
       ? NetworkImage(value)
       : FileImage(File(value)) as ImageProvider;

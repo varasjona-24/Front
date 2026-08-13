@@ -7,6 +7,7 @@ import '../data/source_theme_pill_store.dart';
 import '../data/source_theme_topic_store.dart';
 import '../data/source_theme_topic_playlist_store.dart';
 import '../../playlists/data/playlist_store.dart';
+import '../../captures/data/capture_gallery_store.dart';
 
 class SourcesBinding extends Bindings {
   @override
@@ -41,6 +42,9 @@ class SourcesBinding extends Bindings {
     }
     if (!Get.isRegistered<PlaylistStore>()) {
       Get.put(PlaylistStore(Get.find<GetStorage>()), permanent: true);
+    }
+    if (!Get.isRegistered<CaptureGalleryStore>()) {
+      Get.put(CaptureGalleryStore(Get.find<GetStorage>()), permanent: true);
     }
 
     // ============================

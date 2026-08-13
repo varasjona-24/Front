@@ -22,6 +22,7 @@ import '../domain/source_theme_topic.dart';
 import '../data/source_theme_topic_store.dart';
 import '../domain/source_theme_topic_playlist.dart';
 import '../data/source_theme_topic_playlist_store.dart';
+import '../../captures/data/capture_gallery_store.dart';
 
 class SourcesController extends GetxController {
   // ============================
@@ -33,6 +34,7 @@ class SourcesController extends GetxController {
   final SourceThemeTopicStore _topicStore = Get.find<SourceThemeTopicStore>();
   final SourceThemeTopicPlaylistStore _topicPlaylistStore =
       Get.find<SourceThemeTopicPlaylistStore>();
+  final CaptureGalleryStore _captureStore = Get.find<CaptureGalleryStore>();
   final LocalMediaMetadataService _metadata =
       Get.find<LocalMediaMetadataService>();
 
@@ -48,6 +50,7 @@ class SourcesController extends GetxController {
   final RxList<SourceThemeTopic> topics = <SourceThemeTopic>[].obs;
   final RxList<SourceThemeTopicPlaylist> topicPlaylists =
       <SourceThemeTopicPlaylist>[].obs;
+  final RxInt captureCount = 0.obs;
 
   // ============================
   // 🧭 HELPERS
@@ -426,13 +429,19 @@ class SourcesController extends GetxController {
     _loadPills();
     _loadTopics();
     _loadTopicPlaylists();
+    _loadCaptureCount();
   }
 
   // ============================
   // 🔄 REFRESCO GENERAL
   // ============================
   Future<void> refreshAll() async {
-    await Future.wait([_loadPills(), _loadTopics(), _loadTopicPlaylists()]);
+    await Future.wait([
+      _loadPills(),
+      _loadTopics(),
+      _loadTopicPlaylists(),
+      _loadCaptureCount(),
+    ]);
   }
 
   // ============================
@@ -748,6 +757,11 @@ class SourcesController extends GetxController {
   Future<void> _loadTopicPlaylists() async {
     final list = await _topicPlaylistStore.readAll();
     topicPlaylists.assignAll(list);
+  }
+
+  Future<void> _loadCaptureCount() async {
+    final captures = await _captureStore.listCaptures();
+    captureCount.value = captures.length;
   }
 }
 

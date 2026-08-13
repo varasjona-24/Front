@@ -82,7 +82,7 @@ class AppMediaItemsSliver extends StatelessWidget {
             child: AppMediaListTile(
               item: item,
               videoStyle: videoStyle,
-              carded: compactListCard,
+              carded: compactListCard || videoStyle,
               onTap: () => onTap(item, index),
               onLongPress: onLongPress == null
                   ? null
@@ -164,7 +164,7 @@ class AppMediaItemsList extends StatelessWidget {
             child: AppMediaListTile(
               item: items[index],
               videoStyle: videoStyle,
-              carded: compactListCard,
+              carded: compactListCard || videoStyle,
               onTap: () => onTap(items[index], index),
               onLongPress: onLongPress == null
                   ? null
@@ -253,7 +253,9 @@ class AppMediaActionListTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected
               ? scheme.primary.withValues(alpha: 0.12)
-              : (videoStyle ? Colors.transparent : scheme.surfaceContainerHigh),
+              : (videoStyle
+                    ? Colors.transparent
+                    : scheme.surfaceContainerHigh.withValues(alpha: 0.78)),
           borderRadius: BorderRadius.circular(videoStyle ? 12 : 16),
           border: selected
               ? Border.all(
@@ -562,7 +564,9 @@ class _AudioListTile extends StatelessWidget {
 
     return Card(
       elevation: 0,
-      color: config.carded ? scheme.surfaceContainer : Colors.transparent,
+      color: config.carded
+          ? scheme.surfaceContainer.withValues(alpha: 0.78)
+          : Colors.transparent,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(config.carded ? 18 : 12),
       ),
@@ -628,16 +632,24 @@ class _VideoListTile extends StatelessWidget {
       if ((videoVariant?.size ?? 0) > 0) _formatBytes(videoVariant!.size!),
     ];
     final meta = _buildMeta(item);
+    final radius = BorderRadius.circular(config.carded ? 18 : 12);
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: config.onTap,
         onLongPress: config.onLongPress ?? config.onMore,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         child: Ink(
-          padding: EdgeInsets.zero,
-          decoration: const BoxDecoration(color: Colors.transparent),
+          padding: config.carded
+              ? const EdgeInsets.symmetric(horizontal: 12, vertical: 10)
+              : EdgeInsets.zero,
+          decoration: BoxDecoration(
+            color: config.carded
+                ? scheme.surfaceContainer.withValues(alpha: 0.78)
+                : Colors.transparent,
+            borderRadius: radius,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [

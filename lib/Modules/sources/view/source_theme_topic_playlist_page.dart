@@ -495,7 +495,9 @@ class _SourceThemeTopicPlaylistPageState
       title: tr('sources.sort_items'),
       optionsBuilder: () => [
         SortSheetOption(
+          icon: Icons.history_rounded,
           label: tr('sources.recent_first'),
+          sublabel: tr('sources.sort_items'),
           selected: _itemSort == _SourcePlaylistItemSort.recent,
           onTap: () {
             setState(() => _itemSort = _SourcePlaylistItemSort.recent);
@@ -503,7 +505,9 @@ class _SourceThemeTopicPlaylistPageState
           },
         ),
         SortSheetOption(
+          icon: Icons.sort_by_alpha_rounded,
           label: tr('sources.name'),
+          sublabel: tr('sources.sort_items'),
           selected: _itemSort == _SourcePlaylistItemSort.title,
           onTap: () {
             setState(() => _itemSort = _SourcePlaylistItemSort.title);
@@ -511,7 +515,9 @@ class _SourceThemeTopicPlaylistPageState
           },
         ),
         SortSheetOption(
+          icon: Icons.sd_storage_rounded,
           label: tr('sources.size'),
+          sublabel: tr('sources.sort_items'),
           selected: _itemSort == _SourcePlaylistItemSort.size,
           onTap: () {
             setState(() => _itemSort = _SourcePlaylistItemSort.size);
@@ -519,7 +525,9 @@ class _SourceThemeTopicPlaylistPageState
           },
         ),
         SortSheetOption(
+          icon: Icons.timer_rounded,
           label: tr('sources.duration'),
+          sublabel: tr('sources.sort_items'),
           selected: _itemSort == _SourcePlaylistItemSort.duration,
           onTap: () {
             setState(() => _itemSort = _SourcePlaylistItemSort.duration);
@@ -538,7 +546,9 @@ class _SourceThemeTopicPlaylistPageState
       title: tr('sources.sort_collections'),
       optionsBuilder: () => [
         SortSheetOption(
+          icon: Icons.history_rounded,
           label: tr('sources.recent_first'),
+          sublabel: tr('sources.sort_collections'),
           selected: _subListSort == _SourceSubListSort.recent,
           onTap: () {
             setState(() => _subListSort = _SourceSubListSort.recent);
@@ -549,7 +559,9 @@ class _SourceThemeTopicPlaylistPageState
           },
         ),
         SortSheetOption(
+          icon: Icons.sort_by_alpha_rounded,
           label: tr('sources.name'),
+          sublabel: tr('sources.sort_collections'),
           selected: _subListSort == _SourceSubListSort.name,
           onTap: () {
             setState(() => _subListSort = _SourceSubListSort.name);
@@ -560,7 +572,9 @@ class _SourceThemeTopicPlaylistPageState
           },
         ),
         SortSheetOption(
+          icon: Icons.library_music_rounded,
           label: tr('sources.more_items'),
+          sublabel: tr('sources.sort_collections'),
           selected: _subListSort == _SourceSubListSort.items,
           onTap: () {
             setState(() => _subListSort = _SourceSubListSort.items);
@@ -571,7 +585,9 @@ class _SourceThemeTopicPlaylistPageState
           },
         ),
         SortSheetOption(
+          icon: Icons.folder_special_rounded,
           label: tr('sources.more_collections'),
+          sublabel: tr('sources.sort_collections'),
           selected: _subListSort == _SourceSubListSort.subfolders,
           onTap: () {
             setState(() => _subListSort = _SourceSubListSort.subfolders);

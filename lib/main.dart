@@ -43,6 +43,7 @@ import 'Modules/downloads/domain/contracts/downloads_repository.dart';
 import 'Modules/downloads/domain/usecases/load_download_items_usecase.dart';
 import 'Modules/downloads/service/download_task_service.dart';
 import 'Modules/artists/data/artist_store.dart';
+import 'Modules/playlists/data/playlist_store.dart';
 import 'Modules/sources/data/source_theme_topic_store.dart';
 import 'Modules/sources/data/source_theme_topic_playlist_store.dart';
 import 'Modules/recommendations/data/recommendation_store.dart';
@@ -125,6 +126,9 @@ Future<void> main() async {
 
   // 💾 Local storage
   Get.put(LocalLibraryStore(Get.find<GetStorage>()), permanent: true);
+  if (!Get.isRegistered<PlaylistStore>()) {
+    Get.put(PlaylistStore(Get.find<GetStorage>()), permanent: true);
+  }
   if (!Get.isRegistered<ArtistStore>()) {
     Get.put(ArtistStore(Get.find<GetStorage>()), permanent: true);
   }
@@ -322,3 +326,4 @@ class _MyAppState extends State<MyApp> {
     });
   }
 }
+

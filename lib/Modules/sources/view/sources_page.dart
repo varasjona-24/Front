@@ -37,7 +37,10 @@ class SourcesPage extends GetView<SourcesController> {
           IconButton(
             tooltip: tr('sources.captures'),
             icon: const Icon(Icons.photo_library_rounded),
-            onPressed: () => Get.toNamed(AppRoutes.captureGallery),
+            onPressed: () async {
+              await Get.toNamed(AppRoutes.captureGallery);
+              await controller.refreshAll();
+            },
           ),
         ],
       ),
@@ -60,7 +63,7 @@ class SourcesPage extends GetView<SourcesController> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _header(theme: theme, scheme: scheme, home: home),
+                        _header(theme: theme, scheme: scheme),
                         const SizedBox(height: AppSpacing.lg),
 
                         ..._themeSections(
@@ -85,35 +88,56 @@ class SourcesPage extends GetView<SourcesController> {
   // UI SECTIONS
   // ===========================================================================
 
-  Widget _header({
-    required ThemeData theme,
-    required ColorScheme scheme,
-    required HomeController home,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(
-                tr('sources.title'),
-                style: theme.textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+  Widget _header({required ThemeData theme, required ColorScheme scheme}) {
+    return Obx(() {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Text(
-          tr('sources.subtitle'),
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              tr('sources.title'),
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0,
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              tr('sources.subtitle'),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+                height: 1.25,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Divider(
+              height: 1,
+              color: scheme.outlineVariant.withValues(alpha: 0.46),
+            ),
+            const SizedBox(height: 14),
+            _SourcesHeaderStats(
+              categories: controller.themes.length,
+              sections: controller.topics.length,
+              lists: controller.topicPlaylists.length,
+              captures: controller.captureCount.value,
+            ),
+          ],
         ),
-      ],
-    );
+      );
+    });
   }
 
   List<Widget> _themeSections({
@@ -173,6 +197,112 @@ class SourcesPage extends GetView<SourcesController> {
         'forceKind': theme.forceKind,
         'themeId': theme.id,
       },
+    );
+  }
+}
+
+class _SourcesHeaderStats extends StatelessWidget {
+  const _SourcesHeaderStats({
+    required this.categories,
+    required this.sections,
+    required this.lists,
+    required this.captures,
+  });
+
+  final int categories;
+  final int sections;
+  final int lists;
+  final int captures;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SourceInfoMetric(
+              icon: Icons.dashboard_customize_rounded,
+              value: categories,
+              label: tr('sources.metric_categories'),
+            ),
+          ),
+          Expanded(
+            child: _SourceInfoMetric(
+              icon: Icons.folder_special_rounded,
+              value: sections,
+              label: tr('sources.metric_sections'),
+            ),
+          ),
+          Expanded(
+            child: _SourceInfoMetric(
+              icon: Icons.queue_music_rounded,
+              value: lists,
+              label: tr('sources.metric_lists'),
+            ),
+          ),
+          Expanded(
+            child: _SourceInfoMetric(
+              icon: Icons.photo_camera_rounded,
+              value: captures,
+              label: tr('sources.metric_captures'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SourceInfoMetric extends StatelessWidget {
+  const _SourceInfoMetric({
+    required this.icon,
+    required this.value,
+    required this.label,
+  });
+
+  final IconData icon;
+  final int value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 24, color: scheme.onSurface),
+        const SizedBox(height: 6),
+        Text(
+          NumberFormat.compact(
+            locale: context.locale.toLanguageTag(),
+          ).format(value),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+          ),
+        ),
+        const SizedBox(height: 1),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
     );
   }
 }
