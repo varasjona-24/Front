@@ -351,6 +351,16 @@ class _BackupEstimate {
   final int missingFiles;
 }
 
+class _BackupExportOptions {
+  const _BackupExportOptions({
+    required this.includeInstrumentalVariants,
+    required this.includeFileHashes,
+  });
+
+  final bool includeInstrumentalVariants;
+  final bool includeFileHashes;
+}
+
 class _ManifestArrayStats {
   const _ManifestArrayStats({required this.totalObjects});
 
@@ -387,6 +397,7 @@ class _BackupManifestInspection {
     required this.expectedFiles,
     required this.missingFiles,
     required this.hasFileManifest,
+    required this.hasFileHashes,
   });
 
   final int backupVersion;
@@ -399,8 +410,10 @@ class _BackupManifestInspection {
   final int expectedFiles;
   final int missingFiles;
   final bool hasFileManifest;
+  final bool hasFileHashes;
 
   bool get hasMissingFiles => missingFiles > 0;
+  bool get hasLimitedIntegrity => hasFileManifest && !hasFileHashes;
 }
 
 /// Gestiona: exportar e importar copias de seguridad de la librería.
@@ -424,8 +437,36 @@ class BackupRestoreController extends GetxController {
   Future<void> confirmExportLibrary() async {
     if (isExporting.value || isImporting.value) return;
 
-    final includeInstrumentals = await _showExportOptionsDialog();
-    if (includeInstrumentals == null) return;
+    final options = await _showExportOptionsDialog();
+    if (options == null) return;
+
+    final includeInstrumentals = options.includeInstrumentalVariants;
+    final includeFileHashes = options.includeFileHashes;
+
+    if (!includeFileHashes) {
+      final confirmed = await _showActionDialog(
+        title: tr('backup.fast_title'),
+        subtitle: tr('backup.fast_subtitle'),
+        icon: Icons.bolt_rounded,
+        accent: Colors.orange,
+        notes: [
+          includeInstrumentals
+              ? tr('backup.include_instrumentals')
+              : tr('backup.exclude_instrumentals'),
+          tr('backup.fast_skip_estimate'),
+          tr('backup.fast_integrity_note'),
+          tr('backup.dont_close'),
+        ],
+        confirmText: tr('backup.fast_continue'),
+      );
+      if (confirmed == true) {
+        await exportLibrary(
+          includeInstrumentalVariants: includeInstrumentals,
+          includeFileHashes: false,
+        );
+      }
+      return;
+    }
 
     _showBusyDialog(
       title: tr('backup.preparing_title'),
@@ -474,7 +515,10 @@ class BackupRestoreController extends GetxController {
     );
 
     if (confirmed == true) {
-      await exportLibrary(includeInstrumentalVariants: includeInstrumentals);
+      await exportLibrary(
+        includeInstrumentalVariants: includeInstrumentals,
+        includeFileHashes: true,
+      );
     }
   }
 
@@ -521,9 +565,10 @@ class BackupRestoreController extends GetxController {
     }
   }
 
-  Future<bool?> _showExportOptionsDialog() async {
+  Future<_BackupExportOptions?> _showExportOptionsDialog() async {
     var includeInstrumentals = true;
-    return Get.dialog<bool>(
+    var includeFileHashes = true;
+    return Get.dialog<_BackupExportOptions>(
       StatefulBuilder(
         builder: (context, setStateDialog) {
           return AlertDialog(
@@ -542,6 +587,34 @@ class BackupRestoreController extends GetxController {
                     });
                   },
                 ),
+                const SizedBox(height: 8),
+                SegmentedButton<bool>(
+                  segments: [
+                    ButtonSegment<bool>(
+                      value: true,
+                      icon: const Icon(Icons.verified_user_rounded),
+                      label: Text(tr('backup.verified_mode')),
+                    ),
+                    ButtonSegment<bool>(
+                      value: false,
+                      icon: const Icon(Icons.bolt_rounded),
+                      label: Text(tr('backup.fast_mode')),
+                    ),
+                  ],
+                  selected: {includeFileHashes},
+                  onSelectionChanged: (selection) {
+                    setStateDialog(() {
+                      includeFileHashes = selection.first;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  includeFileHashes
+                      ? tr('backup.verified_mode_body')
+                      : tr('backup.fast_mode_body'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
               ],
             ),
             actions: [
@@ -550,7 +623,12 @@ class BackupRestoreController extends GetxController {
                 child: Text(tr('common.cancel')),
               ),
               FilledButton(
-                onPressed: () => Get.back(result: includeInstrumentals),
+                onPressed: () => Get.back(
+                  result: _BackupExportOptions(
+                    includeInstrumentalVariants: includeInstrumentals,
+                    includeFileHashes: includeFileHashes,
+                  ),
+                ),
                 child: Text(tr('backup.continue')),
               ),
             ],
@@ -597,7 +675,7 @@ class BackupRestoreController extends GetxController {
                             width: 42,
                             height: 42,
                             decoration: BoxDecoration(
-                              color: accent.withOpacity(.14),
+                              color: accent.withValues(alpha: .14),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Icon(icon, color: accent),
@@ -635,12 +713,12 @@ class BackupRestoreController extends GetxController {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest.withOpacity(
-                            .45,
+                          color: scheme.surfaceContainerHighest.withValues(
+                            alpha: .45,
                           ),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: scheme.outlineVariant.withOpacity(.35),
+                            color: scheme.outlineVariant.withValues(alpha: .35),
                           ),
                         ),
                         child: Text(
@@ -715,7 +793,7 @@ class BackupRestoreController extends GetxController {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: accent.withOpacity(.14),
+                        color: accent.withValues(alpha: .14),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(icon, color: accent, size: 20),
@@ -805,7 +883,7 @@ class BackupRestoreController extends GetxController {
                                 width: 44,
                                 height: 44,
                                 decoration: BoxDecoration(
-                                  color: Colors.teal.withOpacity(.14),
+                                  color: Colors.teal.withValues(alpha: .14),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
@@ -816,7 +894,7 @@ class BackupRestoreController extends GetxController {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  'Restaurar respaldo',
+                                  tr('backup.restore_progress_title'),
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -837,10 +915,10 @@ class BackupRestoreController extends GetxController {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.teal.withOpacity(.06),
+                              color: Colors.teal.withValues(alpha: .06),
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: Colors.teal.withOpacity(.20),
+                                color: Colors.teal.withValues(alpha: .20),
                               ),
                             ),
                             child: Column(
@@ -957,7 +1035,7 @@ class BackupRestoreController extends GetxController {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: accent.withOpacity(.14),
+                            color: accent.withValues(alpha: .14),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(icon, color: accent),
@@ -986,9 +1064,11 @@ class BackupRestoreController extends GetxController {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: accent.withOpacity(.07),
+                        color: accent.withValues(alpha: .07),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: accent.withOpacity(.22)),
+                        border: Border.all(
+                          color: accent.withValues(alpha: .22),
+                        ),
                       ),
                       child: Column(
                         children: notes
@@ -1085,7 +1165,7 @@ class BackupRestoreController extends GetxController {
                           width: 44,
                           height: 44,
                           decoration: BoxDecoration(
-                            color: accent.withOpacity(.14),
+                            color: accent.withValues(alpha: .14),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Icon(icon, color: accent),
@@ -1115,12 +1195,12 @@ class BackupRestoreController extends GetxController {
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest.withOpacity(
-                            .45,
+                          color: scheme.surfaceContainerHighest.withValues(
+                            alpha: .45,
                           ),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: scheme.outlineVariant.withOpacity(.35),
+                            color: scheme.outlineVariant.withValues(alpha: .35),
                           ),
                         ),
                         child: Column(
@@ -1184,7 +1264,10 @@ class BackupRestoreController extends GetxController {
   // ============================
   // 📤 EXPORTAR
   // ============================
-  Future<void> exportLibrary({bool includeInstrumentalVariants = true}) async {
+  Future<void> exportLibrary({
+    bool includeInstrumentalVariants = true,
+    bool includeFileHashes = true,
+  }) async {
     if (isExporting.value || isImporting.value) return;
 
     try {
@@ -1240,7 +1323,7 @@ class BackupRestoreController extends GetxController {
         await src.copy(dest.path);
         if (!fileManifestByRel.containsKey(rel)) {
           final size = await dest.length();
-          final hash = await _sha256ForFile(dest);
+          final hash = includeFileHashes ? await _sha256ForFile(dest) : '';
           fileManifestByRel[rel] = _BackupFileManifestEntry(
             path: rel,
             size: size,
@@ -1443,6 +1526,7 @@ class BackupRestoreController extends GetxController {
         'summary': backupSummary,
         'backupOptions': <String, dynamic>{
           'includeInstrumentalVariants': includeInstrumentalVariants,
+          'integrityMode': includeFileHashes ? 'sha256' : 'size',
         },
         'backupFiles': fileManifestByRel.values
             .map((entry) => entry.toJson())
@@ -1515,7 +1599,7 @@ class BackupRestoreController extends GetxController {
         tr('backup.export_error'),
         snackPosition: SnackPosition.BOTTOM,
       );
-      print('exportLibrary error: $e');
+      debugPrint('exportLibrary error: $e');
     } finally {
       isExporting.value = false;
       progress.value = 0.0;
@@ -1538,7 +1622,7 @@ class BackupRestoreController extends GetxController {
             allowedExtensions: const ['zip'],
           );
         } catch (pickErr) {
-          print('Error al abrir FilePicker: $pickErr');
+          debugPrint('Error al abrir FilePicker: $pickErr');
           return;
         }
 
@@ -2135,7 +2219,7 @@ class BackupRestoreController extends GetxController {
         tr('backup.import_error'),
         snackPosition: SnackPosition.BOTTOM,
       );
-      print('importLibrary error: $e');
+      debugPrint('importLibrary error: $e');
     } finally {
       isImporting.value = false;
       progress.value = 0.0;
@@ -2176,6 +2260,8 @@ class BackupRestoreController extends GetxController {
               ],
             )
           : tr('backup.inspect_legacy_files'),
+      if (inspection.hasLimitedIntegrity)
+        tr('backup.inspect_fast_integrity_warning'),
       if (inspection.hasMissingFiles) tr('backup.inspect_missing_warning'),
     ];
 
@@ -2226,6 +2312,9 @@ class BackupRestoreController extends GetxController {
       expectedFiles: fileManifest.length,
       missingFiles: missingFiles,
       hasFileManifest: fileManifest.isNotEmpty,
+      hasFileHashes:
+          fileManifest.isNotEmpty &&
+          fileManifest.values.every((entry) => entry.sha256.length == 64),
     );
   }
 

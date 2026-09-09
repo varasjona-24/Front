@@ -9,6 +9,7 @@ import 'package:get/get.dart';
 import '../../../app/models/audio_cleanup.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/routes/app_routes.dart';
+import '../../../app/services/musicbrainz_metadata_service.dart';
 import '../../../app/utils/artist_credit_parser.dart';
 import '../../../app/utils/country_catalog.dart';
 import '../../../app/ui/widgets/layout/app_gradient_background.dart';
@@ -54,6 +55,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
   int? _colorValue;
   bool _audioCleanupBusy = false;
   bool _dataTransferBusy = false;
+  bool _metadataSuggestionBusy = false;
   MediaItem? _mediaDraft;
   ArtistProfileKind _artistKind = ArtistProfileKind.singer;
   ArtistMainRegion _artistMainRegion = ArtistMainRegion.none;
@@ -907,6 +909,213 @@ class _EditEntityPageState extends State<EditEntityPage> {
       }
     } finally {
       if (mounted) setState(() => _dataTransferBusy = false);
+    }
+  }
+
+  Future<void> _runMusicBrainzSuggestionFlow() async {
+    if (!_isMedia || _media == null || _metadataSuggestionBusy) return;
+
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      Get.snackbar(
+        tr('edit.metadata_suggestions_title'),
+        tr('edit.metadata_suggestions_title_required'),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    setState(() => _metadataSuggestionBusy = true);
+    try {
+      final parsedArtist = ArtistCreditParser.parse(_subtitleCtrl.text);
+      final artistQuery = parsedArtist.primaryArtist.trim().isNotEmpty
+          ? parsedArtist.primaryArtist
+          : _subtitleCtrl.text;
+      final suggestions = await _controller.searchMusicBrainzSuggestions(
+        title: title,
+        artist: artistQuery,
+      );
+      if (!mounted) return;
+      if (suggestions.isEmpty) {
+        Get.snackbar(
+          tr('edit.metadata_suggestions_title'),
+          tr('edit.metadata_suggestions_empty'),
+          snackPosition: SnackPosition.BOTTOM,
+        );
+        return;
+      }
+
+      final selected = await _showMusicBrainzSuggestionsSheet(suggestions);
+      if (!mounted || selected == null) return;
+
+      final confirmed = await _confirmMusicBrainzSuggestion(selected);
+      if (!mounted || confirmed != true) return;
+
+      final updated = await _controller.applyMusicBrainzSuggestion(
+        item: _media!,
+        suggestion: selected,
+      );
+      if (!mounted) return;
+      setState(() {
+        _mediaDraft = updated;
+        _titleCtrl.text = updated.title;
+        _subtitleCtrl.text = updated.subtitle;
+      });
+      Get.snackbar(
+        tr('edit.metadata_suggestions_title'),
+        tr('edit.metadata_suggestions_applied'),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      await _offerMusicBrainzSuggestedCover(selected);
+    } catch (_) {
+      if (!mounted) return;
+      Get.snackbar(
+        tr('edit.metadata_suggestions_title'),
+        tr('edit.metadata_suggestions_error'),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      if (mounted) setState(() => _metadataSuggestionBusy = false);
+    }
+  }
+
+  Future<MusicBrainzRecordingSuggestion?> _showMusicBrainzSuggestionsSheet(
+    List<MusicBrainzRecordingSuggestion> suggestions,
+  ) {
+    return showModalBottomSheet<MusicBrainzRecordingSuggestion>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _MusicBrainzSuggestionsSheet(suggestions: suggestions),
+    );
+  }
+
+  Future<bool?> _confirmMusicBrainzSuggestion(
+    MusicBrainzRecordingSuggestion suggestion,
+  ) {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('edit.metadata_suggestions_confirm_title')),
+        content: Text(
+          tr(
+            'edit.metadata_suggestions_confirm_body',
+            args: [suggestion.title, suggestion.artist],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(tr('common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(tr('edit.metadata_suggestions_apply')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _offerMusicBrainzSuggestedCover(
+    MusicBrainzRecordingSuggestion suggestion,
+  ) async {
+    final coverUrl = await _controller.findMusicBrainzSuggestedCover(
+      suggestion,
+    );
+    if (!mounted || coverUrl == null || coverUrl.isEmpty || _media == null) {
+      return;
+    }
+
+    final useCover = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr('edit.metadata_suggestions_cover_title')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Image.network(
+                  coverUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => ColoredBox(
+                    color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+                    child: const Center(child: Icon(Icons.album_rounded)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              tr(
+                'edit.metadata_suggestions_cover_body',
+                args: [suggestion.releaseTitle ?? suggestion.title],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(tr('edit.metadata_suggestions_cover_keep')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(tr('edit.metadata_suggestions_cover_apply')),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || useCover != true || _media == null) return;
+
+    setState(() => _metadataSuggestionBusy = true);
+    try {
+      final previousPath = _localThumbPath;
+      final updated = await _controller.applyMusicBrainzSuggestedCover(
+        item: _media!,
+        coverUrl: coverUrl,
+      );
+      if (!mounted || updated == null) {
+        if (mounted) {
+          Get.snackbar(
+            tr('edit.metadata_suggestions_title'),
+            tr('edit.metadata_suggestions_cover_error'),
+            snackPosition: SnackPosition.BOTTOM,
+          );
+        }
+        return;
+      }
+      setState(() {
+        _mediaDraft = updated;
+        _localThumbPath = updated.thumbnailLocalPath;
+        _remoteThumbUrl = '';
+        _thumbCtrl.text = '';
+        _thumbTouched = true;
+        _thumbCleared = false;
+      });
+      _evictFileImage(updated.thumbnailLocalPath ?? '');
+      if (previousPath != null &&
+          previousPath.trim().isNotEmpty &&
+          previousPath.trim() != updated.thumbnailLocalPath?.trim()) {
+        _evictFileImage(previousPath);
+        await _controller.deleteFile(previousPath);
+      }
+      if (mounted) {
+        Get.snackbar(
+          tr('edit.metadata_suggestions_title'),
+          tr('edit.metadata_suggestions_cover_applied'),
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _metadataSuggestionBusy = false);
     }
   }
 
@@ -1807,7 +2016,9 @@ class _EditEntityPageState extends State<EditEntityPage> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
           child: FilledButton(
-            onPressed: _audioCleanupBusy ? null : _save,
+            onPressed: _audioCleanupBusy || _metadataSuggestionBusy
+                ? null
+                : _save,
             child: Text(tr('common.save_changes')),
           ),
         ),
@@ -2266,6 +2477,19 @@ class _EditEntityPageState extends State<EditEntityPage> {
                           prefixIcon: const Icon(Icons.timer_rounded),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      _ExtraActionCard(
+                        icon: Icons.travel_explore_rounded,
+                        title: tr('edit.metadata_suggestions_title'),
+                        subtitle: tr('edit.metadata_suggestions_subtitle'),
+                        busy: _metadataSuggestionBusy,
+                        busyLabel: tr('edit.metadata_suggestions_searching'),
+                        actionLabel: tr('edit.metadata_suggestions_action'),
+                        onPressed: _runMusicBrainzSuggestionFlow,
+                      ),
+                      const SizedBox(height: 14),
+                      Divider(color: theme.colorScheme.outlineVariant),
+                      const SizedBox(height: 10),
                       if (_isAudioMedia) ...[
                         const SizedBox(height: 12),
                         _ExtraActionCard(
@@ -2709,6 +2933,207 @@ class _ExtraActionCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _MusicBrainzSuggestionsSheet extends StatelessWidget {
+  const _MusicBrainzSuggestionsSheet({required this.suggestions});
+
+  final List<MusicBrainzRecordingSuggestion> suggestions;
+
+  String _formatDuration(int? durationMs) {
+    if (durationMs == null || durationMs <= 0) return '';
+    final seconds = durationMs ~/ 1000;
+    final minutes = seconds ~/ 60;
+    return '$minutes:${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return SafeArea(
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * .78,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.travel_explore_rounded),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          tr('edit.metadata_suggestions_choose'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(tr('common.close')),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    tr('edit.metadata_suggestions_choose_subtitle'),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Chip(
+                    avatar: const Icon(
+                      Icons.format_list_numbered_rounded,
+                      size: 18,
+                    ),
+                    label: Text(
+                      tr(
+                        'edit.metadata_suggestions_count',
+                        args: ['${suggestions.length}'],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                itemCount: suggestions.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                itemBuilder: (context, index) {
+                  final suggestion = suggestions[index];
+                  final details = <String>[
+                    if ((suggestion.releaseTitle ?? '').isNotEmpty)
+                      suggestion.releaseTitle!,
+                    if ((suggestion.disambiguation ?? '').isNotEmpty)
+                      suggestion.disambiguation!,
+                    if (_formatDuration(suggestion.durationMs).isNotEmpty)
+                      _formatDuration(suggestion.durationMs),
+                  ];
+                  return Material(
+                    color: scheme.surfaceContainerHighest.withValues(
+                      alpha: 0.54,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    clipBehavior: Clip.antiAlias,
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 5,
+                      ),
+                      onTap: () => Navigator.of(context).pop(suggestion),
+                      leading: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        alignment: Alignment.center,
+                        child: _MusicBrainzSuggestionCover(
+                          imageUrl: suggestion.releaseCoverThumbnailUrl,
+                          fallbackLabel: '${index + 1}',
+                        ),
+                      ),
+                      title: Text(
+                        suggestion.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 2),
+                          Text(
+                            suggestion.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (details.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              details.join(' · '),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.insights_rounded, color: scheme.primary),
+                          const SizedBox(height: 2),
+                          Text(
+                            tr(
+                              'edit.metadata_suggestions_score',
+                              args: ['${suggestion.score}'],
+                            ),
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MusicBrainzSuggestionCover extends StatelessWidget {
+  const _MusicBrainzSuggestionCover({
+    required this.imageUrl,
+    required this.fallbackLabel,
+  });
+
+  final String? imageUrl;
+  final String fallbackLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final url = imageUrl?.trim() ?? '';
+    final fallback = Center(
+      child: Text(
+        fallbackLabel,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: scheme.onPrimaryContainer,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+    if (url.isEmpty) return fallback;
+
+    return Image.network(
+      url,
+      width: double.infinity,
+      height: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => fallback,
     );
   }
 }

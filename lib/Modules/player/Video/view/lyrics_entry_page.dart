@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart'
     hide StringTranslateExtension;
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:listenfy/app/ui/widgets/dialogs/lyrics_search_dialog.dart';
 
 import 'package:listenfy/app/models/media_item.dart';
 import 'package:listenfy/app/services/audio_service.dart';
+import 'package:listenfy/app/services/lrclib_lyrics_service.dart';
 import 'package:listenfy/app/services/lyrics_service.dart';
 
 class LyricsEntryArgs {
@@ -111,6 +113,148 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
         _lyricsController.text = normalized;
       });
     }
+  }
+
+  Future<void> _searchLrclibLyrics() async {
+    final title = _titleController.text.trim();
+    final artist = _artistController.text.trim();
+    if (title.isEmpty || artist.isEmpty) {
+      Get.snackbar(
+        tr('player.quick.lyrics'),
+        tr('lyrics.search_query_empty'),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      final service = LrclibLyricsService();
+      final durationSeconds =
+          _syncItem?.effectiveDurationSeconds ??
+          (_playbackDuration > Duration.zero
+              ? _playbackDuration.inSeconds
+              : null);
+      final exact = await service.findBestMatch(
+        title: title,
+        artist: artist,
+        durationSeconds: durationSeconds,
+      );
+      if (!mounted) return;
+
+      final selected = exact?.hasLyrics == true
+          ? exact
+          : await _showLrclibResults(
+              await service.search(title: title, artist: artist),
+            );
+      if (!mounted || selected == null) return;
+      _applyLrclibLyrics(selected);
+    } on DioException catch (error) {
+      if (!mounted) return;
+      final retryAfter = error.response?.headers.value('retry-after');
+      Get.snackbar(
+        tr('player.quick.lyrics'),
+        retryAfter == null
+            ? tr('lyrics.lrclib_request_failed')
+            : tr('lyrics.lrclib_rate_limited', args: [retryAfter]),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      Get.snackbar(
+        tr('player.quick.lyrics'),
+        tr('lyrics.lrclib_request_failed'),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<LrclibLyricsResult?> _showLrclibResults(
+    List<LrclibLyricsResult> results,
+  ) async {
+    if (results.isEmpty) {
+      Get.snackbar(
+        tr('player.quick.lyrics'),
+        tr('lyrics.lrclib_no_matches'),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return null;
+    }
+
+    return showDialog<LrclibLyricsResult>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('lyrics.lrclib_results_title')),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: results.length,
+            separatorBuilder: (_, _) => const Divider(height: 1),
+            itemBuilder: (_, index) {
+              final result = results[index];
+              final duration = result.durationSeconds == null
+                  ? ''
+                  : tr(
+                      'lyrics.lrclib_duration_seconds',
+                      args: ['${result.durationSeconds!.round()}'],
+                    );
+              final detail = <String>[
+                if (result.albumName.isNotEmpty) result.albumName,
+                if (duration.isNotEmpty) duration,
+                result.timedCues.isNotEmpty
+                    ? tr('lyrics.lrclib_synced_badge')
+                    : tr('lyrics.lrclib_plain_badge'),
+              ].join(' · ');
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  result.trackName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Text(
+                  '${result.artistName}${detail.isEmpty ? '' : '\n$detail'}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                onTap: () => Navigator.of(dialogContext).pop(result),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(tr('common.cancel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _applyLrclibLyrics(LrclibLyricsResult result) {
+    final cues = result.timedCues;
+    final lyrics = result.preferredLyrics;
+    if (lyrics.isEmpty && !result.instrumental) return;
+
+    setState(() {
+      _lyricsController.text = lyrics;
+      if (cues.isEmpty) {
+        _timedLyrics.remove(_lyricsLang);
+      } else {
+        _timedLyrics[_lyricsLang] = cues;
+      }
+    });
+    Get.snackbar(
+      tr('player.quick.lyrics'),
+      cues.isEmpty
+          ? tr('lyrics.lrclib_plain_imported')
+          : tr('lyrics.lrclib_synced_imported'),
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   String _normalizeSelectedLyrics(String value) {
@@ -375,7 +519,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
   Future<void> _markNextCue() async {
     if (_audioService == null) {
       Get.snackbar(
-        'Karaoke',
+        tr('lyrics.karaoke_sync'),
         tr('lyrics.play_from_player'),
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -391,7 +535,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
     final lines = _primaryLyricsLines();
     if (lines.isEmpty) {
       Get.snackbar(
-        'Karaoke',
+        tr('lyrics.karaoke_sync'),
         tr('lyrics.add_main_lyrics'),
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -405,7 +549,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
 
     if (current.length >= lines.length) {
       Get.snackbar(
-        'Karaoke',
+        tr('lyrics.karaoke_sync'),
         tr('lyrics.all_lines_marked'),
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -488,7 +632,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
     );
 
     Get.snackbar(
-      'Karaoke',
+      tr('lyrics.karaoke_sync'),
       tr('lyrics.sync_queue_paused_restore'),
       snackPosition: SnackPosition.BOTTOM,
     );
@@ -545,7 +689,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
     final variant = _syncVariantFor(item);
     if (variant == null) {
       Get.snackbar(
-        'Karaoke',
+        tr('lyrics.karaoke_sync'),
         tr('lyrics.sync_no_playable_variant'),
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -575,7 +719,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
     if (_lyricsController.text.isEmpty) return;
     if (_targetLang == _lyricsLang) {
       Get.snackbar(
-        'Traduccion',
+        tr('lyrics.translations'),
         tr('lyrics.different_target_lang'),
         snackPosition: SnackPosition.BOTTOM,
       );
@@ -606,7 +750,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
         }
       } else {
         Get.snackbar(
-          'Traduccion',
+          tr('lyrics.translations'),
           tr('lyrics.translation_failed'),
           snackPosition: SnackPosition.BOTTOM,
         );
@@ -820,7 +964,7 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
@@ -1066,13 +1210,22 @@ class _LyricsEntryPageState extends State<LyricsEntryPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      onPressed: _loading ? null : _searchLyrics,
-                      icon: const Icon(Icons.search),
-                      label: Text(tr('lyrics.search_web')),
-                    ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _loading ? null : _searchLrclibLyrics,
+                          icon: const Icon(Icons.lyrics_rounded),
+                          label: Text(tr('lyrics.search_lrclib')),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filledTonal(
+                        tooltip: tr('lyrics.search_web'),
+                        onPressed: _loading ? null : _searchLyrics,
+                        icon: const Icon(Icons.public_rounded),
+                      ),
+                    ],
                   ),
                 ],
               ),

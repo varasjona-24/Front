@@ -14,6 +14,7 @@ import '../../../app/models/audio_cleanup.dart';
 import '../../../app/models/media_item.dart';
 import '../../../app/services/audio_cleanup_service.dart';
 import '../../../app/services/audio_service.dart';
+import '../../../app/services/musicbrainz_metadata_service.dart';
 import '../../artists/controller/artists_controller.dart';
 import '../../artists/domain/artist_profile.dart';
 import '../../captures/controller/capture_gallery_controller.dart';
@@ -201,6 +202,7 @@ class EditEntityController extends GetxController {
   final PlaylistStore _playlistStore = Get.find<PlaylistStore>();
   final SourcesController _sources = Get.find<SourcesController>();
   final CaptureGalleryStore _capturesStore = Get.find<CaptureGalleryStore>();
+  final MusicBrainzMetadataService _musicBrainz = MusicBrainzMetadataService();
 
   Future<String?> cacheRemoteToLocal({
     required String id,
@@ -618,6 +620,68 @@ class EditEntityController extends GetxController {
     await _refreshDependentControllers();
 
     return true;
+  }
+
+  Future<List<MusicBrainzRecordingSuggestion>> searchMusicBrainzSuggestions({
+    required String title,
+    required String artist,
+  }) {
+    return _musicBrainz.searchRecordings(title: title, artist: artist);
+  }
+
+  Future<MediaItem> applyMusicBrainzSuggestion({
+    required MediaItem item,
+    required MusicBrainzRecordingSuggestion suggestion,
+  }) async {
+    final latest = await resolveLatestMedia(item);
+    final updated = latest.copyWith(
+      title: suggestion.title,
+      subtitle: suggestion.artist,
+    );
+    await _applyMediaMetadataToSiblings(updated);
+    await _refreshDependentControllers();
+    return updated;
+  }
+
+  Future<String?> findMusicBrainzSuggestedCover(
+    MusicBrainzRecordingSuggestion suggestion,
+  ) {
+    return _musicBrainz.findReleaseCoverUrl(suggestion);
+  }
+
+  Future<MediaItem?> applyMusicBrainzSuggestedCover({
+    required MediaItem item,
+    required String coverUrl,
+  }) async {
+    final cached = await cacheRemoteToLocal(
+      id: '${item.id}-musicbrainz',
+      url: coverUrl,
+    );
+    if (cached == null || cached.trim().isEmpty) return null;
+
+    final cropped = await cropToSquare(cached);
+    if (cropped == null || cropped.trim().isEmpty) {
+      await deleteFile(cached);
+      return null;
+    }
+    final persisted = await persistCroppedImage(
+      id: item.id,
+      croppedPath: cropped,
+    );
+    if (persisted == null || persisted.trim().isEmpty) {
+      if (cropped != cached) await deleteFile(cropped);
+      await deleteFile(cached);
+      return null;
+    }
+
+    final latest = await resolveLatestMedia(item);
+    final updated = latest.copyWith(
+      thumbnail: '',
+      thumbnailLocalPath: persisted,
+    );
+    await _applyMediaMetadataToSiblings(updated);
+    await _refreshDependentControllers();
+    return updated;
   }
 
   Future<bool> saveArtist({
