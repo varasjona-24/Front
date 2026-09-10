@@ -926,9 +926,10 @@ class _EditEntityPageState extends State<EditEntityPage> {
     }
 
     setState(() => _metadataSuggestionBusy = true);
+    var artistQuery = _subtitleCtrl.text.trim();
     try {
       final parsedArtist = ArtistCreditParser.parse(_subtitleCtrl.text);
-      final artistQuery = parsedArtist.primaryArtist.trim().isNotEmpty
+      artistQuery = parsedArtist.primaryArtist.trim().isNotEmpty
           ? parsedArtist.primaryArtist
           : _subtitleCtrl.text;
       final suggestions = await _controller.searchMusicBrainzSuggestions(
@@ -970,7 +971,15 @@ class _EditEntityPageState extends State<EditEntityPage> {
         snackPosition: SnackPosition.BOTTOM,
       );
       await _offerMusicBrainzSuggestedCover(selected);
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[MetadataSuggestions] Search failed for '
+        'title="$title", artist="$artistQuery": $error',
+      );
+      debugPrintStack(
+        label: '[MetadataSuggestions] Stack trace',
+        stackTrace: stackTrace,
+      );
       if (!mounted) return;
       Get.snackbar(
         tr('edit.metadata_suggestions_title'),

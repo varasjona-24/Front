@@ -7,6 +7,8 @@ class MetadataSearchQueryResolution {
     required this.fallbackTitle,
     required this.fallbackArtist,
     required this.confidence,
+    this.suggestions,
+    this.suggestionsAvailable = true,
   });
 
   final String title;
@@ -14,6 +16,8 @@ class MetadataSearchQueryResolution {
   final String fallbackTitle;
   final String fallbackArtist;
   final double confidence;
+  final List<Map<String, dynamic>>? suggestions;
+  final bool suggestionsAvailable;
 
   bool get hasDifferentFallback =>
       title.toLowerCase() != fallbackTitle.toLowerCase() ||
@@ -36,6 +40,13 @@ class MetadataSearchQueryResolution {
     final confidence = rawConfidence is num
         ? rawConfidence.toDouble()
         : double.tryParse(rawConfidence?.toString() ?? '') ?? 0;
+    final rawSuggestions = json['suggestions'];
+    final suggestions = rawSuggestions is List
+        ? rawSuggestions
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList(growable: false)
+        : null;
 
     return MetadataSearchQueryResolution(
       title: title.isEmpty ? fallbackTitle : title,
@@ -47,6 +58,8 @@ class MetadataSearchQueryResolution {
           ? fallbackArtist
           : fallbackMap['artist'].toString().trim(),
       confidence: confidence.clamp(0, 1).toDouble(),
+      suggestions: suggestions,
+      suggestionsAvailable: json['suggestionsAvailable'] != false,
     );
   }
 }
@@ -92,6 +105,7 @@ class MetadataSearchQueryResolverService {
       fallbackTitle: fallbackTitle,
       fallbackArtist: fallbackArtist,
       confidence: 0,
+      suggestions: null,
     );
   }
 }

@@ -2,6 +2,10 @@ import 'package:dio/dio.dart';
 
 const _musicBrainzUserAgent =
     'Listenfy/1.1.0 (https://github.com/varasjona-24/Lisenfy-MVP)';
+const _musicBrainzRetryDelays = <Duration>[
+  Duration(milliseconds: 1200),
+  Duration(milliseconds: 2600),
+];
 
 class MusicBrainzRecordingSuggestion {
   const MusicBrainzRecordingSuggestion({
@@ -181,6 +185,21 @@ class MusicBrainzMetadataService {
     );
   }
 
+  List<MusicBrainzRecordingSuggestion> suggestionsFromJson(
+    List<Map<String, dynamic>> recordings,
+  ) {
+    return recordings
+        .map(MusicBrainzRecordingSuggestion.fromJson)
+        .where(
+          (suggestion) =>
+              suggestion.recordingId.isNotEmpty &&
+              suggestion.title.isNotEmpty &&
+              suggestion.artist.isNotEmpty,
+        )
+        .toList(growable: false)
+      ..sort((a, b) => b.score.compareTo(a.score));
+  }
+
   Future<List<MusicBrainzRecordingSuggestion>> _searchRecordings({
     required String title,
     required String artist,
@@ -195,8 +214,7 @@ class MusicBrainzMetadataService {
       if (cleanArtist.isNotEmpty) 'artistname:${_lucenePhrase(cleanArtist)}',
     ];
     final safeLimit = limit.clamp(1, 10).toInt();
-    final response = await _dio.get<Map<String, dynamic>>(
-      '/recording/',
+    final response = await _getRecordingsWithRetry(
       queryParameters: {
         'query': queryParts.join(' AND '),
         'fmt': 'json',
@@ -208,23 +226,47 @@ class MusicBrainzMetadataService {
       return const <MusicBrainzRecordingSuggestion>[];
     }
 
-    final suggestions =
-        recordings
-            .whereType<Map>()
-            .map(
-              (raw) => MusicBrainzRecordingSuggestion.fromJson(
-                Map<String, dynamic>.from(raw),
-              ),
-            )
-            .where(
-              (suggestion) =>
-                  suggestion.recordingId.isNotEmpty &&
-                  suggestion.title.isNotEmpty &&
-                  suggestion.artist.isNotEmpty,
-            )
-            .toList(growable: false)
-          ..sort((a, b) => b.score.compareTo(a.score));
-    return suggestions;
+    return suggestionsFromJson(
+      recordings
+          .whereType<Map>()
+          .map((raw) => Map<String, dynamic>.from(raw))
+          .toList(growable: false),
+    );
+  }
+
+  Future<Response<Map<String, dynamic>>> _getRecordingsWithRetry({
+    required Map<String, dynamic> queryParameters,
+  }) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _dio.get<Map<String, dynamic>>(
+          '/recording/',
+          queryParameters: queryParameters,
+        );
+      } on DioException catch (error) {
+        final canRetry =
+            attempt < _musicBrainzRetryDelays.length && _isRetryable(error);
+        if (!canRetry) rethrow;
+        await Future<void>.delayed(_musicBrainzRetryDelays[attempt]);
+      }
+    }
+  }
+
+  bool _isRetryable(DioException error) {
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.connectionError:
+        return true;
+      case DioExceptionType.badResponse:
+        final status = error.response?.statusCode ?? 0;
+        return status == 429 || status == 502 || status == 503 || status == 504;
+      case DioExceptionType.cancel:
+      case DioExceptionType.badCertificate:
+      case DioExceptionType.unknown:
+        return false;
+    }
   }
 
   String _lucenePhrase(String raw) {

@@ -647,6 +647,12 @@ class EditEntityController extends GetxController {
       artist: artist,
       durationSeconds: durationSeconds,
     );
+    if (query.suggestions != null) {
+      if (!query.suggestionsAvailable) {
+        throw StateError('MusicBrainz is temporarily unavailable.');
+      }
+      return _musicBrainz.suggestionsFromJson(query.suggestions!);
+    }
     return _musicBrainz.searchRecordings(
       title: query.title,
       artist: query.artist,
