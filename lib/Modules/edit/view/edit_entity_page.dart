@@ -970,8 +970,8 @@ class _EditEntityPageState extends State<EditEntityPage> {
         tr('edit.metadata_suggestions_applied'),
         snackPosition: SnackPosition.BOTTOM,
       );
-      await _assignMusicBrainzCountryToNewArtist(selected, updated);
       await _offerMusicBrainzSuggestedCover(selected);
+      await _assignMusicBrainzCountryToNewArtist(selected, updated);
     } catch (error, stackTrace) {
       debugPrint(
         '[MetadataSuggestions] Search failed for '
