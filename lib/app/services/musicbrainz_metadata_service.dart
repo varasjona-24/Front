@@ -155,7 +155,36 @@ class MusicBrainzMetadataService {
   Future<List<MusicBrainzRecordingSuggestion>> searchRecordings({
     required String title,
     required String artist,
+    String? fallbackTitle,
+    String? fallbackArtist,
     int limit = 10,
+  }) async {
+    final suggestions = await _searchRecordings(
+      title: title,
+      artist: artist,
+      limit: limit,
+    );
+    final safeFallbackTitle = fallbackTitle?.trim() ?? '';
+    final safeFallbackArtist = fallbackArtist?.trim() ?? '';
+    final differsFromFallback =
+        safeFallbackTitle.toLowerCase() != title.trim().toLowerCase() ||
+        safeFallbackArtist.toLowerCase() != artist.trim().toLowerCase();
+    if (suggestions.isNotEmpty ||
+        !differsFromFallback ||
+        safeFallbackTitle.isEmpty) {
+      return suggestions;
+    }
+    return _searchRecordings(
+      title: safeFallbackTitle,
+      artist: safeFallbackArtist,
+      limit: limit,
+    );
+  }
+
+  Future<List<MusicBrainzRecordingSuggestion>> _searchRecordings({
+    required String title,
+    required String artist,
+    required int limit,
   }) async {
     final cleanTitle = title.trim();
     final cleanArtist = artist.trim();
@@ -163,7 +192,7 @@ class MusicBrainzMetadataService {
 
     final queryParts = <String>[
       'recording:${_lucenePhrase(cleanTitle)}',
-      if (cleanArtist.isNotEmpty) 'artist:${_lucenePhrase(cleanArtist)}',
+      if (cleanArtist.isNotEmpty) 'artistname:${_lucenePhrase(cleanArtist)}',
     ];
     final safeLimit = limit.clamp(1, 10).toInt();
     final response = await _dio.get<Map<String, dynamic>>(

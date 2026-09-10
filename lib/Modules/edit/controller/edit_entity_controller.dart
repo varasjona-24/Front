@@ -15,6 +15,7 @@ import '../../../app/models/media_item.dart';
 import '../../../app/services/audio_cleanup_service.dart';
 import '../../../app/services/audio_service.dart';
 import '../../../app/services/musicbrainz_metadata_service.dart';
+import '../../../app/services/metadata_search_query_resolver_service.dart';
 import '../../artists/controller/artists_controller.dart';
 import '../../artists/domain/artist_profile.dart';
 import '../../captures/controller/capture_gallery_controller.dart';
@@ -203,6 +204,8 @@ class EditEntityController extends GetxController {
   final SourcesController _sources = Get.find<SourcesController>();
   final CaptureGalleryStore _capturesStore = Get.find<CaptureGalleryStore>();
   final MusicBrainzMetadataService _musicBrainz = MusicBrainzMetadataService();
+  final MetadataSearchQueryResolverService _metadataQueryResolver =
+      MetadataSearchQueryResolverService();
 
   Future<String?> cacheRemoteToLocal({
     required String id,
@@ -625,8 +628,31 @@ class EditEntityController extends GetxController {
   Future<List<MusicBrainzRecordingSuggestion>> searchMusicBrainzSuggestions({
     required String title,
     required String artist,
+    int? durationSeconds,
   }) {
-    return _musicBrainz.searchRecordings(title: title, artist: artist);
+    return _searchMusicBrainzSuggestions(
+      title: title,
+      artist: artist,
+      durationSeconds: durationSeconds,
+    );
+  }
+
+  Future<List<MusicBrainzRecordingSuggestion>> _searchMusicBrainzSuggestions({
+    required String title,
+    required String artist,
+    int? durationSeconds,
+  }) async {
+    final query = await _metadataQueryResolver.resolve(
+      title: title,
+      artist: artist,
+      durationSeconds: durationSeconds,
+    );
+    return _musicBrainz.searchRecordings(
+      title: query.title,
+      artist: query.artist,
+      fallbackTitle: query.hasDifferentFallback ? query.fallbackTitle : null,
+      fallbackArtist: query.hasDifferentFallback ? query.fallbackArtist : null,
+    );
   }
 
   Future<MediaItem> applyMusicBrainzSuggestion({

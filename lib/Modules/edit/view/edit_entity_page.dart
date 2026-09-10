@@ -934,6 +934,9 @@ class _EditEntityPageState extends State<EditEntityPage> {
       final suggestions = await _controller.searchMusicBrainzSuggestions(
         title: title,
         artist: artistQuery,
+        durationSeconds:
+            int.tryParse(_durationCtrl.text.trim()) ??
+            _media?.effectiveDurationSeconds,
       );
       if (!mounted) return;
       if (suggestions.isEmpty) {
