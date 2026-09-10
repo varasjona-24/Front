@@ -13,6 +13,7 @@ class MusicBrainzRecordingSuggestion {
     required this.title,
     required this.artist,
     required this.score,
+    this.primaryArtistId,
     this.releaseId,
     this.releaseTitle,
     this.durationMs,
@@ -23,6 +24,7 @@ class MusicBrainzRecordingSuggestion {
   final String title;
   final String artist;
   final int score;
+  final String? primaryArtistId;
   final String? releaseId;
   final String? releaseTitle;
   final int? durationMs;
@@ -37,11 +39,16 @@ class MusicBrainzRecordingSuggestion {
   factory MusicBrainzRecordingSuggestion.fromJson(Map<String, dynamic> json) {
     final credits = json['artist-credit'];
     final artistBuffer = StringBuffer();
+    String? primaryArtistId;
     if (credits is List) {
       for (final rawCredit in credits) {
         if (rawCredit is! Map) continue;
         final credit = Map<String, dynamic>.from(rawCredit);
         final artist = credit['artist'];
+        if (primaryArtistId == null && artist is Map) {
+          final id = artist['id']?.toString().trim() ?? '';
+          if (id.isNotEmpty) primaryArtistId = id;
+        }
         final name =
             (credit['name'] ?? (artist is Map ? artist['name'] : null) ?? '')
                 .toString()
@@ -81,6 +88,7 @@ class MusicBrainzRecordingSuggestion {
       title: json['title']?.toString().trim() ?? '',
       artist: artistBuffer.toString().trim(),
       score: score.clamp(0, 100).toInt(),
+      primaryArtistId: primaryArtistId,
       releaseId: releaseId?.isEmpty == true ? null : releaseId,
       releaseTitle: releaseTitle,
       durationMs: durationMs,

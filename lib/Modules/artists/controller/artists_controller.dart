@@ -342,6 +342,34 @@ class ArtistsController extends GetxController {
     recentArtists.assignAll(recent.map((e) => e.key).take(8));
   }
 
+  Future<void> assignCountryToNewArtistIfMissing({
+    required String artistName,
+    required String countryCode,
+  }) async {
+    final key = ArtistCreditParser.normalizeKey(artistName);
+    final normalizedCountryCode = _normalizeCountryCode(countryCode);
+    if (key.isEmpty || key == 'unknown' || normalizedCountryCode == null) {
+      return;
+    }
+    if (await _artistStore.getByKey(key) != null) return;
+
+    final country = CountryCatalog.countryNameFromCode(normalizedCountryCode);
+    if (country == null) return;
+    final region = ArtistMainRegionX.fromRaw(
+      CountryCatalog.regionKeyFromCode(normalizedCountryCode),
+    );
+    await _artistStore.upsert(
+      ArtistProfile(
+        key: key,
+        displayName: artistName.trim(),
+        country: country,
+        countryCode: normalizedCountryCode,
+        mainRegion: region,
+      ),
+    );
+    await load();
+  }
+
   Future<void> updateArtist({
     required String key,
     required String newName,

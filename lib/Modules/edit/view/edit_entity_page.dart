@@ -970,6 +970,7 @@ class _EditEntityPageState extends State<EditEntityPage> {
         tr('edit.metadata_suggestions_applied'),
         snackPosition: SnackPosition.BOTTOM,
       );
+      await _assignMusicBrainzCountryToNewArtist(selected, updated);
       await _offerMusicBrainzSuggestedCover(selected);
     } catch (error, stackTrace) {
       debugPrint(
@@ -989,6 +990,27 @@ class _EditEntityPageState extends State<EditEntityPage> {
     } finally {
       if (mounted) setState(() => _metadataSuggestionBusy = false);
     }
+  }
+
+  Future<void> _assignMusicBrainzCountryToNewArtist(
+    MusicBrainzRecordingSuggestion suggestion,
+    MediaItem item,
+  ) async {
+    final artistId = suggestion.primaryArtistId?.trim() ?? '';
+    if (artistId.isEmpty) return;
+
+    final credits = ArtistCreditParser.parse(item.subtitle);
+    final artistName = credits.primaryArtist.trim();
+    if (artistName.isEmpty) return;
+
+    final countryCode = await _controller.resolveMusicBrainzArtistCountry(
+      artistId,
+    );
+    if (!mounted || countryCode == null) return;
+    await _artistsController.assignCountryToNewArtistIfMissing(
+      artistName: artistName,
+      countryCode: countryCode,
+    );
   }
 
   Future<MusicBrainzRecordingSuggestion?> _showMusicBrainzSuggestionsSheet(

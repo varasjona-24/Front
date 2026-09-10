@@ -108,4 +108,21 @@ class MetadataSearchQueryResolverService {
       suggestions: null,
     );
   }
+
+  Future<String?> resolveArtistCountry(String artistId) async {
+    final normalizedId = artistId.trim();
+    if (normalizedId.isEmpty) return null;
+    try {
+      final response = await _client.post<Map<String, dynamic>>(
+        '/media/metadata/artist-country',
+        data: {'artistId': normalizedId},
+      );
+      final countryCode = response.data?['countryCode']?.toString().trim() ?? '';
+      return RegExp(r'^[A-Za-z]{2}$').hasMatch(countryCode)
+          ? countryCode.toUpperCase()
+          : null;
+    } catch (_) {
+      return null;
+    }
+  }
 }

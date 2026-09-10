@@ -637,6 +637,10 @@ class EditEntityController extends GetxController {
     );
   }
 
+  Future<String?> resolveMusicBrainzArtistCountry(String artistId) {
+    return _metadataQueryResolver.resolveArtistCountry(artistId);
+  }
+
   Future<List<MusicBrainzRecordingSuggestion>> _searchMusicBrainzSuggestions({
     required String title,
     required String artist,
