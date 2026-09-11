@@ -48,6 +48,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MainActivity : AudioServiceActivity() {
     private val channel = "listenfy/bluetooth_audio"
     private val mediaMetadataChannel = "listenfy/media_metadata"
+    private val androidAutoArtworkChannel = "listenfy/android_auto_artwork"
     private val spatialChannel = "listenfy/spatial_audio"
     private val openalChannel = "listenfy/openal"
     private val audioCleanupChannel = "listenfy/audio_cleanup"
@@ -81,6 +82,16 @@ class MainActivity : AudioServiceActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, androidAutoArtworkChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getArtworkProviderAuthority" -> {
+                        result.success("$packageName.android_auto_artwork")
+                    }
+                    else -> result.notImplemented()
+                }
+            }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channel)
             .setMethodCallHandler { call, result ->

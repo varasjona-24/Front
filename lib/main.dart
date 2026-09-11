@@ -88,6 +88,7 @@ Future<void> main() async {
   // 🎵 Audio global (CLAVE)
   final appAudio = AudioService();
   Get.put<AudioService>(appAudio, permanent: true);
+  await appAudio.initializeAndroidAutoArtwork();
 
   // 🔔 Background controls / lockscreen
   final handler = await aud.AudioService.init(
@@ -326,4 +327,3 @@ class _MyAppState extends State<MyApp> {
     });
   }
 }
-

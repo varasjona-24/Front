@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -17,9 +18,15 @@ import '../models/media_item.dart';
 enum PlaybackState { stopped, loading, playing, paused }
 
 class AudioService extends GetxService {
+  static const _defaultAndroidAutoArtworkAuthority =
+      'com.jv24dev.listenfy.android_auto_artwork';
+  static const MethodChannel _androidAutoArtworkChannel = MethodChannel(
+    'listenfy/android_auto_artwork',
+  );
   static const MethodChannel _widgetChannel = MethodChannel(
     'listenfy/player_widget',
   );
+  String _androidAutoArtworkAuthority = _defaultAndroidAutoArtworkAuthority;
   late final AndroidEqualizer? _androidEqualizer = Platform.isAndroid
       ? AndroidEqualizer()
       : null;
@@ -29,6 +36,21 @@ class AudioService extends GetxService {
         : AudioPipeline(androidAudioEffects: [_androidEqualizer]),
   );
   final GetStorage _storage = GetStorage();
+
+  Future<void> initializeAndroidAutoArtwork() async {
+    if (!Platform.isAndroid) return;
+
+    try {
+      final authority = await _androidAutoArtworkChannel.invokeMethod<String>(
+        'getArtworkProviderAuthority',
+      );
+      if (authority != null && authority.trim().isNotEmpty) {
+        _androidAutoArtworkAuthority = authority.trim();
+      }
+    } on PlatformException {
+      // Keep the production authority as a backwards-compatible fallback.
+    }
+  }
 
   static const _lastItemKey = 'audio_last_item';
   static const _lastVariantKey = 'audio_last_variant';
@@ -305,7 +327,17 @@ class AudioService extends GetxService {
   Uri? _resolveArtUri(MediaItem item) {
     final local = item.thumbnailLocalPath?.trim();
     if (local != null && local.isNotEmpty) {
-      return Uri.file(local);
+      // Android Auto and AAOS run outside Listenfy's process. They cannot
+      // resolve a private file:// URI, so expose persisted covers through the
+      // tightly scoped AndroidAutoArtworkProvider instead.
+      return Uri(
+        scheme: 'content',
+        host: _androidAutoArtworkAuthority,
+        pathSegments: [
+          'cover',
+          base64Url.encode(utf8.encode(local)).replaceAll('=', ''),
+        ],
+      );
     }
 
     final remote = item.thumbnail?.trim();
